@@ -32,7 +32,9 @@ pub fn create_overlay(app: AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
+    // Use App URL — Tauri injects IPC bridge properly
     let url = WebviewUrl::App("overlay.html".into());
+
     let overlay = WebviewWindowBuilder::new(&app, "overlay", url)
         .title("")
         .transparent(true)

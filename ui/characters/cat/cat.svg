@@ -1,27 +1,27 @@
-<svg viewBox="0 0 56 64" xmlns="http://www.w3.org/2000/svg">
-  <!-- Ears -->
-  <polygon points="12,20 8,4 20,16" fill="#4a4a5a" stroke="#3a3a4a" stroke-width="1"/>
-  <polygon points="44,20 48,4 36,16" fill="#4a4a5a" stroke="#3a3a4a" stroke-width="1"/>
-  <!-- Inner ears -->
-  <polygon points="13,18 10,8 19,16" fill="#ff9eb5" opacity="0.6"/>
-  <polygon points="43,18 46,8 37,16" fill="#ff9eb5" opacity="0.6"/>
-  <!-- Head -->
-  <ellipse cx="28" cy="30" rx="18" ry="16" fill="#4a4a5a" stroke="#3a3a4a" stroke-width="1.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
   <!-- Body -->
-  <ellipse cx="28" cy="50" rx="14" ry="12" fill="#4a4a5a" stroke="#3a3a4a" stroke-width="1.5"/>
+  <ellipse class="body" cx="32" cy="42" rx="16" ry="14" fill="#333" stroke="#222" stroke-width="1"/>
+  <!-- Head -->
+  <circle class="head" cx="32" cy="24" r="12" fill="#333" stroke="#222" stroke-width="1"/>
+  <!-- Ears -->
+  <polygon class="ear ear-left" points="22,16 20,4 28,12" fill="#333" stroke="#222" stroke-width="1"/>
+  <polygon class="ear ear-right" points="42,16 44,4 36,12" fill="#333" stroke="#222" stroke-width="1"/>
+  <!-- Inner ears -->
+  <polygon class="ear-inner ear-inner-left" points="23,14 22,7 27,12" fill="#ff9999" fill-opacity="0.5"/>
+  <polygon class="ear-inner ear-inner-right" points="41,14 42,7 37,12" fill="#ff9999" fill-opacity="0.5"/>
   <!-- Eyes -->
-  <ellipse cx="21" cy="28" rx="4" ry="4.5" fill="#a8e6cf" class="eye eye-left"/>
-  <ellipse cx="35" cy="28" rx="4" ry="4.5" fill="#a8e6cf" class="eye eye-right"/>
+  <ellipse class="eye eye-left" cx="27" cy="23" rx="3" ry="4" fill="#66ff66"/>
+  <ellipse class="eye eye-right" cx="37" cy="23" rx="3" ry="4" fill="#66ff66"/>
   <!-- Pupils -->
-  <ellipse cx="21" cy="28" rx="2" ry="3" fill="#1a1a2a"/>
-  <ellipse cx="35" cy="28" rx="2" ry="3" fill="#1a1a2a"/>
+  <ellipse class="pupil pupil-left" cx="27" cy="23" rx="1.5" ry="3" fill="#111"/>
+  <ellipse class="pupil pupil-right" cx="37" cy="23" rx="1.5" ry="3" fill="#111"/>
   <!-- Nose -->
-  <ellipse cx="28" cy="34" rx="2" ry="1.5" fill="#ff9eb5"/>
+  <ellipse class="nose" cx="32" cy="28" rx="2" ry="1.5" fill="#ff9999"/>
   <!-- Whiskers -->
-  <line x1="6" y1="32" x2="18" y2="33" stroke="#6a6a7a" stroke-width="0.8"/>
-  <line x1="6" y1="36" x2="18" y2="35" stroke="#6a6a7a" stroke-width="0.8"/>
-  <line x1="38" y1="33" x2="50" y2="32" stroke="#6a6a7a" stroke-width="0.8"/>
-  <line x1="38" y1="35" x2="50" y2="36" stroke="#6a6a7a" stroke-width="0.8"/>
+  <line class="whisker whisker-left-top" x1="18" y1="27" x2="26" y2="28" stroke="#666" stroke-width="0.5"/>
+  <line class="whisker whisker-left-bottom" x1="18" y1="30" x2="26" y2="30" stroke="#666" stroke-width="0.5"/>
+  <line class="whisker whisker-right-top" x1="38" y1="28" x2="46" y2="27" stroke="#666" stroke-width="0.5"/>
+  <line class="whisker whisker-right-bottom" x1="38" y1="30" x2="46" y2="30" stroke="#666" stroke-width="0.5"/>
   <!-- Tail -->
-  <path d="M42 50 C50 45 54 55 48 58" fill="none" stroke="#4a4a5a" stroke-width="3" stroke-linecap="round"/>
+  <path class="tail" d="M48 42 Q56 30 50 20" fill="none" stroke="#333" stroke-width="4" stroke-linecap="round"/>
 </svg>

@@ -2,7 +2,7 @@
 # Changes are hot-reloaded (no restart needed).
 
 # HTTP port for hook pushes (POST /event) and state queries (GET /state)
-http_port: 3334
+http_port: 3335
 
 # Log level: trace, debug, info, warn, error
 log_level: info
@@ -14,12 +14,12 @@ log_level: info
 sources:
   kiro-ide:
     scanner: "python3 sources/kiro-ide/scan.py"
-    interval_sec: 5
+    interval_sec: 60
     hook: true
     enabled: true
   kiro-crew:
     scanner: "python3 sources/kiro-crew/scan.py"
-    interval_sec: 10
+    interval_sec: 60
     hook: false
     enabled: true
   # kiro-cli:
@@ -48,13 +48,13 @@ attention_rules:
 panel_order:
   - on-screen
   - kiro-cli
-  - crew
+  - kiro-crew
   - kiro-ide
 
 # ─── Default Characters ──────────────────────────────────────────────────────
 # Map source → default character ID for new sessions from that source.
 
 characters:
-  crew: ghost
+  kiro-crew: ghost
   kiro-cli: cat
   kiro-ide: ghost

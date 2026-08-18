@@ -50,6 +50,31 @@ body {
   color: var(--accent);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overlay-edit-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.overlay-edit-btn:hover {
+  background: var(--bg-group);
+}
+
+.overlay-edit-btn.active {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+}
+
 .session-count {
   font-size: 11px;
   color: var(--text-secondary);
@@ -105,15 +130,21 @@ body {
 
 /* Sessions */
 .group-sessions {
-  padding: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
 }
 
 .session {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  width: 44px;
+  padding: 4px;
   border-radius: 6px;
+  cursor: default;
   transition: background 0.15s;
 }
 
@@ -123,12 +154,12 @@ body {
 
 .session-attention {
   background: var(--attention-glow);
-  border-left: 2px solid var(--attention);
+  border: 1px solid var(--attention);
 }
 
 .session-char {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
 }
 
@@ -137,20 +168,62 @@ body {
   height: 100%;
 }
 
+.session-name-short {
+  font-size: 8px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 42px;
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* Tooltip on hover */
+.session-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 180px;
+  max-width: 240px;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.session:hover .session-tooltip {
+  display: block;
+}
+
+.tooltip-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.tooltip-row {
+  font-size: 9px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.tooltip-row span {
+  color: var(--text-primary);
+}
+
 .session-info {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.session-name {
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .session-meta {

@@ -12,12 +12,14 @@
 use crate::config::ConfigHandle;
 use crate::state::{Session, SessionStore};
 use log::{debug, error, info, warn};
+use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
 /// Start the scanner orchestrator (background thread per source).
-pub fn start(store: SessionStore, config: ConfigHandle) {
+/// `project_root` is used as CWD when spawning scanner commands.
+pub fn start(store: SessionStore, config: ConfigHandle, project_root: PathBuf) {
     let cfg = config.get();
 
     for (source_id, source_cfg) in &cfg.sources {
@@ -37,17 +39,33 @@ pub fn start(store: SessionStore, config: ConfigHandle) {
         let interval = Duration::from_secs(source_cfg.interval_sec);
         let store = store.clone();
         let source_id = source_id.clone();
+        let root = project_root.clone();
 
         thread::spawn(move || {
             info!(
-                "[scanner] {} started (every {}s): {}",
+                "[scanner] {} started (every {}s, cwd={:?}): {}",
                 source_id,
                 interval.as_secs(),
+                root,
                 scanner_cmd
             );
 
+            // Scan immediately at startup
+            match run_scanner(&scanner_cmd, &source_id, &root) {
+                Ok(sessions) => {
+                    let count = sessions.len();
+                    store.push_sessions(sessions);
+                    info!("[scanner] {} initial scan: {} sessions", source_id, count);
+                }
+                Err(e) => {
+                    warn!("[scanner] {} initial scan error: {}", source_id, e);
+                }
+            }
+
+            // Then periodically
             loop {
-                match run_scanner(&scanner_cmd, &source_id) {
+                thread::sleep(interval);
+                match run_scanner(&scanner_cmd, &source_id, &root) {
                     Ok(sessions) => {
                         let count = sessions.len();
                         store.push_sessions(sessions);
@@ -57,17 +75,16 @@ pub fn start(store: SessionStore, config: ConfigHandle) {
                         warn!("[scanner] {} error: {}", source_id, e);
                     }
                 }
-                thread::sleep(interval);
             }
         });
     }
 }
 
 /// Run a scanner command and parse JSON output.
-fn run_scanner(cmd: &str, source_id: &str) -> Result<Vec<Session>, String> {
-    // Split command for shell execution
+fn run_scanner(cmd: &str, source_id: &str, cwd: &PathBuf) -> Result<Vec<Session>, String> {
     let output = Command::new("sh")
         .args(["-c", cmd])
+        .current_dir(cwd)
         .output()
         .map_err(|e| format!("failed to spawn: {}", e))?;
 

@@ -51,10 +51,10 @@ def discover() -> list[dict]:
 
         sessions.append({
             "id": f"crew-{session_key}",
-            "source": "crew",
+            "source": "kiro-crew",
             "name": title[:50],
             "workspace": "",
-            "group": "crew",
+            "group": "kiro-crew",
             "active": True,
             "event": None,
             "attention_source": None,

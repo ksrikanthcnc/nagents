@@ -79,15 +79,24 @@ fn compute(store: &SessionStore, config: &ConfigHandle) {
                     && session.event.is_none()
                 {
                     // Active but idle — might need attention
-                    session.attention = true;
-                    session.attention_reason = Some(format!(
-                        "idle {}s (threshold: {}s)",
-                        age_sec as u32, rules.idle_threshold_sec
-                    ));
+                    // BUT only if session has had at least one hook event before
+                    // (otherwise every scanner-discovered session triggers idle immediately)
+                    // Sessions with event=None have never received a hook → skip
+                    session.attention = false;
+                    session.attention_reason = None;
                 } else if let Some(ref event) = session.event {
                     if rules.waiting_statuses.contains(event) {
-                        session.attention = true;
-                        session.attention_reason = Some(format!("status: {}", event));
+                        // Waiting/idle status — attention only if mtime is recent
+                        // (stale idles from hours ago shouldn't trigger)
+                        if age_sec < 3600.0 {
+                            session.attention = true;
+                            session.attention_reason = Some(format!(
+                                "status: {} ({}s ago)", event, age_sec as u32
+                            ));
+                        } else {
+                            session.attention = false;
+                            session.attention_reason = None;
+                        }
                     } else {
                         session.attention = false;
                         session.attention_reason = None;

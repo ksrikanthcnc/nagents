@@ -32,6 +32,18 @@ html, body {
   transition: filter 0.3s;
 }
 
+.overlay-char-source {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(167, 139, 250, 0.9);
+  text-align: center;
+  pointer-events: none;
+  margin-bottom: 1px;
+}
+
 .overlay-char-svg {
   width: 100%;
   height: 100%;
@@ -46,10 +58,49 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 9px;
   color: #e8e8f0;
-  background: rgba(26, 26, 46, 0.8);
-  padding: 1px 6px;
+  background: rgba(26, 26, 46, 0.85);
+  padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
   margin-top: 2px;
   pointer-events: none;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+/* Following cursor — glowing, bouncy */
+.char-following {
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
+}
+
+.char-following .overlay-char-svg {
+  animation: char-bob 2s ease-in-out infinite;
+}
+
+.char-following .overlay-char-label {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+
+/* Roaming — subtle, faded */
+.char-roaming {
+  opacity: 0.7;
+  filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.4));
+}
+
+.char-roaming .overlay-char-svg {
+  animation: char-float 4s ease-in-out infinite;
+}
+
+@keyframes char-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes char-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(-1deg); }
+  75% { transform: translateY(-2px) rotate(1deg); }
 }

@@ -28,6 +28,35 @@ fn get_config(config: tauri::State<'_, ConfigHandle>) -> config::Config {
     config.get()
 }
 
+/// Tauri command: toggle overlay visibility and push attention sessions to it.
+#[tauri::command]
+fn toggle_overlay(app: tauri::AppHandle, store: tauri::State<'_, SessionStore>) -> Result<bool, String> {
+    // Check if overlay exists and is visible
+    let overlay_visible = app.get_webview_window("overlay")
+        .map(|w| w.is_visible().unwrap_or(false))
+        .unwrap_or(false);
+
+    if overlay_visible {
+        overlay::hide_overlay(app)?;
+        // Clear on_overlay flags
+        store.update_all(|sessions| {
+            for s in sessions.values_mut() {
+                s.on_overlay = false;
+            }
+        });
+        Ok(false)
+    } else {
+        overlay::create_overlay(app)?;
+        // Mark attention sessions as on_overlay
+        store.update_all(|sessions| {
+            for s in sessions.values_mut() {
+                s.on_overlay = s.attention;
+            }
+        });
+        Ok(true)
+    }
+}
+
 pub fn run() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -38,6 +67,20 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .on_window_event(|window, event| {
+            // Only exit app when the main panel window is closed
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if window.label() == "main" {
+                    // Main closed → exit entire app (kills server, scanners, vite)
+                    info!("[nagents] main window closed, exiting");
+                    std::process::exit(0);
+                }
+                // Overlay close → just hide it (don't destroy)
+                if window.label() == "overlay" {
+                    let _ = window.hide();
+                }
+            }
+        })
         .setup(|app| {
             // Resolve config path (project root / config.yaml)
             let config_path = resolve_config_path(app);
@@ -52,13 +95,26 @@ pub fn run() {
             server::start(store.clone(), http_port);
 
             // Start scanner orchestrator (spawns source executables)
-            scanner::start(store.clone(), config.clone());
+            let project_root = config_path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+            scanner::start(store.clone(), config.clone(), project_root);
 
             // Start attention computation loop
             attention::start(store.clone(), config.clone());
 
             // Start cursor broadcast for overlay
             overlay::start_cursor_broadcast(app.handle().clone());
+
+            // Create overlay window at startup (always exists, shows chars when attention)
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                // Wait for Vite dev server to be ready
+                std::thread::sleep(std::time::Duration::from_secs(5));
+                if let Err(e) = overlay::create_overlay(app_handle) {
+                    log::warn!("[nagents] overlay creation failed: {}", e);
+                } else {
+                    info!("[nagents] overlay window created");
+                }
+            });
 
             // Register managed state for Tauri commands
             app.manage(store);
@@ -70,6 +126,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_state,
             get_config,
+            toggle_overlay,
             overlay::create_overlay,
             overlay::hide_overlay,
             overlay::set_overlay_clickthrough,

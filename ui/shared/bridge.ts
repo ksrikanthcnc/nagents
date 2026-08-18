@@ -29,7 +29,7 @@ async function tauriListen(event: string, handler: (payload: any) => void): Prom
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-const HTTP_BASE = "http://127.0.0.1:3334";
+const HTTP_BASE = "http://127.0.0.1:3335";
 
 /** Fetch full state snapshot. */
 export async function getState(): Promise<StateSnapshot> {
@@ -76,6 +76,13 @@ export async function hideOverlay(): Promise<void> {
   }
 }
 
+export async function toggleOverlay(): Promise<boolean> {
+  if (isTauri()) {
+    return tauriInvoke<boolean>("toggle_overlay");
+  }
+  return false;
+}
+
 export async function setOverlayClickthrough(ignore: boolean): Promise<void> {
   if (isTauri()) {
     await tauriInvoke("set_overlay_clickthrough", { ignore });
@@ -89,18 +96,24 @@ export async function onCursorMove(
   handler: (pos: CursorPosition) => void
 ): Promise<() => void> {
   if (isTauri()) {
-    return tauriListen("nagents:cursor", handler);
+    try {
+      return await tauriListen("nagents:cursor", handler);
+    } catch (e) {
+      console.warn("[bridge] Tauri cursor listen failed, using HTTP fallback:", e);
+    }
   }
-  // Fallback: poll /cursor
+  // Fallback: poll /cursor via HTTP
   let active = true;
   const poll = async () => {
     while (active) {
       try {
         const resp = await fetch(`${HTTP_BASE}/cursor`);
-        const pos = await resp.json();
-        handler(pos);
+        if (resp.ok) {
+          const pos = await resp.json();
+          handler(pos);
+        }
       } catch {
-        // ignore
+        // server not ready yet, retry
       }
       await new Promise((r) => setTimeout(r, 33));
     }

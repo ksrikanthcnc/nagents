@@ -15,12 +15,14 @@
 import type { Session, SessionGroup, StateSnapshot, Config } from "../shared/types";
 import { pollState, getConfig, log } from "../shared/bridge";
 import { getCharacter } from "../characters/registry";
+import { setOverlayClickthrough } from "../shared/bridge";
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
 let currentState: StateSnapshot | null = null;
 let config: Config | null = null;
 let container: HTMLElement | null = null;
+let overlayInteractive = false;
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
@@ -49,7 +51,12 @@ function render(): void {
 
   let html = `<header class="panel-header">
     <h1>nagents</h1>
-    <span class="session-count">${currentState.count}</span>
+    <div class="header-actions">
+      <button class="overlay-edit-btn ${overlayInteractive ? "active" : ""}" id="overlay-edit-btn" title="Toggle overlay interaction (move/drag chars)">
+        ${overlayInteractive ? "✋" : "👆"}
+      </button>
+      <span class="session-count">${currentState.count}</span>
+    </div>
   </header>`;
 
   html += `<div class="panel-groups">`;
@@ -83,29 +90,56 @@ function render(): void {
   </footer>`;
 
   container.innerHTML = html;
+
+  // Attach overlay edit toggle handler
+  const editBtn = container.querySelector("#overlay-edit-btn");
+  if (editBtn) {
+    editBtn.addEventListener("click", async () => {
+      overlayInteractive = !overlayInteractive;
+      try {
+        // When interactive: overlay accepts clicks (move/drag chars)
+        // When not: overlay is click-through (normal desktop use)
+        await setOverlayClickthrough(!overlayInteractive);
+        log("panel", `overlay interactive: ${overlayInteractive}`);
+        render();
+      } catch (e) {
+        log("panel", `overlay edit toggle error: ${e}`);
+      }
+    });
+  }
 }
 
 function renderSession(session: Session): string {
   const char = getCharacter(session.character ?? "ghost");
   const attentionClass = session.attention ? "session-attention" : "";
-  const overlayBadge = session.on_overlay ? `<span class="overlay-badge" title="On overlay">👆</span>` : "";
-  const eventLabel = session.event ? `<span class="event-label">${session.event}</span>` : "";
-  const toolLabel = session.tool ? `<span class="tool-label">${session.tool}</span>` : "";
 
   // Determine action for character animation
   const action = sessionToAction(session);
   const actionDef = char.actions[action];
   const animClass = actionDef?.cssClass ?? "";
 
-  return `<div class="session ${attentionClass}" data-id="${session.id}" title="${session.name}\n${session.workspace || ""}\n${session.attention_reason || ""}">
+  // Short name for under the char
+  const shortName = session.name.length > 6 ? session.name.slice(0, 6) : session.name;
+
+  // Tooltip content
+  const workspace = session.workspace ? `<div class="tooltip-row">workspace: <span>${session.workspace}</span></div>` : "";
+  const event = session.event ? `<div class="tooltip-row">event: <span>${session.event}</span></div>` : "";
+  const tool = session.tool ? `<div class="tooltip-row">tool: <span>${session.tool}</span></div>` : "";
+  const file = session.file ? `<div class="tooltip-row">file: <span>${session.file}</span></div>` : "";
+  const attention = session.attention ? `<div class="tooltip-row">attention: <span>${session.attention_reason || "yes"}</span></div>` : "";
+  const tokens = session.tokens > 0 ? `<div class="tooltip-row">tokens: <span>${(session.tokens / 1000).toFixed(0)}k / ${(session.maxTokens / 1000).toFixed(0)}k</span></div>` : "";
+  const overlay = session.on_overlay ? `<div class="tooltip-row">on overlay: <span>yes</span></div>` : "";
+
+  return `<div class="session ${attentionClass}" data-id="${session.id}">
     <div class="session-char ${animClass}">
       ${char.svg}
     </div>
-    <div class="session-info">
-      <span class="session-name">${session.name}</span>
-      <span class="session-meta">
-        ${eventLabel}${toolLabel}${overlayBadge}
-      </span>
+    <div class="session-name-short">${shortName}</div>
+    <div class="session-tooltip">
+      <div class="tooltip-title">${session.name}</div>
+      ${workspace}${event}${tool}${file}${attention}${tokens}${overlay}
+      <div class="tooltip-row">source: <span>${session.source}</span></div>
+      <div class="tooltip-row">group: <span>${session.group}</span></div>
     </div>
   </div>`;
 }
@@ -187,7 +221,7 @@ function sourceLabel(source: string): string {
   switch (source) {
     case "kiro-ide": return "IDE";
     case "kiro-cli": return "CLI";
-    case "crew": return "Crew";
+    case "kiro-crew": return "Crew";
     default: return source;
   }
 }
