@@ -21,6 +21,9 @@ Thumbs.db
 # Temp
 tmp-kiro/
 
+# Event persistence (debug cache)
+data/events/
+
 # Python
 __pycache__/
 *.pyc

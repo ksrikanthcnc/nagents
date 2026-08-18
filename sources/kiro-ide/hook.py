@@ -43,11 +43,6 @@ def main():
         log(f"failed to read stdin: {e}")
         sys.exit(0)
 
-    # Debug: log raw payload to file
-    debug_file = Path("/tmp/nagents-hook-debug.log")
-    with open(debug_file, "a") as f:
-        f.write(f"[{time.strftime('%H:%M:%S')}] {raw[:300]}\n")
-
     trigger = payload.get("hook_event_name", "") or payload.get("trigger", "")
     session_id = payload.get("session_id", "") or payload.get("sessionId", "")
 
@@ -112,7 +107,7 @@ def translate(trigger: str, payload: dict) -> dict | None:
         return {
             "session_id": session_id,
             "event": "running",
-            "attention": False,
+            "attention": None,  # Don't override attention — let it stay, just change mode
             "mtime": time.time(),
         }
     else:

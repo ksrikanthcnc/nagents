@@ -55,47 +55,32 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   container = el;
   log("overlay", "initializing");
 
-  // Debug: show status on screen
-  const dbg = document.getElementById("debug-dot");
-
-  // Use HTTP polling for cursor (reliable across all window types)
-  let cursorActive = true;
-  const dbgDot = document.getElementById("debug-dot");
+  // Poll cursor position from HTTP endpoint (~30fps)
   const pollCursor = async () => {
-    while (cursorActive) {
+    while (true) {
       try {
         const resp = await fetch("http://127.0.0.1:3335/cursor");
         if (resp.ok) {
           cursor = await resp.json();
-          // Debug: move dot to cursor position
-          if (dbgDot) {
-            dbgDot.style.left = `${cursor.x}px`;
-            dbgDot.style.top = `${cursor.y}px`;
-          }
         }
       } catch {
         // server not ready
       }
-      await new Promise((r) => setTimeout(r, 33)); // ~30fps
+      await new Promise((r) => setTimeout(r, 33));
     }
   };
   pollCursor();
-  log("overlay", "cursor polling started (HTTP /cursor)");
+  log("overlay", "cursor polling started");
 
   // Poll state — show chars that have attention
   pollState((state) => {
     const showSessions = state.sessions.filter((s) => s.attention);
-    if (dbg) {
-      dbg.title = `sessions=${state.count} attention=${showSessions.length}`;
-      if (showSessions.length > 0) dbg.style.background = "lime";
-    }
     syncChars(showSessions);
   }, 1000);
 
   // Start render loop
   startRenderLoop();
   log("overlay", "render loop started");
-  if (dbg) dbg.style.background = "blue"; // blue = init complete
 }
 
 // ─── Sync chars with backend state ──────────────────────────────────────────

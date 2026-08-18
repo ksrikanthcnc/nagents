@@ -1,4 +1,4 @@
-/* Panel — Control Center styles */
+/* Panel — Control Center */
 
 :root {
   --bg-primary: #1a1a2e;
@@ -6,20 +6,17 @@
   --bg-group: #0f3460;
   --text-primary: #e8e8f0;
   --text-secondary: #a0a0b8;
+  --text-muted: #6a6a8a;
   --accent: #a78bfa;
   --accent-glow: rgba(167, 139, 250, 0.3);
   --attention: #f59e0b;
-  --attention-glow: rgba(245, 158, 11, 0.3);
+  --attention-glow: rgba(245, 158, 11, 0.15);
   --success: #4ade80;
   --border: #2a2a4a;
   --radius: 8px;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -31,12 +28,12 @@ body {
   min-height: 100vh;
 }
 
-/* Header */
+/* Header — minimal, no title (title bar has it) */
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -44,52 +41,28 @@ body {
   z-index: 10;
 }
 
-.panel-header h1 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.session-count {
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
 .overlay-edit-btn {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 3px 7px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.15s;
 }
-
-.overlay-edit-btn:hover {
-  background: var(--bg-group);
-}
-
-.overlay-edit-btn.active {
-  background: var(--accent-glow);
-  border-color: var(--accent);
-}
-
-.session-count {
-  font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  padding: 2px 8px;
-  border-radius: 10px;
-}
+.overlay-edit-btn:hover { background: var(--bg-group); }
+.overlay-edit-btn.active { background: var(--accent-glow); border-color: var(--accent); }
 
 /* Groups */
-.panel-groups {
-  padding: 8px;
-}
+.panel-groups { padding: 6px; }
 
 .group {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -99,7 +72,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: var(--bg-secondary);
   cursor: pointer;
   user-select: none;
@@ -107,8 +80,7 @@ body {
 
 .group-label {
   font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
+  font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   flex: 1;
@@ -116,7 +88,7 @@ body {
 
 .group-count {
   font-size: 10px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .attention-badge {
@@ -124,16 +96,16 @@ body {
   font-weight: 700;
   color: var(--attention);
   background: var(--attention-glow);
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 8px;
 }
 
-/* Sessions */
+/* Sessions grid */
 .group-sessions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 8px 10px;
 }
 
 .session {
@@ -141,42 +113,53 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 44px;
-  padding: 4px;
-  border-radius: 6px;
+  width: 64px;
+  padding: 6px 4px;
+  border-radius: 8px;
   cursor: default;
   transition: background 0.15s;
 }
 
-.session:hover {
-  background: var(--bg-secondary);
-}
+.session:hover { background: var(--bg-secondary); }
 
 .session-attention {
   background: var(--attention-glow);
-  border: 1px solid var(--attention);
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
+/* Character SVG — bigger */
 .session-char {
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
 }
-
 .session-char svg {
   width: 100%;
   height: 100%;
 }
 
-.session-name-short {
-  font-size: 8px;
-  color: var(--text-secondary);
+/* Session name */
+.session-name {
+  font-size: 9px;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 42px;
+  max-width: 60px;
   text-align: center;
-  margin-top: 2px;
+  margin-top: 3px;
+}
+
+/* Event/tool status below name */
+.session-status {
+  font-size: 8px;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+  text-align: center;
+  margin-top: 1px;
 }
 
 /* Tooltip on hover */
@@ -190,16 +173,14 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 10px;
-  min-width: 180px;
-  max-width: 240px;
+  min-width: 160px;
+  max-width: 220px;
   z-index: 100;
   pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-.session:hover .session-tooltip {
-  display: block;
-}
+.session:hover .session-tooltip { display: block; }
 
 .tooltip-title {
   font-size: 11px;
@@ -213,65 +194,14 @@ body {
   color: var(--text-secondary);
   margin-bottom: 2px;
 }
-
-.tooltip-row span {
-  color: var(--text-primary);
-}
-
-.session-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.session-meta {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.event-label {
-  font-size: 9px;
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: var(--bg-group);
-  color: var(--text-secondary);
-}
-
-.tool-label {
-  font-size: 9px;
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: var(--accent-glow);
-  color: var(--accent);
-}
-
-.overlay-badge {
-  font-size: 10px;
-}
-
-/* Footer */
-.panel-footer {
-  padding: 8px 16px;
-  border-top: 1px solid var(--border);
-  position: sticky;
-  bottom: 0;
-  background: var(--bg-primary);
-}
-
-.timestamp {
-  font-size: 9px;
-  color: var(--text-secondary);
-}
+.tooltip-row span { color: var(--text-primary); }
 
 /* Empty state */
 .panel-groups:empty::after {
-  content: "No sessions detected. Waiting for scanners...";
+  content: "Waiting for sessions...";
   display: block;
   text-align: center;
   padding: 40px 20px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-style: italic;
 }

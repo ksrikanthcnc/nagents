@@ -58,7 +58,7 @@ pub struct Session {
 }
 
 /// Event update from hooks (partial update).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EventUpdate {
     pub session_id: String,
     #[serde(default)]
@@ -225,7 +225,20 @@ impl SessionStore {
         }
         if let Some(attention) = update.attention {
             session.attention_source = Some(attention);
+            // Immediately apply attention change (don't wait for 5s loop)
+            session.attention = attention;
+            if !attention {
+                session.attention_reason = None;
+                session.attention_since = None;
+                session.on_overlay = false;
+            } else {
+                session.attention_reason = Some("source".into());
+                if session.attention_since.is_none() {
+                    session.attention_since = Some(now_epoch());
+                }
+            }
         }
+        // attention=None in update → don't touch attention_source (leave as is)
         if let Some(ref tool) = update.tool {
             session.tool = Some(tool.clone());
         }

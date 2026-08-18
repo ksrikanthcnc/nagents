@@ -17,6 +17,9 @@ use log::{debug, error, info};
 use std::thread;
 use tiny_http::{Header, Request, Response, Server};
 
+/// Directory for persisted hook events (debug + cache)
+const EVENTS_DIR: &str = "data/events";
+
 /// Start the HTTP server on the given port (background thread).
 pub fn start(store: SessionStore, port: u16) {
     let addr = format!("127.0.0.1:{}", port);
@@ -149,8 +152,45 @@ fn handle_event(mut request: Request, store: &SessionStore) {
         "[server] POST /event: {} → event={:?}",
         update.session_id, update.event
     );
+
+    // Persist event to disk for debugging and cache
+    persist_event(&update);
+
     store.push_event(update);
     respond_json(request, 200, r#"{"ok":true}"#);
+}
+
+/// Write event to data/events/<session_id>.jsonl for persistence/debugging.
+fn persist_event(update: &EventUpdate) {
+    use std::fs;
+    use std::io::Write;
+    use std::path::Path;
+
+    let project_root = if cfg!(debug_assertions) {
+        let manifest = env!("CARGO_MANIFEST_DIR");
+        Path::new(manifest).parent().unwrap_or(Path::new(".")).to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default()
+    };
+
+    let events_dir = project_root.join(EVENTS_DIR);
+    if fs::create_dir_all(&events_dir).is_err() {
+        return;
+    }
+
+    let file_path = events_dir.join(format!("{}.jsonl", update.session_id));
+    let line = match serde_json::to_string(update) {
+        Ok(j) => j,
+        Err(_) => return,
+    };
+
+    if let Ok(mut file) = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_path)
+    {
+        let _ = writeln!(file, "{}", line);
+    }
 }
 
 fn respond_json(request: Request, status: u16, body: &str) {

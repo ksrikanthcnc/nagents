@@ -2,20 +2,14 @@
  * Panel — Control center.
  *
  * Shows all sessions grouped by source/workspace.
- * Sessions with attention get highlighted.
- * Sessions on overlay get a badge.
- *
- * Groups (in config order):
- *   - on-screen: sessions currently on overlay (duplicated here for visibility)
- *   - kiro-cli: CLI sessions
- *   - crew: Kiro Crew sessions
- *   - kiro-ide: IDE sessions (sub-grouped by workspace)
+ * On-screen (overlay) chars shown at top.
+ * Each char shows event/tool/action below its name.
  */
 
 import type { Session, SessionGroup, StateSnapshot, Config } from "../shared/types";
-import { pollState, getConfig, log } from "../shared/bridge";
+import { pollState, getConfig, setOverlayClickthrough, log } from "../shared/bridge";
 import { getCharacter } from "../characters/registry";
-import { setOverlayClickthrough } from "../shared/bridge";
+import type { CharacterAction } from "../characters/types";
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -33,7 +27,6 @@ export async function initPanel(el: HTMLElement): Promise<void> {
   config = await getConfig();
   log("panel", "config loaded", config);
 
-  // Start polling state
   pollState((state) => {
     currentState = state;
     render();
@@ -49,14 +42,12 @@ function render(): void {
 
   const groups = groupSessions(currentState.sessions, config.panel_order);
 
+  // Header: just count + edit button (title bar already says "nagents")
   let html = `<header class="panel-header">
-    <h1>nagents</h1>
-    <div class="header-actions">
-      <button class="overlay-edit-btn ${overlayInteractive ? "active" : ""}" id="overlay-edit-btn" title="Toggle overlay interaction (move/drag chars)">
-        ${overlayInteractive ? "✋" : "👆"}
-      </button>
-      <span class="session-count">${currentState.count}</span>
-    </div>
+    <span class="session-count">${currentState.count} sessions</span>
+    <button class="overlay-edit-btn ${overlayInteractive ? "active" : ""}" id="overlay-edit-btn" title="Edit overlay (move/drag chars)">
+      ${overlayInteractive ? "✋" : "👆"}
+    </button>
   </header>`;
 
   html += `<div class="panel-groups">`;
@@ -70,8 +61,8 @@ function render(): void {
     html += `<div class="group" data-group="${group.id}">
       <div class="group-header">
         <span class="group-label">${group.label}</span>
-        <span class="group-count">${group.sessions.length}</span>
         ${attentionBadge}
+        <span class="group-count">${group.sessions.length}</span>
       </div>
       <div class="group-sessions">`;
 
@@ -84,11 +75,6 @@ function render(): void {
 
   html += `</div>`;
 
-  // Footer
-  html += `<footer class="panel-footer">
-    <span class="timestamp">Updated: ${new Date(currentState.timestamp * 1000).toLocaleTimeString()}</span>
-  </footer>`;
-
   container.innerHTML = html;
 
   // Attach overlay edit toggle handler
@@ -97,8 +83,6 @@ function render(): void {
     editBtn.addEventListener("click", async () => {
       overlayInteractive = !overlayInteractive;
       try {
-        // When interactive: overlay accepts clicks (move/drag chars)
-        // When not: overlay is click-through (normal desktop use)
         await setOverlayClickthrough(!overlayInteractive);
         log("panel", `overlay interactive: ${overlayInteractive}`);
         render();
@@ -113,39 +97,42 @@ function renderSession(session: Session): string {
   const char = getCharacter(session.character ?? "ghost");
   const attentionClass = session.attention ? "session-attention" : "";
 
-  // Determine action for character animation
   const action = sessionToAction(session);
   const actionDef = char.actions[action];
   const animClass = actionDef?.cssClass ?? "";
 
-  // Short name for under the char
-  const shortName = session.name.length > 6 ? session.name.slice(0, 6) : session.name;
+  // Name (truncated)
+  const name = session.name.length > 12 ? session.name.slice(0, 11) + "…" : session.name;
+
+  // Status line: event · tool
+  let status = "";
+  if (session.tool) {
+    status = session.tool;
+  } else if (session.event) {
+    status = session.event;
+  }
 
   // Tooltip content
-  const workspace = session.workspace ? `<div class="tooltip-row">workspace: <span>${session.workspace}</span></div>` : "";
-  const event = session.event ? `<div class="tooltip-row">event: <span>${session.event}</span></div>` : "";
-  const tool = session.tool ? `<div class="tooltip-row">tool: <span>${session.tool}</span></div>` : "";
-  const file = session.file ? `<div class="tooltip-row">file: <span>${session.file}</span></div>` : "";
-  const attention = session.attention ? `<div class="tooltip-row">attention: <span>${session.attention_reason || "yes"}</span></div>` : "";
-  const tokens = session.tokens > 0 ? `<div class="tooltip-row">tokens: <span>${(session.tokens / 1000).toFixed(0)}k / ${(session.maxTokens / 1000).toFixed(0)}k</span></div>` : "";
-  const overlay = session.on_overlay ? `<div class="tooltip-row">on overlay: <span>yes</span></div>` : "";
+  const tooltipParts: string[] = [];
+  tooltipParts.push(`<div class="tooltip-title">${session.name}</div>`);
+  if (session.workspace) tooltipParts.push(`<div class="tooltip-row">${session.workspace}</div>`);
+  if (session.event) tooltipParts.push(`<div class="tooltip-row">event: <span>${session.event}</span></div>`);
+  if (session.tool) tooltipParts.push(`<div class="tooltip-row">tool: <span>${session.tool}</span></div>`);
+  if (session.file) tooltipParts.push(`<div class="tooltip-row">file: <span>${session.file}</span></div>`);
+  if (session.attention_reason) tooltipParts.push(`<div class="tooltip-row">attention: <span>${session.attention_reason}</span></div>`);
+  if (session.tokens > 0) tooltipParts.push(`<div class="tooltip-row">tokens: <span>${(session.tokens / 1000).toFixed(0)}k/${(session.maxTokens / 1000).toFixed(0)}k</span></div>`);
 
   return `<div class="session ${attentionClass}" data-id="${session.id}">
     <div class="session-char ${animClass}">
       ${char.svg}
     </div>
-    <div class="session-name-short">${shortName}</div>
-    <div class="session-tooltip">
-      <div class="tooltip-title">${session.name}</div>
-      ${workspace}${event}${tool}${file}${attention}${tokens}${overlay}
-      <div class="tooltip-row">source: <span>${session.source}</span></div>
-      <div class="tooltip-row">group: <span>${session.group}</span></div>
-    </div>
+    <div class="session-name">${name}</div>
+    ${status ? `<div class="session-status">${status}</div>` : ""}
+    <div class="session-tooltip">${tooltipParts.join("")}</div>
   </div>`;
 }
 
-/** Map session state to character action. */
-function sessionToAction(session: Session): import("../characters/types").CharacterAction {
+function sessionToAction(session: Session): CharacterAction {
   if (session.attention) return "alert";
   if (session.event === "running") return "think";
   if (session.event === "tool") return "think";
@@ -158,9 +145,9 @@ function sessionToAction(session: Session): import("../characters/types").Charac
 function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
   const groups: SessionGroup[] = [];
 
-  // "on-screen" pseudo-group: sessions currently on overlay
-  const onScreen = sessions.filter((s) => s.on_overlay);
-  if (onScreen.length > 0 && order.includes("on-screen")) {
+  // "on-screen" pseudo-group: sessions with attention (on overlay)
+  const onScreen = sessions.filter((s) => s.attention);
+  if (onScreen.length > 0) {
     groups.push({
       id: "on-screen",
       label: "On Screen",
@@ -169,7 +156,7 @@ function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
     });
   }
 
-  // Group remaining by source, then IDE by workspace
+  // Group by source, IDE sub-grouped by workspace
   for (const sourceId of order) {
     if (sourceId === "on-screen") continue;
 
@@ -177,7 +164,6 @@ function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
     if (sourceSessions.length === 0) continue;
 
     if (sourceId === "kiro-ide") {
-      // Sub-group by workspace/group
       const byGroup = new Map<string, Session[]>();
       for (const s of sourceSessions) {
         const key = s.group || "ide";
@@ -187,7 +173,7 @@ function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
       for (const [groupName, groupSessions] of byGroup) {
         groups.push({
           id: `ide-${groupName}`,
-          label: groupName,
+          label: groupName.toUpperCase(),
           source: sourceId,
           sessions: groupSessions,
         });
@@ -202,13 +188,13 @@ function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
     }
   }
 
-  // Any sessions from sources not in panel_order go at the end
+  // Unknown sources at end
   const knownSources = new Set(order);
   const unknown = sessions.filter((s) => !knownSources.has(s.source));
   if (unknown.length > 0) {
     groups.push({
       id: "other",
-      label: "Other",
+      label: "OTHER",
       source: "other",
       sessions: unknown,
     });
@@ -221,7 +207,7 @@ function sourceLabel(source: string): string {
   switch (source) {
     case "kiro-ide": return "IDE";
     case "kiro-cli": return "CLI";
-    case "kiro-crew": return "Crew";
-    default: return source;
+    case "kiro-crew": return "CREW";
+    default: return source.toUpperCase();
   }
 }
