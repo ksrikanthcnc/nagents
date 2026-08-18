@@ -1,0 +1,86 @@
+/* Ghost character animations */
+
+/* Idle: gentle floating bob */
+@keyframes ghost-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.ghost-idle {
+  animation: ghost-bob 3s ease-in-out infinite;
+}
+
+/* Walk: bouncy horizontal movement */
+@keyframes ghost-bounce {
+  0%, 100% { transform: translateY(0) scaleX(1); }
+  25% { transform: translateY(-3px) scaleX(0.95); }
+  75% { transform: translateY(-3px) scaleX(1.05); }
+}
+.ghost-walk {
+  animation: ghost-bounce 0.6s ease-in-out infinite;
+}
+
+/* Talk: subtle squish */
+@keyframes ghost-squish {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  50% { transform: scaleY(0.95) scaleX(1.05); }
+}
+.ghost-talk {
+  animation: ghost-squish 0.4s ease-in-out infinite;
+}
+
+/* Alert: jump + glow pulse */
+@keyframes ghost-jump {
+  0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 0 transparent); }
+  50% { transform: translateY(-8px); filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.8)); }
+}
+.ghost-alert {
+  animation: ghost-jump 1s ease-in-out infinite;
+}
+
+/* Sleep: slow drift + shrink */
+@keyframes ghost-drift {
+  0%, 100% { transform: translateY(0) scale(0.95); opacity: 0.7; }
+  50% { transform: translateY(-2px) scale(0.95); opacity: 0.6; }
+}
+.ghost-sleep {
+  animation: ghost-drift 4s ease-in-out infinite;
+}
+
+/* Think: wobble */
+@keyframes ghost-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+.ghost-think {
+  animation: ghost-wobble 2s ease-in-out infinite;
+}
+
+/* Celebrate: spin + grow */
+@keyframes ghost-spin {
+  0% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.2) rotate(180deg); }
+  100% { transform: scale(1) rotate(360deg); }
+}
+.ghost-celebrate {
+  animation: ghost-spin 1.5s ease-out;
+}
+
+/* Wave: tilt side to side */
+@keyframes ghost-tilt {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+.ghost-wave {
+  animation: ghost-tilt 0.8s ease-in-out;
+}
+
+/* Disappear: fade + shrink */
+@keyframes ghost-fade-out {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.5); opacity: 0; }
+}
+.ghost-disappear {
+  animation: ghost-fade-out 0.5s ease-in forwards;
+}

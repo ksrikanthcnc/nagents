@@ -1,0 +1,60 @@
+# nagents configuration
+# Changes are hot-reloaded (no restart needed).
+
+# HTTP port for hook pushes (POST /event) and state queries (GET /state)
+http_port: 3334
+
+# Log level: trace, debug, info, warn, error
+log_level: info
+
+# ─── Sources ─────────────────────────────────────────────────────────────────
+# Each source is a scanner command (any language) that outputs JSON to stdout.
+# Hooks push events via HTTP POST /event.
+
+sources:
+  kiro-ide:
+    scanner: "python3 sources/kiro-ide/scan.py"
+    interval_sec: 5
+    hook: true
+    enabled: true
+  kiro-crew:
+    scanner: "python3 sources/kiro-crew/scan.py"
+    interval_sec: 10
+    hook: false
+    enabled: true
+  # kiro-cli:
+  #   scanner: "python3 sources/kiro-cli/scan.py"
+  #   interval_sec: 5
+  #   hook: true
+  #   enabled: false
+
+# ─── Attention Rules ─────────────────────────────────────────────────────────
+# Core rules applied when source doesn't explicitly set attention.
+# Source can always override by setting attention_source: true/false.
+
+attention_rules:
+  idle_threshold_sec: 30       # active session, no activity for 30s
+  tool_stuck_sec: 30           # tool event older than 30s → "approval"
+  running_stuck_sec: 120       # running event older than 120s → "stuck"
+  waiting_statuses:            # statuses that always trigger attention
+    - waiting_on_user
+    - waiting_for_approval
+    - idle
+
+# ─── Panel Order ─────────────────────────────────────────────────────────────
+# Order of groups in the panel. "on-screen" = sessions currently on overlay.
+# IDE sessions are further sub-grouped by workspace.
+
+panel_order:
+  - on-screen
+  - kiro-cli
+  - crew
+  - kiro-ide
+
+# ─── Default Characters ──────────────────────────────────────────────────────
+# Map source → default character ID for new sessions from that source.
+
+characters:
+  crew: ghost
+  kiro-cli: cat
+  kiro-ide: ghost
