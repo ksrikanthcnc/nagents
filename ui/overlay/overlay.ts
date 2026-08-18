@@ -1,15 +1,11 @@
 /**
  * Overlay — transparent fullscreen window with cursor-following characters.
  *
- * Simple logic driven directly by hook events:
- *   - event="idle" (Stop) → char appears, FOLLOWS cursor (done, needs you)
- *   - event="approval" (stuck tool) → char appears, FOLLOWS cursor
- *   - event="running" → char appears, ROAMS freely (doesn't follow)
- *   - event="tool" → char appears, ROAMS (working)
- *   - UserPromptSubmit clears attention → char disappears
- *
- * No complex attention rules here — the backend decides who has attention,
- * this module just renders and animates.
+ * Lifecycle:
+ *   Stop/approval/stuck → char appears, FOLLOWS cursor
+ *   UserPromptSubmit    → char stays, ROAMS freely
+ *   After SHRINK_AFTER_MS on screen → shrinks to dot, REVOLVES around cursor
+ *   Scanner GC removes session → char removed
  */
 
 import type { Session, CursorPosition } from "../shared/types";
@@ -18,7 +14,7 @@ import { getCharacter } from "../characters/registry";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type CharMode = "follow" | "roam";
+type CharMode = "follow" | "roam" | "revolve";
 
 interface OverlayChar {
   session: Session;
@@ -30,6 +26,10 @@ interface OverlayChar {
   mode: CharMode;
   roamTarget: { x: number; y: number };
   roamTimer: number;
+  /** When this char first appeared on overlay (Date.now()) */
+  spawnedAt: number;
+  /** Angle for revolve mode (radians) */
+  revolveAngle: number;
 }
 
 // ─── State ──────────────────────────────────────────────────────────────────
@@ -48,6 +48,11 @@ const MIN_CURSOR_DIST = 80;
 const MAX_SPEED = 6;
 const COLLISION_DIST = 55;
 const CHAR_SIZE = 44;
+const DOT_SIZE = 12;
+const REVOLVE_RADIUS = 50;
+const REVOLVE_SPEED = 0.015; // radians per frame
+/** After this many ms on screen, char shrinks to dot and revolves */
+const SHRINK_AFTER_MS = 15 * 60 * 1000; // 15 minutes
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
@@ -55,7 +60,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   container = el;
   log("overlay", "initializing");
 
-  // Poll cursor position from HTTP endpoint (~30fps)
+  // Poll cursor position (~30fps)
   const pollCursor = async () => {
     while (true) {
       try {
@@ -72,13 +77,12 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   pollCursor();
   log("overlay", "cursor polling started");
 
-  // Poll state — show chars that have attention
+  // Poll state
   pollState((state) => {
     const showSessions = state.sessions.filter((s) => s.attention);
     syncChars(showSessions);
   }, 1000);
 
-  // Start render loop
   startRenderLoop();
   log("overlay", "render loop started");
 }
@@ -90,7 +94,7 @@ function syncChars(sessions: Session[]): void {
 
   const activeIds = new Set(sessions.map((s) => s.id));
 
-  // Remove chars no longer needing attention
+  // Remove chars no longer on overlay
   for (const [id, char] of chars) {
     if (!activeIds.has(id)) {
       log("overlay", `removing: ${char.session.name}`);
@@ -99,16 +103,19 @@ function syncChars(sessions: Session[]): void {
     }
   }
 
-  // Add or update chars
+  // Add or update
   for (const session of sessions) {
-    const mode = eventToMode(session.event);
-
     if (!chars.has(session.id)) {
-      // New char — spawn near cursor
       const el = createCharElement(session);
       container.appendChild(el);
       const offsetX = (Math.random() - 0.5) * 150;
       const offsetY = (Math.random() - 0.5) * 150;
+
+      // Use attention_since from backend (epoch seconds) for on-screen time tracking
+      // This survives app restarts (hibernate/resume)
+      const spawnedAt = session.attention_since
+        ? session.attention_since * 1000  // epoch seconds → ms
+        : Date.now();
 
       chars.set(session.id, {
         session,
@@ -117,16 +124,25 @@ function syncChars(sessions: Session[]): void {
         y: cursor.y + offsetY,
         vx: 0,
         vy: 0,
-        mode,
+        mode: eventToMode(session.event),
         roamTarget: randomRoamTarget(),
         roamTimer: 0,
+        spawnedAt,
+        revolveAngle: Math.random() * Math.PI * 2,
       });
-      log("overlay", `added: ${session.name} (mode=${mode})`);
+      log("overlay", `added: ${session.name} (mode=${eventToMode(session.event)}, on-screen ${Math.round((Date.now() - spawnedAt) / 1000)}s)`);
     } else {
-      // Update existing
       const char = chars.get(session.id)!;
       char.session = session;
-      char.mode = mode;
+
+      // Check if should shrink to dot (on screen > SHRINK_AFTER_MS)
+      const onScreenMs = Date.now() - char.spawnedAt;
+      if (onScreenMs > SHRINK_AFTER_MS) {
+        char.mode = "revolve";
+      } else {
+        char.mode = eventToMode(session.event);
+      }
+
       // Update label
       const eventLabel = session.event ? ` · ${session.event}` : "";
       const labelEl = char.el.querySelector(".overlay-char-label");
@@ -140,10 +156,10 @@ function eventToMode(event: string | null): CharMode {
     case "idle":
     case "approval":
     case "stuck":
-      return "follow"; // Needs you — follows cursor
+      return "follow";
     case "running":
     case "tool":
-      return "roam"; // Working — roams freely
+      return "roam";
     default:
       return "follow";
   }
@@ -159,7 +175,6 @@ function createCharElement(session: Session): HTMLElement {
   el.dataset.sessionId = session.id;
   el.dataset.group = session.group;
 
-  // Label: group · name + event
   const groupLabel = session.group || session.source;
   const eventLabel = session.event ? ` · ${session.event}` : "";
 
@@ -178,7 +193,6 @@ function createCharElement(session: Session): HTMLElement {
 // ─── Render Loop ────────────────────────────────────────────────────────────
 
 function startRenderLoop(): void {
-  // Create SVG layer for connection lines
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;";
@@ -193,7 +207,6 @@ function startRenderLoop(): void {
 }
 
 function drawConnections(svg: SVGSVGElement): void {
-  // Clear old lines
   svg.innerHTML = "";
   const charArray = Array.from(chars.values());
   const drawn = new Set<string>();
@@ -224,17 +237,32 @@ function updatePhysics(): void {
   const charArray = Array.from(chars.values());
 
   for (const char of charArray) {
+    // ─── Revolve mode: dot orbits cursor ─────────────────────────────
+    if (char.mode === "revolve") {
+      char.revolveAngle += REVOLVE_SPEED;
+      char.x = cursor.x + Math.cos(char.revolveAngle) * REVOLVE_RADIUS - DOT_SIZE / 2;
+      char.y = cursor.y + Math.sin(char.revolveAngle) * REVOLVE_RADIUS - DOT_SIZE / 2;
+
+      // Shrink element
+      char.el.style.left = `${Math.round(char.x)}px`;
+      char.el.style.top = `${Math.round(char.y)}px`;
+      char.el.classList.add("char-dot");
+      char.el.classList.remove("char-following", "char-roaming");
+      continue;
+    }
+
+    // ─── Normal mode: follow or roam ─────────────────────────────────
+    char.el.classList.remove("char-dot");
+
     let targetX: number;
     let targetY: number;
     let strength: number;
 
     if (char.mode === "follow") {
-      // Follow cursor
       targetX = cursor.x;
       targetY = cursor.y;
       strength = FOLLOW_STRENGTH;
     } else {
-      // Roam to random target
       char.roamTimer++;
       if (char.roamTimer > 180 || distTo(char, char.roamTarget) < 30) {
         char.roamTarget = randomRoamTarget();
@@ -245,23 +273,19 @@ function updatePhysics(): void {
       strength = ROAM_STRENGTH;
     }
 
-    // Move toward target
     const dx = targetX - char.x;
     const dy = targetY - char.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (char.mode === "follow") {
-      // Follow but keep min distance
       if (dist > MIN_CURSOR_DIST) {
         char.vx += dx * strength;
         char.vy += dy * strength;
       } else if (dist < MIN_CURSOR_DIST * 0.4) {
-        // Push away if too close
         char.vx -= dx * 0.03;
         char.vy -= dy * 0.03;
       }
     } else {
-      // Roam — just move toward target
       if (dist > 20) {
         char.vx += dx * strength;
         char.vy += dy * strength;
@@ -290,7 +314,6 @@ function updatePhysics(): void {
       char.vy = (char.vy / speed) * MAX_SPEED;
     }
 
-    // Apply
     char.x += char.vx;
     char.y += char.vy;
 
@@ -301,8 +324,6 @@ function updatePhysics(): void {
     // Render
     char.el.style.left = `${Math.round(char.x)}px`;
     char.el.style.top = `${Math.round(char.y)}px`;
-
-    // Animation class based on mode
     char.el.classList.toggle("char-following", char.mode === "follow");
     char.el.classList.toggle("char-roaming", char.mode === "roam");
   }

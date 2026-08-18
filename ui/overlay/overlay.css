@@ -94,6 +94,26 @@ html, body {
   animation: char-float 4s ease-in-out infinite;
 }
 
+/* Dot mode — shrunk, revolving around cursor */
+.char-dot {
+  width: 12px !important;
+  height: 12px !important;
+  transition: width 0.5s, height 0.5s, opacity 0.5s;
+}
+
+.char-dot .overlay-char-svg {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  overflow: hidden;
+  opacity: 0.8;
+}
+
+.char-dot .overlay-char-source,
+.char-dot .overlay-char-label {
+  display: none;
+}
+
 @keyframes char-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }

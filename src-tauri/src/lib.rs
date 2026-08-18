@@ -71,7 +71,13 @@ pub fn run() {
             // Only exit app when the main panel window is closed
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" {
-                    // Main closed → exit entire app (kills server, scanners, vite)
+                    // Write close timestamp for hibernate/resume
+                    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+                    let project_root = PathBuf::from(manifest_dir)
+                        .parent()
+                        .unwrap_or_else(|| std::path::Path::new("."))
+                        .to_path_buf();
+                    write_close_timestamp(&project_root);
                     info!("[nagents] main window closed, exiting");
                     std::process::exit(0);
                 }
@@ -90,12 +96,15 @@ pub fn run() {
             // Create session store
             let store = SessionStore::new();
 
+            // Reload cached events from data/events/ (restore state from last run)
+            let project_root = config_path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+            reload_event_cache(&store, &project_root);
+
             // Start HTTP server for external hook pushes
             let http_port = config.get().http_port;
             server::start(store.clone(), http_port);
 
             // Start scanner orchestrator (spawns source executables)
-            let project_root = config_path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
             scanner::start(store.clone(), config.clone(), project_root);
 
             // Start attention computation loop
@@ -152,4 +161,91 @@ fn resolve_config_path(app: &tauri::App) -> PathBuf {
         .app_config_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join("config.yaml")
+}
+
+/// Reload last event per session from persisted JSONL files.
+/// Only replays events whose mtime is recent (< 1 hour) to avoid stale state.
+/// Also reads app close timestamp to calculate elapsed time for hibernate/resume.
+fn reload_event_cache(store: &state::SessionStore, project_root: &PathBuf) {
+    use std::fs;
+    use std::io::{BufRead, BufReader};
+
+    let events_dir = project_root.join("data/events");
+    if !events_dir.exists() {
+        info!("[cache] no events dir, skipping reload");
+        return;
+    }
+
+    // Read app close timestamp (written on shutdown)
+    let close_file = project_root.join("data/app_closed_at");
+    let closed_at: f64 = fs::read_to_string(&close_file)
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0.0);
+    let now = state::now_epoch();
+    let downtime = if closed_at > 0.0 { now - closed_at } else { 0.0 };
+    info!("[cache] app was closed {}s ago", downtime as u64);
+
+    // Only reload if downtime < 1 hour
+    if downtime > 3600.0 {
+        info!("[cache] downtime > 1hr, starting fresh");
+        return;
+    }
+
+    let mut loaded = 0;
+
+    let entries = match fs::read_dir(&events_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().map(|e| e != "jsonl").unwrap_or(true) {
+            continue;
+        }
+
+        // Read last line of the file (most recent event)
+        let file = match fs::File::open(&path) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+        let reader = BufReader::new(file);
+        let mut last_line = String::new();
+        for line in reader.lines().flatten() {
+            if !line.is_empty() {
+                last_line = line;
+            }
+        }
+
+        if last_line.is_empty() {
+            continue;
+        }
+
+        let update: state::EventUpdate = match serde_json::from_str(&last_line) {
+            Ok(u) => u,
+            Err(_) => continue,
+        };
+
+        let mtime = update.mtime.unwrap_or(0.0);
+        if now - mtime > 3600.0 {
+            continue; // Event itself is too old
+        }
+
+        store.push_event(update);
+        loaded += 1;
+    }
+
+    info!("[cache] reloaded {} recent events (downtime={}s)", loaded, downtime as u64);
+
+    // Clean up the close timestamp file
+    let _ = fs::remove_file(&close_file);
+}
+
+/// Write app close timestamp (called on shutdown).
+fn write_close_timestamp(project_root: &PathBuf) {
+    use std::fs;
+    let close_file = project_root.join("data/app_closed_at");
+    let _ = fs::create_dir_all(project_root.join("data"));
+    let _ = fs::write(&close_file, format!("{}", state::now_epoch()));
 }
