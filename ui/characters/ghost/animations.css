@@ -48,6 +48,7 @@
 }
 
 [data-char="ghost"].char-slot-idle svg .eye {
+  transform-box: fill-box;
   transform-origin: center;
   animation: ghost-blink calc(3.5s + var(--anim-offset, 0s)) ease-in-out infinite;
   animation-delay: var(--anim-offset, 0s);
@@ -64,6 +65,7 @@
 }
 
 [data-char="ghost"].char-slot-active svg .eye {
+  transform-box: fill-box;
   transform-origin: center;
   animation: ghost-blink calc(3s + var(--anim-offset, 0s)) ease-in-out infinite;
   animation-delay: var(--anim-offset, 0s);
@@ -76,6 +78,8 @@
 }
 
 [data-char="ghost"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
   transform: scale(1.2);
 }
 
@@ -88,6 +92,8 @@
 }
 
 [data-char="ghost"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
   transform: scaleY(0.1);
 }
 
@@ -108,6 +114,7 @@
 }
 
 [data-char="ghost"].char-slot-speak svg .mouth {
+  transform-box: fill-box;
   transform-origin: center;
   animation: ghost-mouth-open 2s ease-in-out infinite;
 }

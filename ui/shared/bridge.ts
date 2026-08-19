@@ -5,7 +5,7 @@
  * Falls back to HTTP polling when not running in Tauri (dev/browser mode).
  */
 
-import type { StateSnapshot, Config, CursorPosition } from "./types";
+import type { StateSnapshot, Config } from "./types";
 
 // ─── Detection ──────────────────────────────────────────────────────────────
 
@@ -19,12 +19,6 @@ function isTauri(): boolean {
 async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<T>(cmd, args);
-}
-
-async function tauriListen(event: string, handler: (payload: any) => void): Promise<() => void> {
-  const { listen } = await import("@tauri-apps/api/event");
-  const unlisten = await listen(event, (e) => handler(e.payload));
-  return unlisten;
 }
 
 // ─── State ──────────────────────────────────────────────────────────────────
@@ -63,9 +57,15 @@ export async function getConfig(): Promise<Config> {
       roam_max_speed: 3,
       follow_max_speed: 6,
       min_cursor_distance: 80,
+      collision_distance: 70,
       revolve_radius: 50,
       revolve_speed: 0.015,
       shrink_after_min: 15,
+      cursor_fps: 30,
+      physics_fps: 30,
+      font_size_group: 9,
+      font_size_title: 10,
+      font_size_action: 10,
     },
     http_port: 3335,
     log_level: "info",
@@ -74,64 +74,10 @@ export async function getConfig(): Promise<Config> {
 
 // ─── Overlay Commands ───────────────────────────────────────────────────────
 
-export async function createOverlay(): Promise<void> {
-  if (isTauri()) {
-    await tauriInvoke("create_overlay");
-  }
-}
-
-export async function hideOverlay(): Promise<void> {
-  if (isTauri()) {
-    await tauriInvoke("hide_overlay");
-  }
-}
-
-export async function toggleOverlay(): Promise<boolean> {
-  if (isTauri()) {
-    return tauriInvoke<boolean>("toggle_overlay");
-  }
-  return false;
-}
-
 export async function setOverlayClickthrough(ignore: boolean): Promise<void> {
   if (isTauri()) {
     await tauriInvoke("set_overlay_clickthrough", { ignore });
   }
-}
-
-// ─── Event Subscriptions ────────────────────────────────────────────────────
-
-/** Subscribe to cursor position updates (overlay window). */
-export async function onCursorMove(
-  handler: (pos: CursorPosition) => void
-): Promise<() => void> {
-  if (isTauri()) {
-    try {
-      return await tauriListen("nagents:cursor", handler);
-    } catch (e) {
-      console.warn("[bridge] Tauri cursor listen failed, using HTTP fallback:", e);
-    }
-  }
-  // Fallback: poll /cursor via HTTP
-  let active = true;
-  const poll = async () => {
-    while (active) {
-      try {
-        const resp = await fetch(`${HTTP_BASE}/cursor`);
-        if (resp.ok) {
-          const pos = await resp.json();
-          handler(pos);
-        }
-      } catch {
-        // server not ready yet, retry
-      }
-      await new Promise((r) => setTimeout(r, 33));
-    }
-  };
-  poll();
-  return () => {
-    active = false;
-  };
 }
 
 // ─── State Polling ──────────────────────────────────────────────────────────

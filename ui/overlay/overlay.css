@@ -139,26 +139,15 @@ html, body {
 .char-roaming .overlay-char-svg {
   animation: char-float 4s ease-in-out infinite;
 }
-
-/* ─── Dot mode — shrunk, revolving ───────────────────────────────────────── */
+/* ─── Dot mode — scaled-down char with labels, revolving ─────────────────── */
 
 .char-dot {
-  width: 12px !important;
-  height: 12px !important;
-  transition: width 0.5s, height 0.5s, opacity 0.5s;
-}
-
-.char-dot .overlay-char-svg {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  overflow: hidden;
+  transform: scale(0.5);
+  transform-origin: center center;
+  transition: transform 0.5s ease;
   opacity: 0.8;
+  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.5));
 }
-
-.char-dot .overlay-char-source,
-.char-dot .overlay-char-label {
-  display: none;
 }
 
 /* ─── Connection Lines (SVG overlay) ─────────────────────────────────────── */
@@ -215,43 +204,46 @@ html, body {
 /* ─── New layout: group / title / char / action ──────────────────────────── */
 .overlay-char-group {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 8px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: rgba(167, 139, 250, 0.9);
+  color: #fff;
   text-align: center;
   pointer-events: none;
-  padding: 1px 4px;
+  padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(26, 26, 46, 0.6);
-  border: 1px solid rgba(167, 139, 250, 0.2);
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(167, 139, 250, 0.4);
 }
 
 .overlay-char-title {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 9px;
-  color: #e8e8f0;
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
   text-align: center;
   pointer-events: none;
-  max-width: 110px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .overlay-char-action {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(26, 26, 46, 0.8);
-  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 2px 8px;
   border-radius: 4px;
   white-space: nowrap;
-  margin-top: 3px;
+  margin-top: 4px;
   pointer-events: none;
-  max-width: 130px;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
@@ -262,6 +254,6 @@ html, body {
 }
 
 .action-icon {
-  margin-right: 2px;
-  font-size: 10px;
+  margin-right: 3px;
+  font-size: 11px;
 }

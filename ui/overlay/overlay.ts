@@ -51,15 +51,19 @@ let cfg: OverlayConfig = {
   roam_max_speed: 3,
   follow_max_speed: 6,
   min_cursor_distance: 80,
+  collision_distance: 100,
   revolve_radius: 50,
   revolve_speed: 0.015,
   shrink_after_min: 15,
+  cursor_fps: 30,
+  physics_fps: 30,
+  font_size_group: 9,
+  font_size_title: 10,
+  font_size_action: 10,
 };
 
 const DAMPING = 0.88;
-const COLLISION_DIST = 55;
 const CHAR_SIZE = 44;
-const DOT_SIZE = 14;
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
@@ -78,7 +82,8 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
     log("overlay", "config load failed, using defaults");
   }
 
-  // Poll cursor position (~30fps)
+  // Poll cursor position (configurable fps)
+  const cursorInterval = Math.round(1000 / cfg.cursor_fps);
   const pollCursor = async () => {
     while (true) {
       try {
@@ -90,11 +95,11 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
       } catch {
         // server not ready
       }
-      await new Promise((r) => setTimeout(r, 33));
+      await new Promise((r) => setTimeout(r, cursorInterval));
     }
   };
   pollCursor();
-  log("overlay", "cursor polling started");
+  log("overlay", `cursor polling started (${cfg.cursor_fps}fps)`);
 
   // Poll state
   pollState((state) => {
@@ -153,14 +158,25 @@ function syncChars(sessions: Session[]): void {
       log("overlay", `added: ${session.name} (mode=${eventToMode(session.event)}, on-screen ${Math.round((Date.now() - spawnedAt) / 1000)}s)`);
     } else {
       const char = chars.get(session.id)!;
+      const prevEvent = char.session.event;
       char.session = session;
 
-      // Check if should shrink to dot (on screen > shrink_after_min)
-      const onScreenMs = Date.now() - char.spawnedAt;
-      if (onScreenMs > cfg.shrink_after_min * 60 * 1000) {
-        char.mode = "revolve";
+      // If agent resumed working (was idle/done, now running/tool) → un-dot, reset timer
+      const wasIdle = prevEvent === "idle" || prevEvent === "approval" || prevEvent === "stuck";
+      const nowWorking = session.event === "running" || session.event === "tool";
+      if (wasIdle && nowWorking) {
+        char.spawnedAt = Date.now(); // Reset on-screen timer
+        char.mode = "roam";
+        char.el.classList.remove("char-dot");
+        log("overlay", `${session.name}: woke from dot → roam`);
       } else {
-        char.mode = eventToMode(session.event);
+        // Normal mode check
+        const onScreenMs = Date.now() - char.spawnedAt;
+        if (onScreenMs > cfg.shrink_after_min * 60 * 1000) {
+          char.mode = "revolve";
+        } else {
+          char.mode = eventToMode(session.event);
+        }
       }
 
       // Update labels
@@ -201,10 +217,10 @@ function createCharElement(session: Session): HTMLElement {
   const actionText = session.tool || session.event || "";
 
   el.innerHTML = `
-    <div class="overlay-char-group">${groupLabel}</div>
-    <div class="overlay-char-title">${session.name}</div>
+    <div class="overlay-char-group" style="font-size:${cfg.font_size_group}px">${groupLabel}</div>
+    <div class="overlay-char-title" style="font-size:${cfg.font_size_title}px">${session.name}</div>
     <div class="overlay-char-svg">${charDef.svg}</div>
-    <div class="overlay-char-action">${actionIcon ? `<span class="action-icon">${actionIcon}</span>` : ""}${actionText}</div>
+    <div class="overlay-char-action" style="font-size:${cfg.font_size_action}px">${actionIcon ? `<span class="action-icon">${actionIcon}</span>` : ""}${actionText}</div>
   `;
   el.style.position = "absolute";
   el.style.width = `${CHAR_SIZE}px`;
@@ -233,7 +249,7 @@ function getToolIcon(tool: string | null, event: string | null): string {
   }
   if (event) {
     switch (event) {
-      case "idle": return "💤";
+      case "idle": return "❓";
       case "running": return "⚙️";
       case "approval": return "⏳";
       case "stuck": return "🚨";
@@ -252,12 +268,17 @@ function startRenderLoop(): void {
   svg.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;";
   container!.appendChild(svg);
 
-  function tick() {
+  const frameInterval = 1000 / cfg.physics_fps;
+  let lastFrame = 0;
+
+  function tick(now: number) {
+    animFrameId = requestAnimationFrame(tick);
+    if (now - lastFrame < frameInterval) return;
+    lastFrame = now;
     updatePhysics();
     drawConnections(svg);
-    animFrameId = requestAnimationFrame(tick);
   }
-  tick();
+  animFrameId = requestAnimationFrame(tick);
 }
 
 function drawConnections(svg: SVGSVGElement): void {
@@ -320,8 +341,8 @@ function updatePhysics(): void {
       const dotIndex = dotChars.indexOf(char);
       const angle = globalRevolveAngle + (2 * Math.PI * dotIndex) / Math.max(1, dotCount);
 
-      char.x = cursor.x + Math.cos(angle) * cfg.revolve_radius - DOT_SIZE / 2;
-      char.y = cursor.y + Math.sin(angle) * cfg.revolve_radius - DOT_SIZE / 2;
+      char.x = cursor.x + Math.cos(angle) * cfg.revolve_radius - CHAR_SIZE / 2;
+      char.y = cursor.y + Math.sin(angle) * cfg.revolve_radius - CHAR_SIZE / 2;
 
       char.el.style.left = `${Math.round(char.x)}px`;
       char.el.style.top = `${Math.round(char.y)}px`;
@@ -375,18 +396,16 @@ function updatePhysics(): void {
       }
     }
 
-    // Collision avoidance — only between follow-mode chars (roaming passes through)
-    if (char.mode === "follow") {
-      for (const other of charArray) {
-        if (other === char || other.mode === "revolve" || other.mode === "roam") continue;
-        const cdx = char.x - other.x;
-        const cdy = char.y - other.y;
-        const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
-        if (cdist < COLLISION_DIST && cdist > 0) {
-          const push = ((COLLISION_DIST - cdist) / cdist) * 0.08;
-          char.vx += cdx * push;
-          char.vy += cdy * push;
-        }
+    // Collision avoidance — all non-dot chars collide with each other
+    for (const other of charArray) {
+      if (other === char || other.mode === "revolve") continue;
+      const cdx = char.x - other.x;
+      const cdy = char.y - other.y;
+      const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+      if (cdist < cfg.collision_distance && cdist > 0) {
+        const push = ((cfg.collision_distance - cdist) / cdist) * 0.15;
+        char.vx += cdx * push;
+        char.vy += cdy * push;
       }
     }
 

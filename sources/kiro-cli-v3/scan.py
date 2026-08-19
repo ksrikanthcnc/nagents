@@ -5,15 +5,14 @@ Kiro CLI v3 source scanner.
 Discovers active v3 CLI sessions via ps detection.
 v3 sessions run as: kiro-cli-chat chat --v3
 
-v3 doesn't use --resume-id or write session files to ~/.kiro/sessions/cli/.
-Instead, conversation state is in SQLite:
-  ~/Library/Application Support/kiro-cli/data.sqlite3 (conversations_v2 table)
+v3 session IDs have `sess_` prefix. They create:
+  - ~/.kiro/sessions/cli/sess_<uuid>.history (input history)
+  - ~/.kiro/sessions/<hash>/sess_<uuid>/session.json (full session metadata)
 
-Title is extracted from the first user prompt in the conversation.
-CWD is obtained from lsof.
+ID scheme: cli3-{uuid[:8]} (stripping sess_ prefix)
+When session can't be resolved, falls back to cli3-{pid}.
 
-ID scheme: cli3-{conversation_id[:8]}
-If conversation can't be resolved, falls back to cli3-{pid}.
+Titles come from: data/titles.json (POST /title) > session.json > fallback PID.
 
 Outputs JSON array to stdout (consumed by nagents Rust backend).
 
@@ -21,15 +20,15 @@ Usage: python3 sources/kiro-cli-v3/scan.py
 """
 
 import json
-import sqlite3
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 HOME = Path.home()
-CLI_DB = HOME / "Library/Application Support/kiro-cli/data.sqlite3"
-TITLES_FILE = Path(__file__).parent.parent / "titles.json"
+CLI_SESSIONS_DIR = HOME / ".kiro/sessions/cli"
+KIRO_SESSIONS_DIR = HOME / ".kiro/sessions"
+TITLES_FILE = Path(__file__).parent.parent.parent / "data/titles.json"
 
 
 def log(msg: str) -> None:
@@ -44,7 +43,7 @@ def discover() -> list[dict]:
 
     ps_lines = get_ps_lines()
 
-    # Collect all v3 processes first to detect CWD collisions
+    # Find all v3 processes
     v3_procs: list[tuple[str, str]] = []  # (pid, cwd)
 
     for line in ps_lines:
@@ -56,15 +55,12 @@ def discover() -> list[dict]:
             continue
         pid, cmd = parts[0], parts[1]
 
-        # Must be: kiro-cli-chat chat --v3
         if "kiro-cli-chat chat" not in cmd:
             continue
         if "--v3" not in cmd:
             continue
-        # Skip crew processes
         if "acp" in cmd:
             continue
-        # Skip shell wrappers
         if cmd.startswith("zsh"):
             continue
 
@@ -75,49 +71,105 @@ def discover() -> list[dict]:
         cwd = get_process_cwd(pid)
         v3_procs.append((pid, cwd))
 
-    # Detect CWD collisions — if multiple v3 procs share a CWD,
-    # we can't uniquely map them to conversations. Use PID-based IDs.
-    cwd_counts: dict[str, int] = {}
-    for _, cwd in v3_procs:
-        cwd_counts[cwd] = cwd_counts.get(cwd, 0) + 1
+    # Find v3 session IDs from .history files (sess_ prefix = v3)
+    v3_session_ids = find_v3_sessions()
 
-    for pid, cwd in v3_procs:
-        has_collision = cwd_counts.get(cwd, 0) > 1
-
-        if has_collision:
-            # Can't distinguish — use PID-based ID
-            session_id = pid
-            title = ""
-        else:
-            conv_id, title = resolve_conversation(cwd)
-            session_id = conv_id[:8] if conv_id else pid
-
-        nagents_id = f"cli3-{session_id}"
+    # Try to map processes to sessions
+    # If only one v3 process and one active v3 session, they match.
+    # Otherwise fall back to PID-based IDs.
+    if len(v3_procs) == 1 and len(v3_session_ids) >= 1:
+        # Single process — use most recent v3 session
+        pid, cwd = v3_procs[0]
+        sess_id = v3_session_ids[0]  # most recent
+        uuid = sess_id.replace("sess_", "")
+        title = read_session_title(sess_id)
+        nagents_id = f"cli3-{uuid[:8]}"
         display_title = resolve_title(nagents_id, titles_override) or title or f"CLI v3 ({pid})"
 
-        sessions.append({
-            "id": nagents_id,
-            "source": "kiro-cli-v3",
-            "name": display_title[:50],
-            "workspace": cwd.replace(str(HOME), "~") if cwd else "",
-            "group": "cli",
-            "active": True,
-            "event": None,
-            "attention_source": None,
-            "attention": False,
-            "attention_reason": None,
-            "tool": None,
-            "file": None,
-            "tokens": 0,
-            "maxTokens": 1000000,
-            "mtime": time.time(),
-            "character": None,
-            "attention_since": None,
-            "on_overlay": False,
-        })
+        sessions.append(make_session(nagents_id, display_title, cwd))
+
+    elif len(v3_procs) > 1:
+        # Multiple processes — can't reliably map. Use PID-based IDs.
+        # But if we have matching count of sessions, try by recency order.
+        if len(v3_session_ids) >= len(v3_procs):
+            # Sort procs by PID (older PIDs = older sessions usually)
+            # and sessions by recency — but this is fragile. Use PID for safety.
+            for pid, cwd in v3_procs:
+                nagents_id = f"cli3-{pid}"
+                display_title = resolve_title(nagents_id, titles_override) or f"CLI v3 ({pid})"
+                sessions.append(make_session(nagents_id, display_title, cwd))
+        else:
+            for pid, cwd in v3_procs:
+                nagents_id = f"cli3-{pid}"
+                display_title = resolve_title(nagents_id, titles_override) or f"CLI v3 ({pid})"
+                sessions.append(make_session(nagents_id, display_title, cwd))
 
     log(f"discovered {len(sessions)} sessions")
     return sessions
+
+
+def find_v3_sessions() -> list[str]:
+    """
+    Find v3 session IDs from .history files with sess_ prefix.
+    Returns sorted by most recent modification first.
+    """
+    if not CLI_SESSIONS_DIR.exists():
+        return []
+
+    candidates = []
+    for f in CLI_SESSIONS_DIR.glob("sess_*.history"):
+        candidates.append((f.stat().st_mtime, f.stem))
+
+    candidates.sort(reverse=True)
+    return [sess_id for _, sess_id in candidates]
+
+
+def read_session_title(sess_id: str) -> str:
+    """Read title from ~/.kiro/sessions/<hash>/<sess_id>/session.json."""
+    if not KIRO_SESSIONS_DIR.exists():
+        return ""
+
+    # Search all hash dirs for this session
+    for hash_dir in KIRO_SESSIONS_DIR.iterdir():
+        if not hash_dir.is_dir():
+            continue
+        if hash_dir.name == "cli":
+            continue
+        session_dir = hash_dir / sess_id
+        session_json = session_dir / "session.json"
+        if session_json.exists():
+            try:
+                data = json.loads(session_json.read_text())
+                title = data.get("title", "")
+                if title:
+                    return title[:50]
+            except Exception:
+                pass
+    return ""
+
+
+def make_session(nagents_id: str, title: str, cwd: str) -> dict:
+    """Create a session dict matching the nagents SOURCE_CONTRACT."""
+    return {
+        "id": nagents_id,
+        "source": "kiro-cli-v3",
+        "name": title[:50],
+        "workspace": cwd.replace(str(HOME), "~") if cwd else "",
+        "group": "cli",
+        "active": True,
+        "event": None,
+        "attention_source": None,
+        "attention": False,
+        "attention_reason": None,
+        "tool": None,
+        "file": None,
+        "tokens": 0,
+        "maxTokens": 1000000,
+        "mtime": time.time(),
+        "character": None,
+        "attention_since": None,
+        "on_overlay": False,
+    }
 
 
 def get_ps_lines() -> list[str]:
@@ -145,85 +197,6 @@ def get_process_cwd(pid: str) -> str:
     except Exception:
         pass
     return ""
-
-
-def resolve_conversation(cwd: str) -> tuple[str, str]:
-    """
-    Find the most recent conversation for a given CWD from SQLite.
-
-    Returns (conversation_id, title).
-    Title is the first user prompt in the conversation.
-    """
-    if not cwd or not CLI_DB.exists():
-        return "", ""
-
-    try:
-        conn = sqlite3.connect(str(CLI_DB), timeout=2)
-        conn.execute("PRAGMA journal_mode=WAL")
-        row = conn.execute(
-            "SELECT conversation_id, value FROM conversations_v2 "
-            "WHERE key = ? ORDER BY updated_at DESC LIMIT 1",
-            (cwd,)
-        ).fetchone()
-        conn.close()
-
-        if not row:
-            return "", ""
-
-        conv_id, raw_value = row
-        title = extract_title(raw_value)
-        return conv_id, title
-
-    except Exception as e:
-        log(f"sqlite query failed: {e}")
-        return "", ""
-
-
-def extract_title(raw_value: str) -> str:
-    """Extract a meaningful user prompt from a conversation JSON as title."""
-    try:
-        data = json.loads(raw_value)
-        history = data.get("history", [])
-        for msg in history:
-            if "user" not in msg:
-                continue
-            user = msg["user"]
-            content = user.get("content", "")
-
-            # v3 format: content is {"Prompt": {"prompt": "..."}}
-            if isinstance(content, dict):
-                if "Prompt" in content:
-                    text = content["Prompt"].get("prompt", "")
-                elif "prompt" in content:
-                    text = content["prompt"]
-                else:
-                    continue
-            elif isinstance(content, str):
-                text = content
-            else:
-                continue
-
-            title = clean_title(text)
-            if title:
-                return title
-            # If this message was filtered (JSON blob, etc.), try next user msg
-    except Exception:
-        pass
-    return ""
-
-
-def clean_title(raw: str) -> str:
-    """Clean and truncate a title."""
-    if not raw:
-        return ""
-    # Skip JSON blobs, system prompts
-    if raw.startswith("{") or raw.startswith("[AGENT"):
-        return ""
-    # Take first line only
-    raw = raw.split("\n")[0].strip()
-    if len(raw) > 60:
-        raw = raw[:57] + "..."
-    return raw
 
 
 def load_titles() -> dict:

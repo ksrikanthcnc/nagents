@@ -44,12 +44,24 @@ pub struct OverlayPhysics {
     pub follow_max_speed: f64,
     #[serde(default = "default_min_cursor_distance")]
     pub min_cursor_distance: f64,
+    #[serde(default = "default_collision_distance")]
+    pub collision_distance: f64,
     #[serde(default = "default_revolve_radius")]
     pub revolve_radius: f64,
     #[serde(default = "default_revolve_speed")]
     pub revolve_speed: f64,
     #[serde(default = "default_shrink_after_min")]
     pub shrink_after_min: f64,
+    #[serde(default = "default_cursor_fps")]
+    pub cursor_fps: f64,
+    #[serde(default = "default_physics_fps")]
+    pub physics_fps: f64,
+    #[serde(default = "default_font_size_group")]
+    pub font_size_group: f64,
+    #[serde(default = "default_font_size_title")]
+    pub font_size_title: f64,
+    #[serde(default = "default_font_size_action")]
+    pub font_size_action: f64,
 }
 
 impl Default for OverlayPhysics {
@@ -60,9 +72,15 @@ impl Default for OverlayPhysics {
             roam_max_speed: 3.0,
             follow_max_speed: 6.0,
             min_cursor_distance: 80.0,
+            collision_distance: 100.0,
             revolve_radius: 50.0,
             revolve_speed: 0.015,
             shrink_after_min: 15.0,
+            cursor_fps: 30.0,
+            physics_fps: 30.0,
+            font_size_group: 9.0,
+            font_size_title: 10.0,
+            font_size_action: 10.0,
         }
     }
 }
@@ -72,9 +90,15 @@ fn default_roam_strength() -> f64 { 0.008 }
 fn default_roam_max_speed() -> f64 { 3.0 }
 fn default_follow_max_speed() -> f64 { 6.0 }
 fn default_min_cursor_distance() -> f64 { 80.0 }
+fn default_collision_distance() -> f64 { 100.0 }
 fn default_revolve_radius() -> f64 { 50.0 }
 fn default_revolve_speed() -> f64 { 0.015 }
 fn default_shrink_after_min() -> f64 { 15.0 }
+fn default_cursor_fps() -> f64 { 30.0 }
+fn default_physics_fps() -> f64 { 30.0 }
+fn default_font_size_group() -> f64 { 9.0 }
+fn default_font_size_title() -> f64 { 10.0 }
+fn default_font_size_action() -> f64 { 10.0 }
 
 /// Per-source configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]

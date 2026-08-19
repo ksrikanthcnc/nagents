@@ -55,16 +55,19 @@
 }
 
 [data-char="cat"].char-slot-idle svg .tail {
+  transform-box: fill-box;
   transform-origin: 48px 42px;
   animation: cat-tail-sway 3.5s ease-in-out infinite;
 }
 
 [data-char="cat"].char-slot-idle svg .ear-left {
+  transform-box: fill-box;
   transform-origin: 24px 16px;
   animation: cat-ear-twitch 8s ease-in-out infinite;
 }
 
 [data-char="cat"].char-slot-idle svg .ear-right {
+  transform-box: fill-box;
   transform-origin: 40px 16px;
   animation: cat-ear-twitch 8s ease-in-out infinite;
   animation-delay: 3s;
@@ -77,6 +80,7 @@
 }
 
 [data-char="cat"].char-slot-active svg .tail {
+  transform-box: fill-box;
   transform-origin: 48px 42px;
   animation: cat-tail-fast 1.5s ease-in-out infinite;
 }
@@ -88,6 +92,7 @@
 }
 
 [data-char="cat"].char-slot-alert svg .tail {
+  transform-box: fill-box;
   transform-origin: 48px 42px;
   animation: cat-tail-fast 0.8s ease-in-out infinite;
 }
@@ -101,6 +106,8 @@
 }
 
 [data-char="cat"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
   transform: scaleY(0.2);
 }
 

@@ -62,6 +62,7 @@
 }
 
 [data-char="robot"].char-slot-active svg .antenna-tip {
+  transform-box: fill-box;
   transform-origin: 32px 3px;
   animation: robot-antenna-spin 4s linear infinite;
 }
@@ -88,6 +89,7 @@
 }
 
 [data-char="robot"].char-slot-alert svg .antenna-tip {
+  transform-box: fill-box;
   transform-origin: 32px 3px;
   animation: robot-antenna-spin 1s linear infinite;
 }
@@ -109,6 +111,7 @@
 }
 
 [data-char="robot"].char-slot-celebrate svg .antenna-tip {
+  transform-box: fill-box;
   transform-origin: 32px 3px;
   animation: robot-antenna-spin 0.5s linear 3;
 }

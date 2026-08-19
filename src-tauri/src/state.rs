@@ -278,6 +278,26 @@ impl SessionStore {
         f(&mut store);
     }
 
+    /// Set title/name for a session (user or agent assigned).
+    pub fn set_title(&self, session_id: &str, title: &str) {
+        let mut store = self.inner.lock().unwrap();
+
+        // Try exact match first, then prefix match
+        let matching_id = store
+            .get(session_id)
+            .map(|_| session_id.to_string())
+            .or_else(|| store.keys().find(|k| k.starts_with(session_id)).cloned());
+
+        if let Some(id) = matching_id {
+            if let Some(session) = store.get_mut(&id) {
+                session.name = title.to_string();
+                info!("[state] title set: {} → {:?}", id, title);
+            }
+        } else {
+            info!("[state] title set for unknown session: {}", session_id);
+        }
+    }
+
     /// Remove test sessions.
     pub fn clear_test(&self) {
         let mut store = self.inner.lock().unwrap();

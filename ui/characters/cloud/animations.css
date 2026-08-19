@@ -56,6 +56,7 @@
 [data-char="cloud"].char-slot-idle svg .puff-3 { animation-delay: 1s; }
 
 [data-char="cloud"].char-slot-idle svg .eye {
+  transform-box: fill-box;
   transform-origin: center;
   animation: cloud-blink calc(4s + var(--anim-offset, 0s)) ease-in-out infinite;
   animation-delay: var(--anim-offset, 0s);
@@ -83,6 +84,8 @@
 }
 
 [data-char="cloud"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
   transform: scaleY(0.1);
 }
 

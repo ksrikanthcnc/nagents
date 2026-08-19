@@ -67,9 +67,15 @@ export interface OverlayConfig {
   roam_max_speed: number;
   follow_max_speed: number;
   min_cursor_distance: number;
+  collision_distance: number;
   revolve_radius: number;
   revolve_speed: number;
   shrink_after_min: number;
+  cursor_fps: number;
+  physics_fps: number;
+  font_size_group: number;
+  font_size_title: number;
+  font_size_action: number;
 }
 
 export interface Config {

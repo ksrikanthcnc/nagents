@@ -52,18 +52,20 @@ def main():
     if not raw_session_id:
         sys.exit(0)
 
-    # IDE sessions have sess_ prefix — skip
-    if raw_session_id.startswith("sess_"):
-        sys.exit(0)
+    # IDE sessions without sess_ prefix and not in our systems — skip
+    # (they'll be handled by the IDE hook via the dispatcher)
 
-    uuid = raw_session_id
+    uuid = raw_session_id.replace("sess_", "")
 
-    # v2 sessions have files in ~/.kiro/sessions/cli/ — skip
+    # v2 sessions have .json files in ~/.kiro/sessions/cli/ — skip
     if (CLI_SESSIONS_DIR / f"{uuid}.json").exists():
         sys.exit(0)
 
-    # Check if this is a v3 conversation (exists in SQLite)
-    if not is_v3_conversation(uuid):
+    # Must be a v3 session — check for .history file or conversations_v2
+    is_v3 = (CLI_SESSIONS_DIR / f"{raw_session_id}.history").exists()
+    if not is_v3:
+        is_v3 = is_v3_conversation(uuid)
+    if not is_v3:
         sys.exit(0)
 
     update = translate(trigger, payload, uuid)

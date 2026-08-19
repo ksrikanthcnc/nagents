@@ -56,12 +56,14 @@
 }
 
 [data-char="owl"].char-slot-idle svg .eye {
+  transform-box: fill-box;
   transform-origin: center;
   animation: owl-slow-blink calc(5s + var(--anim-offset, 0s)) ease-in-out infinite;
   animation-delay: var(--anim-offset, 0s);
 }
 
 [data-char="owl"].char-slot-idle svg .head {
+  transform-box: fill-box;
   transform-origin: 32px 22px;
   animation: owl-head-tilt 6s ease-in-out infinite;
 }
@@ -73,12 +75,14 @@
 }
 
 [data-char="owl"].char-slot-active svg .eye {
+  transform-box: fill-box;
   transform-origin: center;
   animation: owl-slow-blink calc(3s + var(--anim-offset, 0s)) ease-in-out infinite;
 }
 
 [data-char="owl"].char-slot-active svg .wing-left,
 [data-char="owl"].char-slot-active svg .wing-right {
+  transform-box: fill-box;
   transform-origin: center;
   animation: owl-wing-flutter 4s ease-in-out infinite;
 }
@@ -86,11 +90,14 @@
 /* ─── alert ──────────────────────────────────────────────────────────────── */
 
 [data-char="owl"].char-slot-alert svg .head {
+  transform-box: fill-box;
   transform-origin: 32px 22px;
   animation: owl-alert-look 1.5s ease-in-out infinite;
 }
 
 [data-char="owl"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
   transform: scale(1.2);
 }
 
@@ -103,6 +110,8 @@
 }
 
 [data-char="owl"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
   transform: scaleY(0.05);
 }
 

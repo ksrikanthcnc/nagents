@@ -66,9 +66,15 @@ overlay:
   roam_max_speed: 3            # Max roam speed (pixels/frame)
   follow_max_speed: 6          # Max follow speed (pixels/frame)
   min_cursor_distance: 80      # Min distance from cursor (follow mode)
+  collision_distance: 100       # Min distance between chars (pixels, accounts for labels)
   revolve_radius: 50           # Dot orbit radius (pixels)
   revolve_speed: 0.015         # Dot orbit speed (radians/frame)
   shrink_after_min: 15         # Minutes before char shrinks to dot
+  cursor_fps: 30               # Cursor poll rate (frames per second)
+  physics_fps: 30              # Physics/render loop rate (lower = save battery, 15-60)
+  font_size_group: 9           # Group label font size (px)
+  font_size_title: 10          # Session title font size (px)
+  font_size_action: 10         # Action line font size (px)
 # Map source → default character ID for new sessions from that source.
 
 characters:

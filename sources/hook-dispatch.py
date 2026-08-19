@@ -77,21 +77,25 @@ def main():
 
 def classify(session_id: str) -> str:
     """Determine which source owns this session."""
-    # IDE sessions typically have sess_ prefix
-    if session_id.startswith("sess_"):
-        return "ide"
+    # Strip sess_ prefix for file lookups
+    uuid = session_id.replace("sess_", "")
 
-    uuid = session_id
-
-    # v2: has a session file in ~/.kiro/sessions/cli/
+    # v2: has a .json session file in ~/.kiro/sessions/cli/
     if (CLI_SESSIONS_DIR / f"{uuid}.json").exists():
         return "cli-v2"
 
-    # v3: exists in conversations_v2 SQLite table
+    # v3: has a .history file with sess_ prefix in ~/.kiro/sessions/cli/
+    if (CLI_SESSIONS_DIR / f"{session_id}.history").exists():
+        return "cli-v3"
+    # Also check without sess_ prefix (older v3 sessions)
+    if session_id.startswith("sess_") and (CLI_SESSIONS_DIR / f"{session_id}.history").exists():
+        return "cli-v3"
+
+    # v3 alternative: exists in conversations_v2 SQLite table
     if is_v3_conversation(uuid):
         return "cli-v3"
 
-    # Default: treat as IDE (some IDE sessions don't have sess_ prefix)
+    # Default: treat as IDE
     return "ide"
 
 

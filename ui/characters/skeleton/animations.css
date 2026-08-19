@@ -56,6 +56,7 @@
 /* ─── idle ───────────────────────────────────────────────────────────────── */
 
 [data-char="skeleton"].char-slot-idle svg .jaw {
+  transform-box: fill-box;
   transform-origin: center;
   animation: skeleton-jaw-clack 6s ease-in-out infinite;
 }
@@ -67,6 +68,7 @@
 }
 
 [data-char="skeleton"].char-slot-active svg .jaw {
+  transform-box: fill-box;
   transform-origin: center;
   animation: skeleton-jaw-clack 4s ease-in-out infinite;
 }
@@ -110,6 +112,7 @@
 /* ─── celebrate ──────────────────────────────────────────────────────────── */
 
 [data-char="skeleton"].char-slot-celebrate svg .skull {
+  transform-box: fill-box;
   transform-origin: center;
   animation: skeleton-spin-skull 1.5s ease-in-out;
 }

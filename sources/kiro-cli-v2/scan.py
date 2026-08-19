@@ -22,7 +22,7 @@ from pathlib import Path
 
 HOME = Path.home()
 CLI_SESSIONS_DIR = HOME / ".kiro/sessions/cli"
-TITLES_FILE = Path(__file__).parent.parent / "titles.json"
+TITLES_FILE = Path(__file__).parent.parent.parent / "data/titles.json"
 
 
 def log(msg: str) -> None:
