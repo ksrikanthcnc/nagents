@@ -69,7 +69,7 @@ overlay:
   collision_distance: 100       # Min distance between chars (pixels, accounts for labels)
   revolve_radius: 50           # Dot orbit radius (pixels)
   revolve_speed: 0.015         # Dot orbit speed (radians/frame)
-  shrink_after_min: 15         # Minutes before char shrinks to dot
+  shrink_after_min: 1            # Minutes before char shrinks to dot (1 for testing, set to 15 for prod)
   dot_scale: 0.5               # How much to scale down dot chars (0.3-0.7)
   cursor_fps: 10               # Cursor poll rate (10=low CPU, 30=smooth)
   physics_fps: 60              # Physics/render loop rate (60=smooth, 30=battery saver)
@@ -77,14 +77,12 @@ overlay:
   font_size_title: 10          # Session title font size (px)
   font_size_action: 10         # Action line font size (px)
 # Map source → default character ID for new sessions from that source.
-# ─── Characters (pool-based, persisted to data/char-assignments.json) ────────
+# ─── Characters ──────────────────────────────────────────────────────────────
+# Default char per source (flat). Pool assignment done in frontend.
+# Per-session override via right-click in panel (persisted to localStorage).
+
 characters:
-  kiro-crew:
-    pool: [ghost, owl, flame]
-  kiro-cli-v2:
-    pool: [mushroom, crystal, cat]
-  kiro-cli-v3:
-    pool: [mushroom, crystal, cat]
-  kiro-ide:
-    pool: [ghost, skeleton, robot, cat, owl]
+  kiro-crew: ghost
+  kiro-cli-v2: cat
+  kiro-cli-v3: cat
   kiro-ide: ghost

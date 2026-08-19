@@ -104,9 +104,18 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   pollCursor();
   log("overlay", `cursor polling started (${cfg.cursor_fps}fps)`);
 
-  // Poll state
-  pollState((state) => {
-    if (!cursorReady) return; // Don't spawn chars until cursor position is known
+  // Poll state + re-read config periodically
+  let configPollCount = 0;
+  pollState(async (state) => {
+    if (!cursorReady) return;
+    // Re-read config every 30 polls (~30s)
+    configPollCount++;
+    if (configPollCount % 30 === 0) {
+      try {
+        const fresh = await getConfig();
+        if (fresh.overlay) cfg = fresh.overlay;
+      } catch {}
+    }
     const showSessions = state.sessions.filter((s) => s.attention);
     syncChars(showSessions);
   }, 1000);
@@ -193,6 +202,8 @@ function syncChars(sessions: Session[]): void {
 }
 
 function eventToMode(event: string | null): CharMode {
+  // NOTE: This is only called when attention_source didn't explicitly set follow.
+  // The syncChars logic now uses session.attention directly for mode.
   switch (event) {
     case "idle":
     case "approval":
@@ -253,8 +264,8 @@ function getToolIcon(tool: string | null, event: string | null): string {
       case "web_fetch": return "🌐";
       case "remote_web_search": return "🌐";
       case "invoke_sub_agent": return "🤖";
-      case "update_session_information": return "";
-      case "todo_list": return "";
+      case "update_session_information": return "📋";
+      case "todo_list": return "☑️";
       default: return "🔧";
     }
   }
@@ -293,8 +304,9 @@ function getActionText(session: Session): string {
       case "invoke_sub_agent":
         return "sub-agent";
       case "update_session_information":
+        return "status";
       case "todo_list":
-        return "";  // Internal tools, not interesting to show
+        return "todo";
       default:
         return session.tool.length > 15 ? session.tool.slice(0, 14) + "…" : session.tool;
     }
@@ -409,6 +421,7 @@ function updatePhysics(): void {
 
     // ─── Normal mode: follow or roam ─────────────────────────────────
     char.el.classList.remove("char-dot");
+    char.el.style.transform = ""; // Clear dot scale if was previously dot
 
     let targetX: number;
     let targetY: number;
@@ -500,16 +513,17 @@ function updatePhysics(): void {
     }
 
     // Face toward cursor (follow) or movement direction (roam)
+    // ONLY flip the SVG, not the text labels
+    const svgEl = char.el.querySelector(".overlay-char-svg") as HTMLElement | null;
     if (char.mode === "follow") {
-      const dx = cursor.x - (char.x + CHAR_SIZE / 2);
-      const tilt = Math.max(-8, Math.min(8, dx * 0.03));
-      const flip = dx < -20 ? -1 : dx > 20 ? 1 : (char.el.dataset.flip === "-1" ? -1 : 1);
+      const faceDx = cursor.x - (char.x + CHAR_SIZE / 2);
+      const flip = faceDx < -20 ? -1 : faceDx > 20 ? 1 : (char.el.dataset.flip === "-1" ? -1 : 1);
       char.el.dataset.flip = String(flip);
-      char.el.style.transform = `scaleX(${flip}) rotate(${tilt}deg)`;
+      if (svgEl) svgEl.style.transform = `scaleX(${flip})`;
     } else {
       const flip = char.vx < -0.5 ? -1 : char.vx > 0.5 ? 1 : (char.el.dataset.flip === "-1" ? -1 : 1);
       char.el.dataset.flip = String(flip);
-      char.el.style.transform = `scaleX(${flip})`;
+      if (svgEl) svgEl.style.transform = `scaleX(${flip})`;
     }
 
     // Eye tracking — eyes shift toward cursor

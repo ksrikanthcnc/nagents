@@ -103,12 +103,7 @@ def translate(trigger: str, payload: dict) -> dict | None:
                 cmds.append(first_word)
         file_path = ",".join(cmds[:4]) if cmds else cmd[:30]
 
-    # Internal/housekeeping tools — don't report to nagents
-    INTERNAL_TOOLS = {"update_session_information", "todo_list"}
-
     if trigger == "PreToolUse":
-        if tool_name in INTERNAL_TOOLS:
-            return None  # Skip internal tools entirely
         return {
             "session_id": session_id,
             "event": "tool",
@@ -117,8 +112,6 @@ def translate(trigger: str, payload: dict) -> dict | None:
             "mtime": time.time(),
         }
     elif trigger == "PostToolUse":
-        if tool_name in INTERNAL_TOOLS:
-            return None
         return {
             "session_id": session_id,
             "event": "running",
