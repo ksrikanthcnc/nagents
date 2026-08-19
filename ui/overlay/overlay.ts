@@ -42,10 +42,11 @@ let animFrameId: number | null = null;
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 const FOLLOW_STRENGTH = 0.04;
-const ROAM_STRENGTH = 0.015;
+const ROAM_STRENGTH = 0.008;
 const DAMPING = 0.88;
 const MIN_CURSOR_DIST = 80;
 const MAX_SPEED = 6;
+const ROAM_MAX_SPEED = 3;
 const COLLISION_DIST = 55;
 const CHAR_SIZE = 44;
 const DOT_SIZE = 12;
@@ -145,8 +146,9 @@ function syncChars(sessions: Session[]): void {
 
       // Update label
       const eventLabel = session.event ? ` · ${session.event}` : "";
+      const toolLabel = session.tool ? ` [${session.tool}]` : "";
       const labelEl = char.el.querySelector(".overlay-char-label");
-      if (labelEl) labelEl.textContent = `${session.name}${eventLabel}`;
+      if (labelEl) labelEl.textContent = `${session.name}${eventLabel}${toolLabel}`;
     }
   }
 }
@@ -177,11 +179,12 @@ function createCharElement(session: Session): HTMLElement {
 
   const groupLabel = session.group || session.source;
   const eventLabel = session.event ? ` · ${session.event}` : "";
+  const toolLabel = session.tool ? ` [${session.tool}]` : "";
 
   el.innerHTML = `
     <div class="overlay-char-source">${groupLabel}</div>
     <div class="overlay-char-svg">${charDef.svg}</div>
-    <div class="overlay-char-label">${session.name}${eventLabel}</div>
+    <div class="overlay-char-label">${session.name}${eventLabel}${toolLabel}</div>
   `;
   el.style.position = "absolute";
   el.style.width = `${CHAR_SIZE}px`;
@@ -236,18 +239,27 @@ function drawConnections(svg: SVGSVGElement): void {
 function updatePhysics(): void {
   const charArray = Array.from(chars.values());
 
-  for (const char of charArray) {
-    // ─── Revolve mode: dot orbits cursor ─────────────────────────────
-    if (char.mode === "revolve") {
-      char.revolveAngle += REVOLVE_SPEED;
-      char.x = cursor.x + Math.cos(char.revolveAngle) * REVOLVE_RADIUS - DOT_SIZE / 2;
-      char.y = cursor.y + Math.sin(char.revolveAngle) * REVOLVE_RADIUS - DOT_SIZE / 2;
+  // Count dots for equidistant revolve positioning
+  const dotChars = charArray.filter((c) => c.mode === "revolve");
+  const dotCount = dotChars.length;
 
-      // Shrink element
+  for (const char of charArray) {
+    // ─── Revolve mode: dot orbits cursor at equidistant positions ─────
+    if (char.mode === "revolve") {
+      // Equidistant: spread dots evenly around circle
+      const dotIndex = dotChars.indexOf(char);
+      const baseAngle = (2 * Math.PI * dotIndex) / Math.max(1, dotCount);
+      char.revolveAngle += REVOLVE_SPEED;
+      const angle = char.revolveAngle + baseAngle;
+
+      char.x = cursor.x + Math.cos(angle) * REVOLVE_RADIUS - DOT_SIZE / 2;
+      char.y = cursor.y + Math.sin(angle) * REVOLVE_RADIUS - DOT_SIZE / 2;
+
       char.el.style.left = `${Math.round(char.x)}px`;
       char.el.style.top = `${Math.round(char.y)}px`;
       char.el.classList.add("char-dot");
       char.el.classList.remove("char-following", "char-roaming");
+      // Dots don't participate in collision — skip physics below
       continue;
     }
 
@@ -257,20 +269,23 @@ function updatePhysics(): void {
     let targetX: number;
     let targetY: number;
     let strength: number;
+    let maxSpeed: number;
 
     if (char.mode === "follow") {
       targetX = cursor.x;
       targetY = cursor.y;
       strength = FOLLOW_STRENGTH;
+      maxSpeed = MAX_SPEED;
     } else {
       char.roamTimer++;
-      if (char.roamTimer > 180 || distTo(char, char.roamTarget) < 30) {
+      if (char.roamTimer > 240 || distTo(char, char.roamTarget) < 30) {
         char.roamTarget = randomRoamTarget();
         char.roamTimer = 0;
       }
       targetX = char.roamTarget.x;
       targetY = char.roamTarget.y;
       strength = ROAM_STRENGTH;
+      maxSpeed = ROAM_MAX_SPEED;
     }
 
     const dx = targetX - char.x;
@@ -292,9 +307,9 @@ function updatePhysics(): void {
       }
     }
 
-    // Collision avoidance
+    // Collision avoidance — only with other NON-dot chars
     for (const other of charArray) {
-      if (other === char) continue;
+      if (other === char || other.mode === "revolve") continue;
       const cdx = char.x - other.x;
       const cdy = char.y - other.y;
       const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
@@ -309,9 +324,9 @@ function updatePhysics(): void {
     char.vx *= DAMPING;
     char.vy *= DAMPING;
     const speed = Math.sqrt(char.vx * char.vx + char.vy * char.vy);
-    if (speed > MAX_SPEED) {
-      char.vx = (char.vx / speed) * MAX_SPEED;
-      char.vy = (char.vy / speed) * MAX_SPEED;
+    if (speed > maxSpeed) {
+      char.vx = (char.vx / speed) * maxSpeed;
+      char.vy = (char.vy / speed) * maxSpeed;
     }
 
     char.x += char.vx;

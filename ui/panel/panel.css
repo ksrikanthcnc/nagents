@@ -150,6 +150,22 @@ body {
   margin-top: 3px;
 }
 
+/* Health bar (context usage) */
+.session-health {
+  width: 36px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+
+.session-health-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
 /* Event/tool status below name */
 .session-status {
   font-size: 8px;
@@ -157,6 +173,16 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 60px;
+  text-align: center;
+  margin-top: 1px;
+}
+
+.dot-badge {
+  font-size: 8px;
+  color: var(--accent);
+  opacity: 0.8;
+}
   max-width: 60px;
   text-align: center;
   margin-top: 1px;

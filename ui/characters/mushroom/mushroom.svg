@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Stem -->
+  <rect class="stem" x="26" y="34" width="12" height="22" rx="4" fill="#F5DEB3" stroke="#DEB887" stroke-width="1"/>
+  <!-- Cap -->
+  <ellipse class="cap" cx="32" cy="30" rx="20" ry="16" fill="#DC143C" stroke="#8B0000" stroke-width="1"/>
+  <!-- Spots on cap -->
+  <circle class="spot spot-1" cx="24" cy="24" r="3" fill="#FFF8DC" opacity="0.9"/>
+  <circle class="spot spot-2" cx="38" cy="22" r="2.5" fill="#FFF8DC" opacity="0.9"/>
+  <circle class="spot spot-3" cx="32" cy="18" r="2" fill="#FFF8DC" opacity="0.9"/>
+  <circle class="spot spot-4" cx="42" cy="30" r="2" fill="#FFF8DC" opacity="0.8"/>
+  <circle class="spot spot-5" cx="20" cy="32" r="1.5" fill="#FFF8DC" opacity="0.7"/>
+  <!-- Face on stem -->
+  <circle class="face-dot face-dot-left" cx="29" cy="42" r="1.5" fill="#333"/>
+  <circle class="face-dot face-dot-right" cx="35" cy="42" r="1.5" fill="#333"/>
+  <!-- Smile -->
+  <path class="smile" d="M29 46 Q32 49 35 46" fill="none" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Little arm bumps -->
+  <circle class="bump bump-left" cx="24" cy="44" r="3" fill="#F5DEB3" stroke="#DEB887" stroke-width="0.5"/>
+  <circle class="bump bump-right" cx="40" cy="44" r="3" fill="#F5DEB3" stroke="#DEB887" stroke-width="0.5"/>
+</svg>

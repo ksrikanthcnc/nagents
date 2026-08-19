@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Main crystal body -->
+  <polygon class="body crystal-main" points="32,4 48,24 44,56 20,56 16,24" fill="#88CCFF" fill-opacity="0.7" stroke="#44AAEE" stroke-width="1"/>
+  <!-- Facets -->
+  <polygon class="facet facet-left" points="32,4 16,24 28,28" fill="#AADDFF" fill-opacity="0.4"/>
+  <polygon class="facet facet-right" points="32,4 48,24 36,28" fill="#66BBEE" fill-opacity="0.3"/>
+  <!-- Inner glow -->
+  <ellipse class="core" cx="32" cy="34" rx="6" ry="10" fill="white" opacity="0.25"/>
+  <!-- Sparkle dots -->
+  <circle class="sparkle sparkle-1" cx="24" cy="20" r="1.5" fill="white" opacity="0.7"/>
+  <circle class="sparkle sparkle-2" cx="40" cy="30" r="1" fill="white" opacity="0.5"/>
+  <circle class="sparkle sparkle-3" cx="28" cy="44" r="1.2" fill="white" opacity="0.6"/>
+</svg>

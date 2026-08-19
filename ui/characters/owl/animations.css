@@ -1,0 +1,124 @@
+/* Owl — wise, slow blink, head tilt, wing flutter */
+
+@keyframes owl-slow-blink {
+  0%, 85%, 100% { transform: scaleY(1); }
+  90% { transform: scaleY(0.05); }
+  95% { transform: scaleY(0.3); }
+}
+
+@keyframes owl-head-tilt {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(8deg); }
+  70% { transform: rotate(-5deg); }
+}
+
+@keyframes owl-wing-flutter {
+  0%, 80%, 100% { transform: scaleX(1) rotate(0deg); }
+  85% { transform: scaleX(1.1) rotate(-3deg); }
+  90% { transform: scaleX(0.9) rotate(3deg); }
+  95% { transform: scaleX(1.05) rotate(-1deg); }
+}
+
+@keyframes owl-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
+}
+
+@keyframes owl-sleep {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(2px) rotate(-2deg); }
+}
+
+@keyframes owl-alert-look {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  15% { transform: rotate(20deg) scale(1.05); }
+  30% { transform: rotate(-15deg) scale(1.05); }
+  45% { transform: rotate(10deg) scale(1.02); }
+  60% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes owl-celebrate {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25% { transform: rotate(-5deg) translateY(-4px); }
+  50% { transform: rotate(5deg) translateY(-4px); }
+  75% { transform: rotate(-3deg) translateY(-2px); }
+}
+
+@keyframes owl-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-5px); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="owl"].char-slot-idle svg {
+  animation: owl-bob 4s ease-in-out infinite;
+}
+
+[data-char="owl"].char-slot-idle svg .eye {
+  transform-origin: center;
+  animation: owl-slow-blink calc(5s + var(--anim-offset, 0s)) ease-in-out infinite;
+  animation-delay: var(--anim-offset, 0s);
+}
+
+[data-char="owl"].char-slot-idle svg .head {
+  transform-origin: 32px 22px;
+  animation: owl-head-tilt 6s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="owl"].char-slot-active svg {
+  animation: owl-bob 2.5s ease-in-out infinite;
+}
+
+[data-char="owl"].char-slot-active svg .eye {
+  transform-origin: center;
+  animation: owl-slow-blink calc(3s + var(--anim-offset, 0s)) ease-in-out infinite;
+}
+
+[data-char="owl"].char-slot-active svg .wing-left,
+[data-char="owl"].char-slot-active svg .wing-right {
+  transform-origin: center;
+  animation: owl-wing-flutter 4s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="owl"].char-slot-alert svg .head {
+  transform-origin: 32px 22px;
+  animation: owl-alert-look 1.5s ease-in-out infinite;
+}
+
+[data-char="owl"].char-slot-alert svg .eye {
+  transform: scale(1.2);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="owl"].char-slot-sleep svg {
+  animation: owl-sleep 6s ease-in-out infinite;
+  opacity: 0.4;
+  filter: grayscale(0.5);
+}
+
+[data-char="owl"].char-slot-sleep svg .eye {
+  transform: scaleY(0.05);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="owl"].char-slot-celebrate svg {
+  animation: owl-celebrate 1.5s ease-in-out;
+}
+
+[data-char="owl"].char-slot-celebrate svg .wing-left,
+[data-char="owl"].char-slot-celebrate svg .wing-right {
+  animation: owl-wing-flutter 0.5s ease-in-out 4;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="owl"].char-slot-fading svg {
+  animation: owl-fade 5s ease-out forwards;
+}

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Outer flame -->
+  <path class="flame-outer" d="M32 4 C20 20 16 30 16 42 C16 52 23 60 32 60 C41 60 48 52 48 42 C48 30 44 20 32 4Z"
+    fill="#FF6B00" fill-opacity="0.9"/>
+  <!-- Inner flame -->
+  <path class="flame-inner" d="M32 16 C26 28 22 34 22 42 C22 50 26 56 32 56 C38 56 42 50 42 42 C42 34 38 28 32 16Z"
+    fill="#FFAA00" fill-opacity="0.95"/>
+  <!-- Core -->
+  <ellipse class="flame-core" cx="32" cy="46" rx="6" ry="8" fill="#FFDD44" fill-opacity="0.9"/>
+  <!-- Eyes (ember dots) -->
+  <circle class="ember ember-left" cx="28" cy="40" r="2.5" fill="#1a1a1a" opacity="0.7"/>
+  <circle class="ember ember-right" cx="36" cy="40" r="2.5" fill="#1a1a1a" opacity="0.7"/>
+  <!-- Sparkles -->
+  <circle class="spark spark-1" cx="22" cy="20" r="1" fill="#FFDD44" opacity="0.6"/>
+  <circle class="spark spark-2" cx="40" cy="16" r="1.2" fill="#FFAA00" opacity="0.5"/>
+  <circle class="spark spark-3" cx="26" cy="10" r="0.8" fill="#FF6B00" opacity="0.4"/>
+</svg>

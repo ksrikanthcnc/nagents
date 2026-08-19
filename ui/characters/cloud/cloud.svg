@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Cloud body (puffy) -->
+  <circle class="puff puff-1" cx="22" cy="36" r="12" fill="white" fill-opacity="0.9"/>
+  <circle class="puff puff-2" cx="36" cy="32" r="14" fill="white" fill-opacity="0.92"/>
+  <circle class="puff puff-3" cx="46" cy="38" r="10" fill="white" fill-opacity="0.88"/>
+  <circle class="puff puff-4" cx="30" cy="42" r="11" fill="white" fill-opacity="0.9"/>
+  <!-- Face -->
+  <circle class="eye eye-left" cx="28" cy="36" r="2" fill="#555"/>
+  <circle class="eye eye-right" cx="38" cy="34" r="2" fill="#555"/>
+  <!-- Smile -->
+  <path class="smile" d="M28 40 Q33 43 38 40" fill="none" stroke="#555" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Rain drops (hidden by default, shown in pressure slot) -->
+  <circle class="raindrop raindrop-1" cx="24" cy="52" r="1" fill="#88BBFF" opacity="0"/>
+  <circle class="raindrop raindrop-2" cx="32" cy="54" r="1" fill="#88BBFF" opacity="0"/>
+  <circle class="raindrop raindrop-3" cx="40" cy="52" r="1" fill="#88BBFF" opacity="0"/>
+</svg>

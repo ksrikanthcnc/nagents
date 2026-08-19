@@ -1,0 +1,65 @@
+/* Blob — amorphous, squishes, no anatomy */
+
+@keyframes blob-breathe {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  50% { transform: scaleX(1.04) scaleY(0.96); }
+}
+
+@keyframes blob-jiggle {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(2px) rotate(1deg); }
+  75% { transform: translateX(-2px) rotate(-1deg); }
+}
+
+@keyframes blob-squish {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  30% { transform: scaleX(1.15) scaleY(0.85); }
+  60% { transform: scaleX(0.9) scaleY(1.1); }
+}
+
+@keyframes blob-flatten {
+  0%, 100% { transform: scaleX(1.1) scaleY(0.9); }
+  50% { transform: scaleX(1.15) scaleY(0.85); }
+}
+
+@keyframes blob-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="blob"].char-slot-idle svg {
+  animation: blob-breathe 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="blob"].char-slot-active svg {
+  animation: blob-jiggle 1.5s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="blob"].char-slot-alert svg {
+  animation: blob-squish 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="blob"].char-slot-sleep svg {
+  animation: blob-flatten 6s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="blob"].char-slot-celebrate svg {
+  animation: blob-squish 0.5s ease-in-out 4;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="blob"].char-slot-fading svg {
+  animation: blob-fade 5s ease-out forwards;
+}

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Antenna -->
+  <line class="antenna-stem" x1="32" y1="4" x2="32" y2="12" stroke="#888" stroke-width="2"/>
+  <circle class="antenna-tip" cx="32" cy="3" r="3" fill="#ff4444"/>
+  <!-- Head -->
+  <rect class="head" x="18" y="12" width="28" height="22" rx="4" fill="#607d8b" stroke="#455a64" stroke-width="1"/>
+  <!-- Eyes (LED) -->
+  <rect class="eye eye-left led" x="23" y="18" width="6" height="6" rx="1" fill="#00ff88"/>
+  <rect class="eye eye-right led" x="35" y="18" width="6" height="6" rx="1" fill="#00ff88"/>
+  <!-- Mouth (speaker grid) -->
+  <rect class="mouth speaker" x="24" y="28" width="16" height="4" rx="1" fill="#333"/>
+  <line class="speaker-line" x1="28" y1="28" x2="28" y2="32" stroke="#555" stroke-width="0.5"/>
+  <line class="speaker-line" x1="32" y1="28" x2="32" y2="32" stroke="#555" stroke-width="0.5"/>
+  <line class="speaker-line" x1="36" y1="28" x2="36" y2="32" stroke="#555" stroke-width="0.5"/>
+  <!-- Body -->
+  <rect class="body chassis" x="20" y="36" width="24" height="20" rx="3" fill="#78909c" stroke="#546e7a" stroke-width="1"/>
+  <!-- Chest panel -->
+  <rect class="chest-panel" x="26" y="40" width="12" height="8" rx="2" fill="#37474f"/>
+  <circle class="indicator indicator-warn" cx="30" cy="44" r="2" fill="#ff9800"/>
+  <circle class="indicator indicator-ok" cx="36" cy="44" r="2" fill="#4caf50"/>
+  <!-- Arms -->
+  <rect class="arm arm-left" x="12" y="38" width="6" height="14" rx="3" fill="#607d8b"/>
+  <rect class="arm arm-right" x="46" y="38" width="6" height="14" rx="3" fill="#607d8b"/>
+</svg>

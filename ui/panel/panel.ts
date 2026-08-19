@@ -94,23 +94,19 @@ function render(): void {
 }
 
 function renderSession(session: Session): string {
-  const char = getCharacter(session.character ?? "ghost");
+  const charId = session.character ?? "ghost";
+  const char = getCharacter(charId);
   const attentionClass = session.attention ? "session-attention" : "";
 
   const action = sessionToAction(session);
   const actionDef = char.actions[action];
   const animClass = actionDef?.cssClass ?? "";
 
-  // Name (truncated)
-  const name = session.name.length > 12 ? session.name.slice(0, 11) + "…" : session.name;
+  // Name (truncated with ellipsis via CSS)
+  const name = session.name;
 
-  // Status line: event · tool
-  let status = "";
-  if (session.tool) {
-    status = session.tool;
-  } else if (session.event) {
-    status = session.event;
-  }
+  // Activity indicator dot (priority: red > amber > green > gray > none)
+  const indicator = getIndicator(session);
 
   // Tooltip content
   const tooltipParts: string[] = [];
@@ -122,14 +118,59 @@ function renderSession(session: Session): string {
   if (session.attention_reason) tooltipParts.push(`<div class="tooltip-row">attention: <span>${session.attention_reason}</span></div>`);
   if (session.tokens > 0) tooltipParts.push(`<div class="tooltip-row">tokens: <span>${(session.tokens / 1000).toFixed(0)}k/${(session.maxTokens / 1000).toFixed(0)}k</span></div>`);
 
+  // Health bar (context usage)
+  const pct = session.maxTokens > 0 ? Math.min(100, Math.round((session.tokens / session.maxTokens) * 100)) : 0;
+  const barColor = pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#4ade80";
+  const healthBar = session.tokens > 0
+    ? `<div class="session-health"><div class="session-health-fill" style="width:${pct}%;background:${barColor}"></div></div>`
+    : "";
+
+  // Is this session in dot/revolve mode on overlay? (on screen > 15 min)
+  const onScreenSec = session.attention_since
+    ? (Date.now() / 1000 - session.attention_since)
+    : 0;
+  const isDot = onScreenSec > 15 * 60;
+  const dotBadge = isDot ? ` <span class="dot-badge">⊙</span>` : "";
+
+  // Status line: event · tool
+  let status = "";
+  if (session.tool) {
+    status = session.tool;
+  } else if (session.event) {
+    status = session.event;
+  }
+
+  // data-char + animClass on the char container — CSS targets [data-char="X"].char-slot-Y svg
   return `<div class="session ${attentionClass}" data-id="${session.id}">
-    <div class="session-char ${animClass}">
+    <div class="session-char ${animClass}" data-char="${charId}">
       ${char.svg}
     </div>
-    <div class="session-name">${name}</div>
+    ${indicator}
+    ${healthBar}
+    <div class="session-name-short">${name}${dotBadge}</div>
     ${status ? `<div class="session-status">${status}</div>` : ""}
     <div class="session-tooltip">${tooltipParts.join("")}</div>
   </div>`;
+}
+
+/** Activity indicator dot. Priority: red > amber > green > gray > none. */
+function getIndicator(session: Session): string {
+  if (session.event === "approval" || session.event === "stuck") {
+    return `<div class="activity-dot dot-red"></div>`;
+  }
+  if (session.attention) {
+    return `<div class="activity-dot dot-amber"></div>`;
+  }
+  if (session.event === "tool") {
+    return `<div class="activity-dot dot-green dot-pulse"></div>`;
+  }
+  if (session.event === "running") {
+    return `<div class="activity-dot dot-green"></div>`;
+  }
+  if (!session.active) {
+    return `<div class="activity-dot dot-gray"></div>`;
+  }
+  return "";
 }
 
 function sessionToAction(session: Session): CharacterAction {

@@ -22,11 +22,16 @@ sources:
     interval_sec: 60
     hook: false
     enabled: true
-  # kiro-cli:
-  #   scanner: "python3 sources/kiro-cli/scan.py"
-  #   interval_sec: 5
-  #   hook: true
-  #   enabled: false
+  kiro-cli-v2:
+    scanner: "python3 sources/kiro-cli-v2/scan.py"
+    interval_sec: 5
+    hook: true
+    enabled: true
+  kiro-cli-v3:
+    scanner: "python3 sources/kiro-cli-v3/scan.py"
+    interval_sec: 5
+    hook: true
+    enabled: true
 
 # ─── Attention Rules ─────────────────────────────────────────────────────────
 # Core rules applied when source doesn't explicitly set attention.
@@ -47,7 +52,8 @@ attention_rules:
 
 panel_order:
   - on-screen
-  - kiro-cli
+  - kiro-cli-v2
+  - kiro-cli-v3
   - kiro-crew
   - kiro-ide
 
@@ -56,5 +62,6 @@ panel_order:
 
 characters:
   kiro-crew: ghost
-  kiro-cli: cat
+  kiro-cli-v2: cat
+  kiro-cli-v3: cat
   kiro-ide: ghost

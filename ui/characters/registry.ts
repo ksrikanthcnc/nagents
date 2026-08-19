@@ -11,10 +11,29 @@
 import type { CharacterDef } from "./types";
 import { ghost } from "./ghost/manifest";
 import { cat } from "./cat/manifest";
+import { skeleton } from "./skeleton/manifest";
+import { robot } from "./robot/manifest";
+import { owl } from "./owl/manifest";
+import { mushroom } from "./mushroom/manifest";
+import { flame } from "./flame/manifest";
+import { crystal } from "./crystal/manifest";
+import { cloud } from "./cloud/manifest";
+import { blob } from "./blob/manifest";
 
 // ─── Registry ───────────────────────────────────────────────────────────────
 
-const CHARACTERS: CharacterDef[] = [ghost, cat];
+const CHARACTERS: CharacterDef[] = [
+  ghost,
+  cat,
+  skeleton,
+  robot,
+  owl,
+  mushroom,
+  flame,
+  crystal,
+  cloud,
+  blob,
+];
 
 const charMap = new Map<string, CharacterDef>(
   CHARACTERS.map((c) => [c.id, c])

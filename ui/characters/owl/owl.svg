@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Body -->
+  <ellipse class="body" cx="32" cy="42" rx="14" ry="16" fill="#8B4513" stroke="#5C2E0A" stroke-width="1"/>
+  <!-- Wings -->
+  <ellipse class="wing wing-left" cx="18" cy="40" rx="6" ry="12" fill="#6B3510" stroke="#4A2508" stroke-width="0.5"/>
+  <ellipse class="wing wing-right" cx="46" cy="40" rx="6" ry="12" fill="#6B3510" stroke="#4A2508" stroke-width="0.5"/>
+  <!-- Head -->
+  <circle class="head" cx="32" cy="22" r="14" fill="#A0522D" stroke="#6B3510" stroke-width="1"/>
+  <!-- Ear tufts -->
+  <polygon class="tuft tuft-left" points="20,12 18,2 24,10" fill="#6B3510"/>
+  <polygon class="tuft tuft-right" points="44,12 46,2 40,10" fill="#6B3510"/>
+  <!-- Eye circles (large, owl-like) -->
+  <circle class="eye-ring eye-ring-left" cx="26" cy="22" r="7" fill="#FFF8DC" stroke="#8B4513" stroke-width="1"/>
+  <circle class="eye-ring eye-ring-right" cx="38" cy="22" r="7" fill="#FFF8DC" stroke="#8B4513" stroke-width="1"/>
+  <!-- Pupils -->
+  <circle class="eye eye-left" cx="26" cy="22" r="4" fill="#1a1a1a"/>
+  <circle class="eye eye-right" cx="38" cy="22" r="4" fill="#1a1a1a"/>
+  <!-- Pupil highlights -->
+  <circle class="highlight" cx="24" cy="20" r="1.5" fill="white" opacity="0.8"/>
+  <circle class="highlight" cx="36" cy="20" r="1.5" fill="white" opacity="0.8"/>
+  <!-- Beak -->
+  <polygon class="beak" points="30,28 32,33 34,28" fill="#FFD700" stroke="#DAA520" stroke-width="0.5"/>
+  <!-- Feet -->
+  <path class="foot foot-left" d="M26 56 L24 60 M26 56 L26 60 M26 56 L28 60" stroke="#DAA520" stroke-width="1.5" fill="none"/>
+  <path class="foot foot-right" d="M38 56 L36 60 M38 56 L38 60 M38 56 L40 60" stroke="#DAA520" stroke-width="1.5" fill="none"/>
+</svg>

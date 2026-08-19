@@ -1,0 +1,126 @@
+/* Skeleton — rattly, jaw clacks, ribs jitter */
+
+@keyframes skeleton-rattle {
+  0%, 40%, 100% { transform: translateY(0); }
+  10% { transform: translateY(-1px); }
+  20% { transform: translateY(0.5px); }
+  30% { transform: translateY(-0.5px); }
+}
+
+@keyframes skeleton-jaw-clack {
+  0%, 80%, 100% { transform: translateY(0); }
+  85% { transform: translateY(2px); }
+  90% { transform: translateY(0); }
+  95% { transform: translateY(1px); }
+}
+
+@keyframes skeleton-rib-jitter {
+  0%, 70%, 100% { transform: translateX(0); }
+  75% { transform: translateX(-0.5px); }
+  85% { transform: translateX(0.5px); }
+  90% { transform: translateX(0); }
+}
+
+@keyframes skeleton-collapse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
+
+@keyframes skeleton-spin-skull {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(15deg); }
+  50% { transform: rotate(0deg); }
+  75% { transform: rotate(-15deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes skeleton-sleep {
+  0%, 100% { transform: rotate(0deg); opacity: 0.4; }
+  50% { transform: rotate(-10deg); opacity: 0.35; }
+}
+
+@keyframes skeleton-click-settle {
+  0% { transform: translateY(0); }
+  15% { transform: translateY(-2px); }
+  30% { transform: translateY(1px); }
+  50% { transform: translateY(-1px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes skeleton-nod {
+  0%, 100% { transform: rotate(0deg); }
+  40% { transform: rotate(5deg); }
+  60% { transform: rotate(-2deg); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="skeleton"].char-slot-idle svg .jaw {
+  transform-origin: center;
+  animation: skeleton-jaw-clack 6s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="skeleton"].char-slot-active svg {
+  animation: skeleton-rattle 2s ease-in-out infinite;
+}
+
+[data-char="skeleton"].char-slot-active svg .jaw {
+  transform-origin: center;
+  animation: skeleton-jaw-clack 4s ease-in-out infinite;
+}
+
+[data-char="skeleton"].char-slot-active svg .rib-1 {
+  animation: skeleton-rib-jitter 3s ease-in-out infinite;
+}
+
+[data-char="skeleton"].char-slot-active svg .rib-2 {
+  animation: skeleton-rib-jitter 3s ease-in-out infinite;
+  animation-delay: 0.4s;
+}
+
+[data-char="skeleton"].char-slot-active svg .rib-3 {
+  animation: skeleton-rib-jitter 3s ease-in-out infinite;
+  animation-delay: 0.8s;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="skeleton"].char-slot-alert svg {
+  animation: skeleton-rattle 0.5s ease-in-out infinite;
+}
+
+[data-char="skeleton"].char-slot-alert svg .jaw {
+  animation: skeleton-jaw-clack 1s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="skeleton"].char-slot-sleep svg {
+  animation: skeleton-sleep 8s ease-in-out infinite;
+}
+
+[data-char="skeleton"].char-slot-sleep svg .rib-1,
+[data-char="skeleton"].char-slot-sleep svg .rib-2,
+[data-char="skeleton"].char-slot-sleep svg .rib-3 {
+  animation: skeleton-collapse 6s ease-in-out infinite;
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="skeleton"].char-slot-celebrate svg .skull {
+  transform-origin: center;
+  animation: skeleton-spin-skull 1.5s ease-in-out;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+@keyframes skeleton-fade {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(4px); }
+}
+
+[data-char="skeleton"].char-slot-fading svg {
+  animation: skeleton-fade 5s ease-out forwards;
+}

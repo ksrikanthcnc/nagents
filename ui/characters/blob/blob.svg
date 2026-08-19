@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Main blob body (amorphous) -->
+  <path class="body" d="M16 40 Q10 32 18 24 Q24 16 34 16 Q46 16 50 24 Q56 32 50 40 Q46 50 36 52 Q28 54 20 50 Q14 48 16 40Z"
+    fill="#7B68EE" fill-opacity="0.85" stroke="#5B48CE" stroke-width="1"/>
+  <!-- Inner shine -->
+  <ellipse class="shine" cx="30" cy="28" rx="8" ry="6" fill="white" opacity="0.15"/>
+  <!-- Face dots (minimal) -->
+  <circle class="face-dot face-left" cx="28" cy="34" r="2.5" fill="#2a1a4e"/>
+  <circle class="face-dot face-right" cx="38" cy="34" r="2.5" fill="#2a1a4e"/>
+  <!-- Smile -->
+  <path class="smile" d="M28 40 Q33 44 38 40" fill="none" stroke="#2a1a4e" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

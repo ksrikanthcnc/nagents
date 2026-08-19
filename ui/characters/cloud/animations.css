@@ -1,0 +1,112 @@
+/* Cloud — soft, drifty, rains when stressed */
+
+@keyframes cloud-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+
+@keyframes cloud-puff-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes cloud-blink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  92% { transform: scaleY(0.1); }
+}
+
+@keyframes cloud-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes cloud-rain {
+  0% { transform: translateY(0); opacity: 0.8; }
+  100% { transform: translateY(10px); opacity: 0; }
+}
+
+@keyframes cloud-darken {
+  0%, 100% { fill-opacity: 0.9; fill: white; }
+  50% { fill-opacity: 0.85; fill: #ddd; }
+}
+
+@keyframes cloud-rainbow {
+  0% { filter: brightness(1); }
+  25% { filter: brightness(1.2) hue-rotate(30deg); }
+  50% { filter: brightness(1.3) hue-rotate(60deg); }
+  75% { filter: brightness(1.2) hue-rotate(30deg); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes cloud-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="cloud"].char-slot-idle svg {
+  animation: cloud-drift 5s ease-in-out infinite;
+}
+
+[data-char="cloud"].char-slot-idle svg .puff {
+  animation: cloud-puff-breathe 4s ease-in-out infinite;
+}
+[data-char="cloud"].char-slot-idle svg .puff-2 { animation-delay: 0.5s; }
+[data-char="cloud"].char-slot-idle svg .puff-3 { animation-delay: 1s; }
+
+[data-char="cloud"].char-slot-idle svg .eye {
+  transform-origin: center;
+  animation: cloud-blink calc(4s + var(--anim-offset, 0s)) ease-in-out infinite;
+  animation-delay: var(--anim-offset, 0s);
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="cloud"].char-slot-active svg {
+  animation: cloud-drift 3s ease-in-out infinite;
+  filter: brightness(1.1);
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="cloud"].char-slot-alert svg {
+  animation: cloud-bounce 1s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="cloud"].char-slot-sleep svg {
+  animation: cloud-drift 10s ease-in-out infinite;
+  opacity: 0.4;
+  filter: grayscale(0.5);
+}
+
+[data-char="cloud"].char-slot-sleep svg .eye {
+  transform: scaleY(0.1);
+}
+
+/* ─── pressure (raining!) ────────────────────────────────────────────────── */
+
+[data-char="cloud"].char-slot-pressure svg .puff {
+  animation: cloud-darken 2s ease-in-out infinite;
+}
+
+[data-char="cloud"].char-slot-pressure svg .raindrop {
+  opacity: 0.8;
+  animation: cloud-rain 1s ease-in infinite;
+}
+[data-char="cloud"].char-slot-pressure svg .raindrop-2 { animation-delay: 0.3s; }
+[data-char="cloud"].char-slot-pressure svg .raindrop-3 { animation-delay: 0.6s; }
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="cloud"].char-slot-celebrate svg {
+  animation: cloud-rainbow 2s ease-in-out;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="cloud"].char-slot-fading svg {
+  animation: cloud-fade 5s ease-out forwards;
+}

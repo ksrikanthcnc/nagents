@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Skull -->
+  <circle class="skull" cx="32" cy="20" r="14" fill="#e8e8e8" stroke="#ccc" stroke-width="1"/>
+  <!-- Eye sockets -->
+  <circle class="eye eye-left" cx="26" cy="18" r="4" fill="#1a1a1a"/>
+  <circle class="eye eye-right" cx="38" cy="18" r="4" fill="#1a1a1a"/>
+  <!-- Nose -->
+  <path class="nose" d="M30 24 L32 27 L34 24" fill="none" stroke="#666" stroke-width="1.5"/>
+  <!-- Mouth (grin) -->
+  <path class="mouth jaw" d="M24 30 Q32 35 40 30" fill="none" stroke="#1a1a1a" stroke-width="1.5"/>
+  <line class="tooth" x1="28" y1="31" x2="28" y2="33" stroke="#1a1a1a" stroke-width="1"/>
+  <line class="tooth" x1="32" y1="32" x2="32" y2="34" stroke="#1a1a1a" stroke-width="1"/>
+  <line class="tooth" x1="36" y1="31" x2="36" y2="33" stroke="#1a1a1a" stroke-width="1"/>
+  <!-- Spine -->
+  <rect class="spine" x="30" y="34" width="4" height="20" fill="#e8e8e8" rx="2"/>
+  <!-- Ribs -->
+  <rect class="rib rib-1" x="22" y="38" width="20" height="3" fill="#ddd" rx="1"/>
+  <rect class="rib rib-2" x="24" y="43" width="16" height="3" fill="#ddd" rx="1"/>
+  <rect class="rib rib-3" x="26" y="48" width="12" height="3" fill="#ddd" rx="1"/>
+</svg>

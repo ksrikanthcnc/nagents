@@ -107,7 +107,7 @@ def translate(trigger: str, payload: dict) -> dict | None:
         return {
             "session_id": session_id,
             "event": "running",
-            "attention": None,  # Don't override attention — let it stay, just change mode
+            "attention": True,  # Stay on overlay, switch to roam mode
             "mtime": time.time(),
         }
     else:

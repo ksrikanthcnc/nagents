@@ -1,0 +1,89 @@
+/* Crystal — geometric, sparkles, refracts light */
+
+@keyframes crystal-shimmer {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.15); }
+}
+
+@keyframes crystal-sparkle {
+  0%, 60%, 100% { opacity: 0.5; transform: scale(1); }
+  80% { opacity: 1; transform: scale(1.5); }
+}
+
+@keyframes crystal-rotate {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(2deg); }
+  75% { transform: rotate(-2deg); }
+}
+
+@keyframes crystal-shatter-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-2px) rotate(-1deg); }
+  40% { transform: translateX(2px) rotate(1deg); }
+  60% { transform: translateX(-1px) rotate(-0.5deg); }
+  80% { transform: translateX(1px) rotate(0.5deg); }
+}
+
+@keyframes crystal-dim {
+  0%, 100% { opacity: 0.35; filter: brightness(0.7); }
+  50% { opacity: 0.3; filter: brightness(0.6); }
+}
+
+@keyframes crystal-burst {
+  0% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.15); filter: brightness(1.6) hue-rotate(20deg); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes crystal-fade {
+  0% { opacity: 1; filter: brightness(1); }
+  100% { opacity: 0; filter: brightness(0.5) saturate(0); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="crystal"].char-slot-idle svg {
+  animation: crystal-shimmer 4s ease-in-out infinite;
+}
+
+[data-char="crystal"].char-slot-idle svg .sparkle {
+  animation: crystal-sparkle 3s ease-in-out infinite;
+}
+[data-char="crystal"].char-slot-idle svg .sparkle-2 { animation-delay: 1s; }
+[data-char="crystal"].char-slot-idle svg .sparkle-3 { animation-delay: 2s; }
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="crystal"].char-slot-active svg {
+  animation: crystal-rotate 2s ease-in-out infinite;
+  filter: brightness(1.2);
+}
+
+[data-char="crystal"].char-slot-active svg .sparkle {
+  animation: crystal-sparkle 1.5s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="crystal"].char-slot-alert svg {
+  animation: crystal-shatter-shake 0.6s ease-in-out infinite;
+  filter: brightness(1.4) saturate(1.5);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="crystal"].char-slot-sleep svg {
+  animation: crystal-dim 8s ease-in-out infinite;
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="crystal"].char-slot-celebrate svg {
+  animation: crystal-burst 2s ease-in-out;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="crystal"].char-slot-fading svg {
+  animation: crystal-fade 5s ease-out forwards;
+}
