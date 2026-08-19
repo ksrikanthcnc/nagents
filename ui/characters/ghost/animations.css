@@ -97,6 +97,11 @@
   transform: scale(1.2);
 }
 
+[data-char="ghost"].char-slot-alert svg .blush {
+  fill-opacity: 0.85;
+  transition: fill-opacity 0.3s;
+}
+
 /* ─── sleep ──────────────────────────────────────────────────────────────── */
 
 [data-char="ghost"].char-slot-sleep svg {

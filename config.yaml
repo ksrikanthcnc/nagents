@@ -77,9 +77,14 @@ overlay:
   font_size_title: 10          # Session title font size (px)
   font_size_action: 10         # Action line font size (px)
 # Map source → default character ID for new sessions from that source.
-
+# ─── Characters (pool-based, persisted to data/char-assignments.json) ────────
 characters:
-  kiro-crew: ghost
-  kiro-cli-v2: cat
-  kiro-cli-v3: cat
+  kiro-crew:
+    pool: [ghost, owl, flame]
+  kiro-cli-v2:
+    pool: [mushroom, crystal, cat]
+  kiro-cli-v3:
+    pool: [mushroom, crystal, cat]
+  kiro-ide:
+    pool: [ghost, skeleton, robot, cat, owl]
   kiro-ide: ghost

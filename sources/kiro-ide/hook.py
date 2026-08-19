@@ -53,6 +53,9 @@ def main():
     if not update:
         sys.exit(0)
 
+    # Verbose: log translation
+    log(f"{trigger} → {update.get('event','?')} | tool={update.get('tool','–')} | file={update.get('file','–')} | attn={update.get('attention','–')}")
+
     # POST to nagents
     try:
         data = json.dumps(update).encode()
@@ -80,12 +83,32 @@ def translate(trigger: str, payload: dict) -> dict | None:
 
     tool_name = payload.get("tool_name", "") or payload.get("toolName", "unknown")
     file_path = payload.get("file") or payload.get("tool_input", {}).get("path")
-    # For execute_bash, extract the command (first 40 chars)
+    # Extract command names from chains (&&, |, ;, &)
     tool_input = payload.get("tool_input", {})
     if tool_name == "execute_bash" and "command" in tool_input:
-        file_path = tool_input["command"][:40]
+        cmd = tool_input["command"]
+        # Split on all chain operators
+        import re
+        parts = re.split(r'&&|\|\||[|;&]', cmd)
+        cmds = []
+        for part in parts:
+            words = part.strip().split()
+            if not words:
+                continue
+            first_word = words[0].split("/")[-1]  # strip path
+            # Skip cd (not interesting), skip env vars (FOO=bar)
+            if first_word == "cd" or "=" in first_word:
+                continue
+            if first_word and first_word not in cmds:
+                cmds.append(first_word)
+        file_path = ",".join(cmds[:4]) if cmds else cmd[:30]
+
+    # Internal/housekeeping tools — don't report to nagents
+    INTERNAL_TOOLS = {"update_session_information", "todo_list"}
 
     if trigger == "PreToolUse":
+        if tool_name in INTERNAL_TOOLS:
+            return None  # Skip internal tools entirely
         return {
             "session_id": session_id,
             "event": "tool",
@@ -94,6 +117,8 @@ def translate(trigger: str, payload: dict) -> dict | None:
             "mtime": time.time(),
         }
     elif trigger == "PostToolUse":
+        if tool_name in INTERNAL_TOOLS:
+            return None
         return {
             "session_id": session_id,
             "event": "running",

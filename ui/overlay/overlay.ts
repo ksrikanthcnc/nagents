@@ -253,8 +253,8 @@ function getToolIcon(tool: string | null, event: string | null): string {
       case "web_fetch": return "🌐";
       case "remote_web_search": return "🌐";
       case "invoke_sub_agent": return "🤖";
-      case "update_session_information": return "📋";
-      case "todo_list": return "📝";
+      case "update_session_information": return "";
+      case "todo_list": return "";
       default: return "🔧";
     }
   }
@@ -511,6 +511,37 @@ function updatePhysics(): void {
       char.el.dataset.flip = String(flip);
       char.el.style.transform = `scaleX(${flip})`;
     }
+
+    // Eye tracking — eyes shift toward cursor
+    trackEyes(char);
+  }
+}
+
+// ─── Eye Tracking ───────────────────────────────────────────────────────────
+
+const EYE_MAX_OFFSET = 2; // px — subtle shift, not cartoon-huge
+
+function trackEyes(char: OverlayChar): void {
+  const eyes = char.el.querySelectorAll("svg .eye");
+  if (eyes.length === 0) return;
+
+  // Compute direction from char center to cursor
+  const cx = char.x + CHAR_SIZE / 2;
+  const cy = char.y + CHAR_SIZE / 2;
+  const dx = cursor.x - cx;
+  const dy = cursor.y - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 1) return;
+
+  // Normalize and scale
+  const ox = (dx / dist) * EYE_MAX_OFFSET;
+  const oy = (dy / dist) * EYE_MAX_OFFSET;
+
+  // Account for flip (scaleX(-1) reverses x)
+  const flip = char.el.dataset.flip === "-1" ? -1 : 1;
+
+  for (const eye of eyes) {
+    (eye as SVGElement).style.translate = `${ox * flip}px ${oy}px`;
   }
 }
 
