@@ -80,6 +80,10 @@ def translate(trigger: str, payload: dict) -> dict | None:
 
     tool_name = payload.get("tool_name", "") or payload.get("toolName", "unknown")
     file_path = payload.get("file") or payload.get("tool_input", {}).get("path")
+    # For execute_bash, extract the command (first 40 chars)
+    tool_input = payload.get("tool_input", {})
+    if tool_name == "execute_bash" and "command" in tool_input:
+        file_path = tool_input["command"][:40]
 
     if trigger == "PreToolUse":
         return {

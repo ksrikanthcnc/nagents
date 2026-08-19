@@ -14,7 +14,7 @@ export const ghost: CharacterDef = {
     sleep: { cssClass: "char-slot-sleep" },
     celebrate: { cssClass: "char-slot-celebrate", duration: 2000, loop: false },
     talk: { cssClass: "char-slot-speak" },
-    walk: { cssClass: "char-slot-idle", duration: 2500 },
+    walk: { cssClass: "char-slot-walk", duration: 1200 },
     wave: { cssClass: "char-slot-celebrate", duration: 1500, loop: false },
     disappear: { cssClass: "char-slot-fading", duration: 5000, loop: false },
   },

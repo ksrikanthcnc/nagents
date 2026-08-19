@@ -71,6 +71,7 @@ export interface OverlayConfig {
   revolve_radius: number;
   revolve_speed: number;
   shrink_after_min: number;
+  dot_scale: number;
   cursor_fps: number;
   physics_fps: number;
   font_size_group: number;

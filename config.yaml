@@ -70,8 +70,9 @@ overlay:
   revolve_radius: 50           # Dot orbit radius (pixels)
   revolve_speed: 0.015         # Dot orbit speed (radians/frame)
   shrink_after_min: 15         # Minutes before char shrinks to dot
-  cursor_fps: 30               # Cursor poll rate (frames per second)
-  physics_fps: 30              # Physics/render loop rate (lower = save battery, 15-60)
+  dot_scale: 0.5               # How much to scale down dot chars (0.3-0.7)
+  cursor_fps: 10               # Cursor poll rate (10=low CPU, 30=smooth)
+  physics_fps: 60              # Physics/render loop rate (60=smooth, 30=battery saver)
   font_size_group: 9           # Group label font size (px)
   font_size_title: 10          # Session title font size (px)
   font_size_action: 10         # Action line font size (px)

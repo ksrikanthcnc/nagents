@@ -35,6 +35,8 @@ interface OverlayChar {
 // ─── State ──────────────────────────────────────────────────────────────────
 
 let cursor: CursorPosition = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+/** Smoothed cursor — interpolated each physics frame for smooth movement at low cursor_fps */
+let smoothCursor: CursorPosition = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 const chars: Map<string, OverlayChar> = new Map();
 let container: HTMLElement | null = null;
 let animFrameId: number | null = null;
@@ -55,8 +57,9 @@ let cfg: OverlayConfig = {
   revolve_radius: 50,
   revolve_speed: 0.015,
   shrink_after_min: 15,
+  dot_scale: 0.5,
   cursor_fps: 30,
-  physics_fps: 30,
+  physics_fps: 60,
   font_size_group: 9,
   font_size_title: 10,
   font_size_action: 10,
@@ -133,20 +136,20 @@ function syncChars(sessions: Session[]): void {
     if (!chars.has(session.id)) {
       const el = createCharElement(session);
       container.appendChild(el);
-      const offsetX = (Math.random() - 0.5) * 150;
-      const offsetY = (Math.random() - 0.5) * 150;
 
-      // Use attention_since from backend (epoch seconds) for on-screen time tracking
-      // This survives app restarts (hibernate/resume)
+      // Spawn at random screen edge (walk in from off-screen)
+      const edge = randomEdgePosition();
+
+      // Use attention_since from backend for on-screen time tracking
       const spawnedAt = session.attention_since
-        ? session.attention_since * 1000  // epoch seconds → ms
+        ? session.attention_since * 1000
         : Date.now();
 
       chars.set(session.id, {
         session,
         el,
-        x: cursor.x + offsetX,
-        y: cursor.y + offsetY,
+        x: edge.x,
+        y: edge.y,
         vx: 0,
         vy: 0,
         mode: eventToMode(session.event),
@@ -155,7 +158,7 @@ function syncChars(sessions: Session[]): void {
         spawnedAt,
         revolveAngle: Math.random() * Math.PI * 2,
       });
-      log("overlay", `added: ${session.name} (mode=${eventToMode(session.event)}, on-screen ${Math.round((Date.now() - spawnedAt) / 1000)}s)`);
+      log("overlay", `added: ${session.name} (mode=${eventToMode(session.event)}, spawned at edge)`);
     } else {
       const char = chars.get(session.id)!;
       const prevEvent = char.session.event;
@@ -168,6 +171,7 @@ function syncChars(sessions: Session[]): void {
         char.spawnedAt = Date.now(); // Reset on-screen timer
         char.mode = "roam";
         char.el.classList.remove("char-dot");
+        char.el.style.transform = "";
         log("overlay", `${session.name}: woke from dot → roam`);
       } else {
         // Normal mode check
@@ -181,7 +185,7 @@ function syncChars(sessions: Session[]): void {
 
       // Update labels
       const actionIcon = getToolIcon(session.tool, session.event);
-      const actionText = session.tool || session.event || "";
+      const actionText = getActionText(session);
       const actionEl = char.el.querySelector(".overlay-char-action");
       if (actionEl) actionEl.innerHTML = `${actionIcon ? `<span class="action-icon">${actionIcon}</span>` : ""}${actionText}`;
     }
@@ -205,21 +209,26 @@ function eventToMode(event: string | null): CharMode {
 // ─── DOM ────────────────────────────────────────────────────────────────────
 
 function createCharElement(session: Session): HTMLElement {
-  const charDef = getCharacter(session.character ?? "ghost");
+  // Use localStorage override (same as panel) or session.character or default
+  const overrides: Record<string, string> = JSON.parse(localStorage.getItem("nagents:charOverrides") || "{}");
+  const charId = overrides[session.id] || session.character || "ghost";
+  const charDef = getCharacter(charId);
 
   const el = document.createElement("div");
   el.className = "overlay-char";
   el.dataset.sessionId = session.id;
   el.dataset.group = session.group;
+  el.dataset.source = session.source;
+  el.dataset.char = charId;
 
   const groupLabel = session.group || session.source;
   const actionIcon = getToolIcon(session.tool, session.event);
-  const actionText = session.tool || session.event || "";
+  const actionText = getActionText(session);
 
   el.innerHTML = `
     <div class="overlay-char-group" style="font-size:${cfg.font_size_group}px">${groupLabel}</div>
     <div class="overlay-char-title" style="font-size:${cfg.font_size_title}px">${session.name}</div>
-    <div class="overlay-char-svg">${charDef.svg}</div>
+    <div class="overlay-char-svg char-slot-idle" data-char="${charId}">${charDef.svg}</div>
     <div class="overlay-char-action" style="font-size:${cfg.font_size_action}px">${actionIcon ? `<span class="action-icon">${actionIcon}</span>` : ""}${actionText}</div>
   `;
   el.style.position = "absolute";
@@ -228,7 +237,7 @@ function createCharElement(session: Session): HTMLElement {
   return el;
 }
 
-/** Map tool/event to a small icon. */
+/** Map tool/event to a small icon + display text. */
 function getToolIcon(tool: string | null, event: string | null): string {
   if (tool) {
     switch (tool) {
@@ -244,6 +253,8 @@ function getToolIcon(tool: string | null, event: string | null): string {
       case "web_fetch": return "🌐";
       case "remote_web_search": return "🌐";
       case "invoke_sub_agent": return "🤖";
+      case "update_session_information": return "📋";
+      case "todo_list": return "📝";
       default: return "🔧";
     }
   }
@@ -258,6 +269,42 @@ function getToolIcon(tool: string | null, event: string | null): string {
     }
   }
   return "";
+}
+
+/** Get display text for the action line (meaningful info, not raw tool name). */
+function getActionText(session: Session): string {
+  if (session.tool) {
+    // Show file for read/write, or short tool description
+    switch (session.tool) {
+      case "read_file":
+      case "read_files":
+      case "read_code":
+        return session.file ? basename(session.file) : "reading";
+      case "fs_write":
+      case "str_replace":
+        return session.file ? basename(session.file) : "writing";
+      case "execute_bash":
+        return session.file ? session.file.slice(0, 25) : "bash";
+      case "grep_search":
+      case "file_search":
+        return "searching";
+      case "list_directory":
+        return session.file ? basename(session.file) : "listing";
+      case "invoke_sub_agent":
+        return "sub-agent";
+      case "update_session_information":
+      case "todo_list":
+        return "";  // Internal tools, not interesting to show
+      default:
+        return session.tool.length > 15 ? session.tool.slice(0, 14) + "…" : session.tool;
+    }
+  }
+  return session.event || "";
+}
+
+function basename(path: string): string {
+  const parts = path.split("/");
+  return parts[parts.length - 1] || path;
 }
 
 // ─── Render Loop ────────────────────────────────────────────────────────────
@@ -329,6 +376,10 @@ function drawConnections(svg: SVGSVGElement): void {
 function updatePhysics(): void {
   const charArray = Array.from(chars.values());
 
+  // Smoothly interpolate cursor for smooth dot movement at low cursor_fps
+  smoothCursor.x += (cursor.x - smoothCursor.x) * 0.2;
+  smoothCursor.y += (cursor.y - smoothCursor.y) * 0.2;
+
   // Count dots for equidistant revolve positioning
   const dotChars = charArray.filter((c) => c.mode === "revolve");
   const dotCount = dotChars.length;
@@ -341,12 +392,16 @@ function updatePhysics(): void {
       const dotIndex = dotChars.indexOf(char);
       const angle = globalRevolveAngle + (2 * Math.PI * dotIndex) / Math.max(1, dotCount);
 
-      char.x = cursor.x + Math.cos(angle) * cfg.revolve_radius - CHAR_SIZE / 2;
-      char.y = cursor.y + Math.sin(angle) * cfg.revolve_radius - CHAR_SIZE / 2;
+      // Position dot centered on cursor (account for element height: labels + SVG)
+      const elemCenterX = CHAR_SIZE / 2;
+      const elemCenterY = 40; // approx center of full element (group+title+SVG+action)
+      char.x = smoothCursor.x + Math.cos(angle) * cfg.revolve_radius - elemCenterX;
+      char.y = smoothCursor.y + Math.sin(angle) * cfg.revolve_radius - elemCenterY;
 
       char.el.style.left = `${Math.round(char.x)}px`;
       char.el.style.top = `${Math.round(char.y)}px`;
       char.el.classList.add("char-dot");
+      char.el.style.transform = `scale(${cfg.dot_scale || 0.5})`;
       char.el.classList.remove("char-following", "char-roaming");
       // Dots don't participate in collision — skip physics below
       continue;
@@ -361,8 +416,8 @@ function updatePhysics(): void {
     let maxSpeed: number;
 
     if (char.mode === "follow") {
-      targetX = cursor.x;
-      targetY = cursor.y;
+      targetX = smoothCursor.x;
+      targetY = smoothCursor.y;
       strength = cfg.follow_strength;
       maxSpeed = cfg.follow_max_speed;
     } else {
@@ -430,6 +485,63 @@ function updatePhysics(): void {
     char.el.style.top = `${Math.round(char.y)}px`;
     char.el.classList.toggle("char-following", char.mode === "follow");
     char.el.classList.toggle("char-roaming", char.mode === "roam");
+
+    // Apply character-specific animation slot based on mode
+    const slotForMode = char.mode === "follow" ? "char-slot-alert" : "char-slot-idle";
+    const svgWrap = char.el.querySelector(".overlay-char-svg") as HTMLElement | null;
+    if (svgWrap && !svgWrap.classList.contains(slotForMode)) {
+      svgWrap.classList.remove("char-slot-idle", "char-slot-active", "char-slot-alert", "char-slot-walk");
+      svgWrap.classList.add(slotForMode);
+    }
+    // Keep outer element in sync for CSS that targets it
+    if (!char.el.classList.contains(slotForMode)) {
+      char.el.classList.remove("char-slot-idle", "char-slot-active", "char-slot-alert", "char-slot-walk");
+      char.el.classList.add(slotForMode);
+    }
+
+    // Face toward cursor (follow) or movement direction (roam)
+    if (char.mode === "follow") {
+      const dx = cursor.x - (char.x + CHAR_SIZE / 2);
+      const tilt = Math.max(-8, Math.min(8, dx * 0.03));
+      const flip = dx < -20 ? -1 : dx > 20 ? 1 : (char.el.dataset.flip === "-1" ? -1 : 1);
+      char.el.dataset.flip = String(flip);
+      char.el.style.transform = `scaleX(${flip}) rotate(${tilt}deg)`;
+    } else {
+      const flip = char.vx < -0.5 ? -1 : char.vx > 0.5 ? 1 : (char.el.dataset.flip === "-1" ? -1 : 1);
+      char.el.dataset.flip = String(flip);
+      char.el.style.transform = `scaleX(${flip})`;
+    }
+
+    // Eye tracking — eyes shift toward cursor
+    trackEyes(char);
+  }
+}
+
+// ─── Eye Tracking ───────────────────────────────────────────────────────────
+
+const EYE_MAX_OFFSET = 2; // px — subtle shift, not cartoon-huge
+
+function trackEyes(char: OverlayChar): void {
+  const eyes = char.el.querySelectorAll("svg .eye");
+  if (eyes.length === 0) return;
+
+  // Compute direction from char center to cursor
+  const cx = char.x + CHAR_SIZE / 2;
+  const cy = char.y + CHAR_SIZE / 2;
+  const dx = cursor.x - cx;
+  const dy = cursor.y - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 1) return;
+
+  // Normalize and scale
+  const ox = (dx / dist) * EYE_MAX_OFFSET;
+  const oy = (dy / dist) * EYE_MAX_OFFSET;
+
+  // Account for flip (scaleX(-1) reverses x)
+  const flip = char.el.dataset.flip === "-1" ? -1 : 1;
+
+  for (const eye of eyes) {
+    (eye as SVGElement).style.translate = `${ox * flip}px ${oy}px`;
   }
 }
 
@@ -440,6 +552,23 @@ function randomRoamTarget(): { x: number; y: number } {
     x: 50 + Math.random() * (window.innerWidth - 100),
     y: 50 + Math.random() * (window.innerHeight - 100),
   };
+}
+
+/** Pick a random position along a screen edge (for walk-in spawn). */
+function randomEdgePosition(): { x: number; y: number } {
+  const edge = Math.floor(Math.random() * 4);
+  switch (edge) {
+    case 0: // top
+      return { x: Math.random() * window.innerWidth, y: -CHAR_SIZE };
+    case 1: // right
+      return { x: window.innerWidth + CHAR_SIZE, y: Math.random() * window.innerHeight };
+    case 2: // bottom
+      return { x: Math.random() * window.innerWidth, y: window.innerHeight + CHAR_SIZE };
+    case 3: // left
+      return { x: -CHAR_SIZE, y: Math.random() * window.innerHeight };
+    default:
+      return { x: -CHAR_SIZE, y: window.innerHeight / 2 };
+  }
 }
 
 function distTo(char: OverlayChar, target: { x: number; y: number }): number {

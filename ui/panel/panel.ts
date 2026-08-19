@@ -25,6 +25,10 @@ let collapsed: Set<string> = new Set(
 let charOverrides: Record<string, string> = JSON.parse(
   localStorage.getItem("nagents:charOverrides") || "{}"
 );
+/** Track last rendered session IDs to detect structural changes */
+let lastSessionIds: string = "";
+/** Track per-session state hash for incremental updates */
+let sessionHashes: Map<string, string> = new Map();
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
@@ -37,7 +41,7 @@ export async function initPanel(el: HTMLElement): Promise<void> {
 
   pollState((state) => {
     currentState = state;
-    render();
+    updatePanel();
   }, 1500);
 
   log("panel", "polling started (1.5s)");
@@ -54,6 +58,92 @@ function saveCharOverrides(): void {
 }
 
 // ─── Rendering ──────────────────────────────────────────────────────────────
+
+/** Hash a session's visible state (to detect what actually changed). */
+function hashSession(session: Session): string {
+  return `${session.character}|${session.event}|${session.attention}|${session.active}|${session.tool}|${session.tokens}|${session.on_overlay}`;
+}
+
+/**
+ * Smart update: only full-render when structure changes (sessions added/removed/reordered).
+ * For state-only changes (event, attention), update in-place to preserve animations.
+ */
+function updatePanel(): void {
+  if (!container || !currentState || !config) return;
+
+  // Compute current session ID set (order matters)
+  const currentIds = currentState.sessions.map((s) => s.id).sort().join(",");
+
+  // If structure changed OR first render, do full render
+  if (currentIds !== lastSessionIds || !container.querySelector(".panel-header")) {
+    lastSessionIds = currentIds;
+    sessionHashes.clear();
+    for (const s of currentState.sessions) {
+      sessionHashes.set(s.id, hashSession(s));
+    }
+    render();
+    return;
+  }
+
+  // Otherwise, update individual sessions in-place (preserves animations)
+  for (const session of currentState.sessions) {
+    const newHash = hashSession(session);
+    const oldHash = sessionHashes.get(session.id);
+    if (newHash === oldHash) continue; // No change
+
+    sessionHashes.set(session.id, newHash);
+    updateSessionElement(session);
+  }
+
+  // Update header count
+  const countEl = container.querySelector(".session-count");
+  if (countEl) countEl.textContent = `${currentState.count} sessions`;
+}
+
+/** Update a single session element in-place without destroying it. */
+function updateSessionElement(session: Session): void {
+  if (!container) return;
+  const el = container.querySelector(`.session[data-id="${session.id}"]`) as HTMLElement | null;
+  if (!el) return;
+
+  const charId = charOverrides[session.id] || session.character || "ghost";
+  const char = getCharacter(charId);
+  const action = sessionToAction(session);
+  const actionDef = char.actions[action];
+  const newAnimClass = actionDef?.cssClass ?? "";
+
+  // Update attention styling
+  el.classList.toggle("session-attention", !!session.attention);
+
+  // Update animation class on .session-char (preserve data-char, don't replace element)
+  const charEl = el.querySelector(".session-char") as HTMLElement | null;
+  if (charEl) {
+    // Remove old slot classes, add new one
+    const oldClasses = Array.from(charEl.classList).filter((c) => c.startsWith("char-slot-") || c.startsWith("char-action-"));
+    for (const c of oldClasses) charEl.classList.remove(c);
+    if (newAnimClass) charEl.classList.add(newAnimClass);
+
+    // Update data-char if character changed
+    if (charEl.dataset.char !== charId) {
+      charEl.dataset.char = charId;
+      charEl.innerHTML = char.svg;
+    }
+  }
+
+  // Update indicator
+  const oldIndicator = el.querySelector(".activity-dot");
+  const newIndicatorHtml = getIndicator(session);
+  if (oldIndicator) {
+    if (!newIndicatorHtml) {
+      oldIndicator.remove();
+    } else {
+      oldIndicator.outerHTML = newIndicatorHtml;
+    }
+  } else if (newIndicatorHtml && charEl) {
+    charEl.insertAdjacentHTML("afterend", newIndicatorHtml);
+  }
+}
+
 
 function render(): void {
   if (!container || !currentState || !config) return;

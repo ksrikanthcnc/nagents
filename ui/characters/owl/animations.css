@@ -63,7 +63,6 @@
 }
 
 [data-char="owl"].char-slot-idle svg .head {
-  transform-box: fill-box;
   transform-origin: 32px 22px;
   animation: owl-head-tilt 6s ease-in-out infinite;
 }
@@ -90,7 +89,6 @@
 /* ─── alert ──────────────────────────────────────────────────────────────── */
 
 [data-char="owl"].char-slot-alert svg .head {
-  transform-box: fill-box;
   transform-origin: 32px 22px;
   animation: owl-alert-look 1.5s ease-in-out infinite;
 }

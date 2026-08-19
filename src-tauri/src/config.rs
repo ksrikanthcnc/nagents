@@ -52,6 +52,8 @@ pub struct OverlayPhysics {
     pub revolve_speed: f64,
     #[serde(default = "default_shrink_after_min")]
     pub shrink_after_min: f64,
+    #[serde(default = "default_dot_scale")]
+    pub dot_scale: f64,
     #[serde(default = "default_cursor_fps")]
     pub cursor_fps: f64,
     #[serde(default = "default_physics_fps")]
@@ -75,9 +77,10 @@ impl Default for OverlayPhysics {
             collision_distance: 100.0,
             revolve_radius: 50.0,
             revolve_speed: 0.015,
+            dot_scale: 0.5,
             shrink_after_min: 15.0,
             cursor_fps: 30.0,
-            physics_fps: 30.0,
+            physics_fps: 60.0,
             font_size_group: 9.0,
             font_size_title: 10.0,
             font_size_action: 10.0,
@@ -95,7 +98,7 @@ fn default_revolve_radius() -> f64 { 50.0 }
 fn default_revolve_speed() -> f64 { 0.015 }
 fn default_shrink_after_min() -> f64 { 15.0 }
 fn default_cursor_fps() -> f64 { 30.0 }
-fn default_physics_fps() -> f64 { 30.0 }
+fn default_physics_fps() -> f64 { 60.0 }
 fn default_font_size_group() -> f64 { 9.0 }
 fn default_font_size_title() -> f64 { 10.0 }
 fn default_font_size_action() -> f64 { 10.0 }
@@ -268,3 +271,5 @@ fn read_config(path: &Path) -> Config {
         }
     }
 }
+
+fn default_dot_scale() -> f64 { 0.5 }

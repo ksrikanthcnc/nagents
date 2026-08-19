@@ -108,7 +108,7 @@ html, body {
 }
 
 .char-following .overlay-char-svg {
-  animation: char-bob 2s ease-in-out infinite;
+  /* Character-specific animation via [data-char].char-slot-* svg */
 }
 
 .char-following .overlay-char-label {
@@ -137,7 +137,7 @@ html, body {
 }
 
 .char-roaming .overlay-char-svg {
-  animation: char-float 4s ease-in-out infinite;
+  /* Character-specific animation via [data-char].char-slot-* svg */
 }
 /* ─── Dot mode — scaled-down char with labels, revolving ─────────────────── */
 
@@ -256,4 +256,14 @@ html, body {
 .action-icon {
   margin-right: 3px;
   font-size: 11px;
+}
+
+
+/* ─── Anti-flip fix for text in transparent windows ──────────────────────── */
+.overlay-char-group,
+.overlay-char-title,
+.overlay-char-action {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
