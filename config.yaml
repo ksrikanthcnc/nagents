@@ -57,7 +57,18 @@ panel_order:
   - kiro-crew
   - kiro-ide
 
-# ─── Default Characters ──────────────────────────────────────────────────────
+# ─── Overlay Physics ─────────────────────────────────────────────────────────
+# Speed and behavior controls for overlay characters.
+
+overlay:
+  follow_strength: 0.04        # How strongly chars follow cursor (0.01-0.1)
+  roam_strength: 0.008         # How strongly chars move to roam targets
+  roam_max_speed: 3            # Max roam speed (pixels/frame)
+  follow_max_speed: 6          # Max follow speed (pixels/frame)
+  min_cursor_distance: 80      # Min distance from cursor (follow mode)
+  revolve_radius: 50           # Dot orbit radius (pixels)
+  revolve_speed: 0.015         # Dot orbit speed (radians/frame)
+  shrink_after_min: 15         # Minutes before char shrinks to dot
 # Map source → default character ID for new sessions from that source.
 
 characters:

@@ -6,9 +6,17 @@
 import { initOverlay } from "./overlay/overlay";
 import { log } from "./shared/bridge";
 
-// Import character animation CSS
+// Import character animation CSS (all 10 characters)
 import "./characters/ghost/animations.css";
 import "./characters/cat/animations.css";
+import "./characters/skeleton/animations.css";
+import "./characters/robot/animations.css";
+import "./characters/owl/animations.css";
+import "./characters/mushroom/animations.css";
+import "./characters/flame/animations.css";
+import "./characters/crystal/animations.css";
+import "./characters/cloud/animations.css";
+import "./characters/blob/animations.css";
 import "./overlay/overlay.css";
 
 async function main() {

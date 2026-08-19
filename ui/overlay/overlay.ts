@@ -8,8 +8,8 @@
  *   Scanner GC removes session → char removed
  */
 
-import type { Session, CursorPosition } from "../shared/types";
-import { pollState, log } from "../shared/bridge";
+import type { Session, CursorPosition, OverlayConfig } from "../shared/types";
+import { pollState, getConfig, log } from "../shared/bridge";
 import { getCharacter } from "../characters/registry";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -38,28 +38,45 @@ let cursor: CursorPosition = { x: window.innerWidth / 2, y: window.innerHeight /
 const chars: Map<string, OverlayChar> = new Map();
 let container: HTMLElement | null = null;
 let animFrameId: number | null = null;
+/** Global revolve angle — shared by all dots for perfect equidistance */
+let globalRevolveAngle = 0;
+/** Have we received at least one cursor position from backend? */
+let cursorReady = false;
 
-// ─── Config ─────────────────────────────────────────────────────────────────
+// ─── Config (loaded from backend, with defaults) ────────────────────────────
 
-const FOLLOW_STRENGTH = 0.04;
-const ROAM_STRENGTH = 0.008;
+let cfg: OverlayConfig = {
+  follow_strength: 0.04,
+  roam_strength: 0.008,
+  roam_max_speed: 3,
+  follow_max_speed: 6,
+  min_cursor_distance: 80,
+  revolve_radius: 50,
+  revolve_speed: 0.015,
+  shrink_after_min: 15,
+};
+
 const DAMPING = 0.88;
-const MIN_CURSOR_DIST = 80;
-const MAX_SPEED = 6;
-const ROAM_MAX_SPEED = 3;
 const COLLISION_DIST = 55;
 const CHAR_SIZE = 44;
-const DOT_SIZE = 12;
-const REVOLVE_RADIUS = 50;
-const REVOLVE_SPEED = 0.015; // radians per frame
-/** After this many ms on screen, char shrinks to dot and revolves */
-const SHRINK_AFTER_MS = 15 * 60 * 1000; // 15 minutes
+const DOT_SIZE = 14;
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 export async function initOverlay(el: HTMLElement): Promise<void> {
   container = el;
   log("overlay", "initializing");
+
+  // Load config
+  try {
+    const appConfig = await getConfig();
+    if (appConfig.overlay) {
+      cfg = appConfig.overlay;
+      log("overlay", "config loaded", cfg);
+    }
+  } catch {
+    log("overlay", "config load failed, using defaults");
+  }
 
   // Poll cursor position (~30fps)
   const pollCursor = async () => {
@@ -68,6 +85,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
         const resp = await fetch("http://127.0.0.1:3335/cursor");
         if (resp.ok) {
           cursor = await resp.json();
+          cursorReady = true;
         }
       } catch {
         // server not ready
@@ -80,6 +98,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
 
   // Poll state
   pollState((state) => {
+    if (!cursorReady) return; // Don't spawn chars until cursor position is known
     const showSessions = state.sessions.filter((s) => s.attention);
     syncChars(showSessions);
   }, 1000);
@@ -136,19 +155,19 @@ function syncChars(sessions: Session[]): void {
       const char = chars.get(session.id)!;
       char.session = session;
 
-      // Check if should shrink to dot (on screen > SHRINK_AFTER_MS)
+      // Check if should shrink to dot (on screen > shrink_after_min)
       const onScreenMs = Date.now() - char.spawnedAt;
-      if (onScreenMs > SHRINK_AFTER_MS) {
+      if (onScreenMs > cfg.shrink_after_min * 60 * 1000) {
         char.mode = "revolve";
       } else {
         char.mode = eventToMode(session.event);
       }
 
-      // Update label
-      const eventLabel = session.event ? ` · ${session.event}` : "";
-      const toolLabel = session.tool ? ` [${session.tool}]` : "";
-      const labelEl = char.el.querySelector(".overlay-char-label");
-      if (labelEl) labelEl.textContent = `${session.name}${eventLabel}${toolLabel}`;
+      // Update labels
+      const actionIcon = getToolIcon(session.tool, session.event);
+      const actionText = session.tool || session.event || "";
+      const actionEl = char.el.querySelector(".overlay-char-action");
+      if (actionEl) actionEl.innerHTML = `${actionIcon ? `<span class="action-icon">${actionIcon}</span>` : ""}${actionText}`;
     }
   }
 }
@@ -178,19 +197,51 @@ function createCharElement(session: Session): HTMLElement {
   el.dataset.group = session.group;
 
   const groupLabel = session.group || session.source;
-  const eventLabel = session.event ? ` · ${session.event}` : "";
-  const toolLabel = session.tool ? ` [${session.tool}]` : "";
+  const actionIcon = getToolIcon(session.tool, session.event);
+  const actionText = session.tool || session.event || "";
 
   el.innerHTML = `
-    <div class="overlay-char-source">${groupLabel}</div>
+    <div class="overlay-char-group">${groupLabel}</div>
+    <div class="overlay-char-title">${session.name}</div>
     <div class="overlay-char-svg">${charDef.svg}</div>
-    <div class="overlay-char-label">${session.name}${eventLabel}${toolLabel}</div>
+    <div class="overlay-char-action">${actionIcon ? `<span class="action-icon">${actionIcon}</span>` : ""}${actionText}</div>
   `;
   el.style.position = "absolute";
   el.style.width = `${CHAR_SIZE}px`;
-  el.style.height = `${CHAR_SIZE}px`;
   el.style.pointerEvents = "none";
   return el;
+}
+
+/** Map tool/event to a small icon. */
+function getToolIcon(tool: string | null, event: string | null): string {
+  if (tool) {
+    switch (tool) {
+      case "fs_write": return "✏️";
+      case "str_replace": return "✏️";
+      case "read_file": return "📖";
+      case "read_files": return "📖";
+      case "read_code": return "📖";
+      case "execute_bash": return "⚡";
+      case "grep_search": return "🔍";
+      case "file_search": return "🔍";
+      case "list_directory": return "📂";
+      case "web_fetch": return "🌐";
+      case "remote_web_search": return "🌐";
+      case "invoke_sub_agent": return "🤖";
+      default: return "🔧";
+    }
+  }
+  if (event) {
+    switch (event) {
+      case "idle": return "💤";
+      case "running": return "⚙️";
+      case "approval": return "⏳";
+      case "stuck": return "🚨";
+      case "tool": return "🔧";
+      default: return "";
+    }
+  }
+  return "";
 }
 
 // ─── Render Loop ────────────────────────────────────────────────────────────
@@ -222,16 +273,34 @@ function drawConnections(svg: SVGSVGElement): void {
       if (drawn.has(key)) continue;
       drawn.add(key);
 
-      const halfSize = CHAR_SIZE / 2;
+      // From center of char
+      const ax = a.x + CHAR_SIZE / 2;
+      const ay = a.y + CHAR_SIZE / 2;
+      const bx = b.x + CHAR_SIZE / 2;
+      const by = b.y + CHAR_SIZE / 2;
+
       const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", String(a.x + halfSize));
-      line.setAttribute("y1", String(a.y + halfSize));
-      line.setAttribute("x2", String(b.x + halfSize));
-      line.setAttribute("y2", String(b.y + halfSize));
-      line.setAttribute("stroke", "rgba(167, 139, 250, 0.25)");
+      line.setAttribute("x1", String(ax));
+      line.setAttribute("y1", String(ay));
+      line.setAttribute("x2", String(bx));
+      line.setAttribute("y2", String(by));
+      // Alternating black-white dash for visibility on any background
+      line.setAttribute("stroke", "rgba(255, 255, 255, 0.5)");
       line.setAttribute("stroke-width", "1.5");
-      line.setAttribute("stroke-dasharray", "4 3");
+      line.setAttribute("stroke-dasharray", "6 4");
       svg.appendChild(line);
+
+      // Shadow line underneath for contrast
+      const shadow = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      shadow.setAttribute("x1", String(ax));
+      shadow.setAttribute("y1", String(ay));
+      shadow.setAttribute("x2", String(bx));
+      shadow.setAttribute("y2", String(by));
+      shadow.setAttribute("stroke", "rgba(0, 0, 0, 0.4)");
+      shadow.setAttribute("stroke-width", "2.5");
+      shadow.setAttribute("stroke-dasharray", "6 4");
+      shadow.setAttribute("stroke-dashoffset", "5");
+      svg.insertBefore(shadow, svg.firstChild);
     }
   }
 }
@@ -242,18 +311,17 @@ function updatePhysics(): void {
   // Count dots for equidistant revolve positioning
   const dotChars = charArray.filter((c) => c.mode === "revolve");
   const dotCount = dotChars.length;
+  globalRevolveAngle += cfg.revolve_speed;
 
   for (const char of charArray) {
     // ─── Revolve mode: dot orbits cursor at equidistant positions ─────
     if (char.mode === "revolve") {
-      // Equidistant: spread dots evenly around circle
+      // Each dot gets an equal slice of the circle
       const dotIndex = dotChars.indexOf(char);
-      const baseAngle = (2 * Math.PI * dotIndex) / Math.max(1, dotCount);
-      char.revolveAngle += REVOLVE_SPEED;
-      const angle = char.revolveAngle + baseAngle;
+      const angle = globalRevolveAngle + (2 * Math.PI * dotIndex) / Math.max(1, dotCount);
 
-      char.x = cursor.x + Math.cos(angle) * REVOLVE_RADIUS - DOT_SIZE / 2;
-      char.y = cursor.y + Math.sin(angle) * REVOLVE_RADIUS - DOT_SIZE / 2;
+      char.x = cursor.x + Math.cos(angle) * cfg.revolve_radius - DOT_SIZE / 2;
+      char.y = cursor.y + Math.sin(angle) * cfg.revolve_radius - DOT_SIZE / 2;
 
       char.el.style.left = `${Math.round(char.x)}px`;
       char.el.style.top = `${Math.round(char.y)}px`;
@@ -274,8 +342,8 @@ function updatePhysics(): void {
     if (char.mode === "follow") {
       targetX = cursor.x;
       targetY = cursor.y;
-      strength = FOLLOW_STRENGTH;
-      maxSpeed = MAX_SPEED;
+      strength = cfg.follow_strength;
+      maxSpeed = cfg.follow_max_speed;
     } else {
       char.roamTimer++;
       if (char.roamTimer > 240 || distTo(char, char.roamTarget) < 30) {
@@ -284,8 +352,8 @@ function updatePhysics(): void {
       }
       targetX = char.roamTarget.x;
       targetY = char.roamTarget.y;
-      strength = ROAM_STRENGTH;
-      maxSpeed = ROAM_MAX_SPEED;
+      strength = cfg.roam_strength;
+      maxSpeed = cfg.roam_max_speed;
     }
 
     const dx = targetX - char.x;
@@ -293,10 +361,10 @@ function updatePhysics(): void {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (char.mode === "follow") {
-      if (dist > MIN_CURSOR_DIST) {
+      if (dist > cfg.min_cursor_distance) {
         char.vx += dx * strength;
         char.vy += dy * strength;
-      } else if (dist < MIN_CURSOR_DIST * 0.4) {
+      } else if (dist < cfg.min_cursor_distance * 0.4) {
         char.vx -= dx * 0.03;
         char.vy -= dy * 0.03;
       }
@@ -307,16 +375,18 @@ function updatePhysics(): void {
       }
     }
 
-    // Collision avoidance — only with other NON-dot chars
-    for (const other of charArray) {
-      if (other === char || other.mode === "revolve") continue;
-      const cdx = char.x - other.x;
-      const cdy = char.y - other.y;
-      const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
-      if (cdist < COLLISION_DIST && cdist > 0) {
-        const push = ((COLLISION_DIST - cdist) / cdist) * 0.08;
-        char.vx += cdx * push;
-        char.vy += cdy * push;
+    // Collision avoidance — only between follow-mode chars (roaming passes through)
+    if (char.mode === "follow") {
+      for (const other of charArray) {
+        if (other === char || other.mode === "revolve" || other.mode === "roam") continue;
+        const cdx = char.x - other.x;
+        const cdy = char.y - other.y;
+        const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+        if (cdist < COLLISION_DIST && cdist > 0) {
+          const push = ((COLLISION_DIST - cdist) / cdist) * 0.08;
+          char.vx += cdx * push;
+          char.vy += cdy * push;
+        }
       }
     }
 

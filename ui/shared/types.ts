@@ -61,11 +61,23 @@ export interface AttentionRules {
   waiting_statuses: string[];
 }
 
+export interface OverlayConfig {
+  follow_strength: number;
+  roam_strength: number;
+  roam_max_speed: number;
+  follow_max_speed: number;
+  min_cursor_distance: number;
+  revolve_radius: number;
+  revolve_speed: number;
+  shrink_after_min: number;
+}
+
 export interface Config {
   sources: Record<string, SourceConfig>;
   attention_rules: AttentionRules;
   panel_order: string[];
   characters: Record<string, string>;
+  overlay: OverlayConfig;
   http_port: number;
   log_level: string;
 }

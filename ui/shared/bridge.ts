@@ -57,7 +57,17 @@ export async function getConfig(): Promise<Config> {
     },
     panel_order: ["on-screen", "kiro-cli", "crew", "kiro-ide"],
     characters: {},
-    http_port: 3334,
+    overlay: {
+      follow_strength: 0.04,
+      roam_strength: 0.008,
+      roam_max_speed: 3,
+      follow_max_speed: 6,
+      min_cursor_distance: 80,
+      revolve_radius: 50,
+      revolve_speed: 0.015,
+      shrink_after_min: 15,
+    },
+    http_port: 3335,
     log_level: "info",
   };
 }

@@ -23,11 +23,58 @@ pub struct Config {
     pub panel_order: Vec<String>,
     #[serde(default)]
     pub characters: HashMap<String, String>,
+    #[serde(default)]
+    pub overlay: OverlayPhysics,
     #[serde(default = "default_http_port")]
     pub http_port: u16,
     #[serde(default = "default_log_level")]
     pub log_level: String,
 }
+
+/// Overlay physics settings (passed to frontend).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverlayPhysics {
+    #[serde(default = "default_follow_strength")]
+    pub follow_strength: f64,
+    #[serde(default = "default_roam_strength")]
+    pub roam_strength: f64,
+    #[serde(default = "default_roam_max_speed")]
+    pub roam_max_speed: f64,
+    #[serde(default = "default_follow_max_speed")]
+    pub follow_max_speed: f64,
+    #[serde(default = "default_min_cursor_distance")]
+    pub min_cursor_distance: f64,
+    #[serde(default = "default_revolve_radius")]
+    pub revolve_radius: f64,
+    #[serde(default = "default_revolve_speed")]
+    pub revolve_speed: f64,
+    #[serde(default = "default_shrink_after_min")]
+    pub shrink_after_min: f64,
+}
+
+impl Default for OverlayPhysics {
+    fn default() -> Self {
+        Self {
+            follow_strength: 0.04,
+            roam_strength: 0.008,
+            roam_max_speed: 3.0,
+            follow_max_speed: 6.0,
+            min_cursor_distance: 80.0,
+            revolve_radius: 50.0,
+            revolve_speed: 0.015,
+            shrink_after_min: 15.0,
+        }
+    }
+}
+
+fn default_follow_strength() -> f64 { 0.04 }
+fn default_roam_strength() -> f64 { 0.008 }
+fn default_roam_max_speed() -> f64 { 3.0 }
+fn default_follow_max_speed() -> f64 { 6.0 }
+fn default_min_cursor_distance() -> f64 { 80.0 }
+fn default_revolve_radius() -> f64 { 50.0 }
+fn default_revolve_speed() -> f64 { 0.015 }
+fn default_shrink_after_min() -> f64 { 15.0 }
 
 /// Per-source configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,10 +117,11 @@ impl Default for Config {
             panel_order: vec![
                 "on-screen".into(),
                 "kiro-cli".into(),
-                "crew".into(),
+                "kiro-crew".into(),
                 "kiro-ide".into(),
             ],
             characters: HashMap::new(),
+            overlay: OverlayPhysics::default(),
             http_port: default_http_port(),
             log_level: default_log_level(),
         }

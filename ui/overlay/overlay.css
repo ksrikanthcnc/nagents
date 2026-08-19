@@ -23,6 +23,8 @@ html, body {
   pointer-events: none;
 }
 
+/* ─── Character Container ────────────────────────────────────────────────── */
+
 .overlay-char {
   position: absolute;
   display: flex;
@@ -32,17 +34,44 @@ html, body {
   transition: filter 0.3s;
 }
 
+/* ─── Source label (above char) ──────────────────────────────────────────── */
+
 .overlay-char-source {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 8px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: rgba(167, 139, 250, 0.9);
   text-align: center;
   pointer-events: none;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(26, 26, 46, 0.6);
 }
+
+/* Per-source color theming for labels */
+.overlay-char[data-source="kiro-crew"] .overlay-char-source {
+  color: rgba(167, 139, 250, 0.95);
+  border: 1px solid rgba(167, 139, 250, 0.25);
+}
+
+.overlay-char[data-source="kiro-cli"] .overlay-char-source {
+  color: rgba(168, 230, 207, 0.95);
+  border: 1px solid rgba(168, 230, 207, 0.25);
+}
+
+.overlay-char[data-source="kiro-ide"] .overlay-char-source {
+  color: rgba(96, 165, 250, 0.95);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+/* Fallback for unknown sources */
+.overlay-char-source {
+  color: rgba(232, 232, 240, 0.8);
+}
+
+/* ─── SVG area ───────────────────────────────────────────────────────────── */
 
 .overlay-char-svg {
   width: 100%;
@@ -53,6 +82,8 @@ html, body {
   width: 100%;
   height: 100%;
 }
+
+/* ─── Name label (below char) ────────────────────────────────────────────── */
 
 .overlay-char-label {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -70,7 +101,8 @@ html, body {
   text-align: center;
 }
 
-/* Following cursor — glowing, bouncy */
+/* ─── Following cursor — needs attention ─────────────────────────────────── */
+
 .char-following {
   filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
 }
@@ -84,9 +116,23 @@ html, body {
   border: 1px solid rgba(245, 158, 11, 0.5);
 }
 
-/* Roaming — subtle, faded */
+/* Per-source glow ring for following chars */
+.char-following[data-source="kiro-crew"] {
+  filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.7));
+}
+
+.char-following[data-source="kiro-cli"] {
+  filter: drop-shadow(0 0 8px rgba(168, 230, 207, 0.7));
+}
+
+.char-following[data-source="kiro-ide"] {
+  filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.7));
+}
+
+/* ─── Roaming — working independently ────────────────────────────────────── */
+
 .char-roaming {
-  opacity: 0.7;
+  opacity: 0.75;
   filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.4));
 }
 
@@ -94,26 +140,52 @@ html, body {
   animation: char-float 4s ease-in-out infinite;
 }
 
-/* Dot mode — shrunk, revolving around cursor */
+/* ─── Dot mode — shrunk, revolving ───────────────────────────────────────── */
+
 .char-dot {
-  width: 14px !important;
-  height: 14px !important;
-  opacity: 0.9;
-  transition: width 0.5s, height 0.5s;
-  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.6));
+  width: 12px !important;
+  height: 12px !important;
+  transition: width 0.5s, height 0.5s, opacity 0.5s;
 }
 
 .char-dot .overlay-char-svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   overflow: hidden;
+  opacity: 0.8;
 }
 
 .char-dot .overlay-char-source,
 .char-dot .overlay-char-label {
   display: none;
 }
+
+/* ─── Connection Lines (SVG overlay) ─────────────────────────────────────── */
+/* Lines are rendered in JS (drawConnections) but styled here */
+
+/* Default connection line style — subtle dashed */
+.connection-line {
+  stroke: rgba(167, 139, 250, 0.25);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  stroke-linecap: round;
+}
+
+/* Per-source connection colors */
+.connection-line[data-source="kiro-crew"] {
+  stroke: rgba(167, 139, 250, 0.3);
+}
+
+.connection-line[data-source="kiro-cli"] {
+  stroke: rgba(168, 230, 207, 0.3);
+}
+
+.connection-line[data-source="kiro-ide"] {
+  stroke: rgba(96, 165, 250, 0.3);
+}
+
+/* ─── Keyframes ──────────────────────────────────────────────────────────── */
 
 @keyframes char-bob {
   0%, 100% { transform: translateY(0); }
@@ -124,4 +196,72 @@ html, body {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   25% { transform: translateY(-2px) rotate(-1deg); }
   75% { transform: translateY(-2px) rotate(1deg); }
+}
+
+/* ─── Debug dot ──────────────────────────────────────────────────────────── */
+
+#debug-dot {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 9999;
+  transition: left 0.05s linear, top 0.05s linear;
+}
+
+
+/* ─── New layout: group / title / char / action ──────────────────────────── */
+.overlay-char-group {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(167, 139, 250, 0.9);
+  text-align: center;
+  pointer-events: none;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(26, 26, 46, 0.6);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+}
+
+.overlay-char-title {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  color: #e8e8f0;
+  text-align: center;
+  pointer-events: none;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 3px;
+}
+
+.overlay-char-action {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(26, 26, 46, 0.8);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  margin-top: 3px;
+  pointer-events: none;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.overlay-char-action:empty {
+  display: none;
+}
+
+.action-icon {
+  margin-right: 2px;
+  font-size: 10px;
 }

@@ -3,12 +3,12 @@
  *
  * Shows all sessions grouped by source/workspace.
  * On-screen (overlay) chars shown at top.
- * Each char shows event/tool/action below its name.
+ * Groups are collapsible. Right-click session to change character.
  */
 
 import type { Session, SessionGroup, StateSnapshot, Config } from "../shared/types";
 import { pollState, getConfig, setOverlayClickthrough, log } from "../shared/bridge";
-import { getCharacter } from "../characters/registry";
+import { getCharacter, listCharacters } from "../characters/registry";
 import type { CharacterAction } from "../characters/types";
 
 // ─── State ──────────────────────────────────────────────────────────────────
@@ -17,6 +17,14 @@ let currentState: StateSnapshot | null = null;
 let config: Config | null = null;
 let container: HTMLElement | null = null;
 let overlayInteractive = false;
+/** Collapsed group IDs (persisted to localStorage) */
+let collapsed: Set<string> = new Set(
+  JSON.parse(localStorage.getItem("nagents:collapsed") || "[]")
+);
+/** Per-session character overrides (persisted to localStorage) */
+let charOverrides: Record<string, string> = JSON.parse(
+  localStorage.getItem("nagents:charOverrides") || "{}"
+);
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +43,16 @@ export async function initPanel(el: HTMLElement): Promise<void> {
   log("panel", "polling started (1.5s)");
 }
 
+// ─── Persistence ────────────────────────────────────────────────────────────
+
+function saveCollapsed(): void {
+  localStorage.setItem("nagents:collapsed", JSON.stringify([...collapsed]));
+}
+
+function saveCharOverrides(): void {
+  localStorage.setItem("nagents:charOverrides", JSON.stringify(charOverrides));
+}
+
 // ─── Rendering ──────────────────────────────────────────────────────────────
 
 function render(): void {
@@ -42,7 +60,6 @@ function render(): void {
 
   const groups = groupSessions(currentState.sessions, config.panel_order);
 
-  // Header: just count + edit button (title bar already says "nagents")
   let html = `<header class="panel-header">
     <span class="session-count">${currentState.count} sessions</span>
     <button class="overlay-edit-btn ${overlayInteractive ? "active" : ""}" id="overlay-edit-btn" title="Edit overlay (move/drag chars)">
@@ -53,31 +70,65 @@ function render(): void {
   html += `<div class="panel-groups">`;
 
   for (const group of groups) {
+    const isCollapsed = collapsed.has(group.id);
     const attentionCount = group.sessions.filter((s) => s.attention).length;
     const attentionBadge = attentionCount > 0
       ? `<span class="attention-badge">${attentionCount}!</span>`
       : "";
+    const arrow = isCollapsed ? "▸" : "▾";
 
-    html += `<div class="group" data-group="${group.id}">
-      <div class="group-header">
+    html += `<div class="group ${isCollapsed ? "group-collapsed" : ""}" data-group="${group.id}">
+      <div class="group-header" data-toggle="${group.id}">
+        <span class="group-arrow">${arrow}</span>
         <span class="group-label">${group.label}</span>
         ${attentionBadge}
         <span class="group-count">${group.sessions.length}</span>
-      </div>
-      <div class="group-sessions">`;
+      </div>`;
 
-    for (const session of group.sessions) {
-      html += renderSession(session);
+    if (!isCollapsed) {
+      html += `<div class="group-sessions">`;
+      for (const session of group.sessions) {
+        html += renderSession(session);
+      }
+      html += `</div>`;
     }
 
-    html += `</div></div>`;
+    html += `</div>`;
   }
 
   html += `</div>`;
 
   container.innerHTML = html;
+  attachEventHandlers();
+}
 
-  // Attach overlay edit toggle handler
+function attachEventHandlers(): void {
+  if (!container) return;
+
+  // Group collapse toggle
+  container.querySelectorAll(".group-header[data-toggle]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const groupId = (el as HTMLElement).dataset.toggle!;
+      if (collapsed.has(groupId)) {
+        collapsed.delete(groupId);
+      } else {
+        collapsed.add(groupId);
+      }
+      saveCollapsed();
+      render();
+    });
+  });
+
+  // Right-click session to change character
+  container.querySelectorAll(".session[data-id]").forEach((el) => {
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const sessionId = (el as HTMLElement).dataset.id!;
+      showCharPicker(sessionId, e as MouseEvent);
+    });
+  });
+
+  // Overlay edit button
   const editBtn = container.querySelector("#overlay-edit-btn");
   if (editBtn) {
     editBtn.addEventListener("click", async () => {
@@ -93,8 +144,65 @@ function render(): void {
   }
 }
 
+// ─── Character Picker (right-click menu) ────────────────────────────────────
+
+function showCharPicker(sessionId: string, event: MouseEvent): void {
+  // Remove any existing picker
+  document.querySelector(".char-picker")?.remove();
+
+  const chars = listCharacters();
+  const picker = document.createElement("div");
+  picker.className = "char-picker";
+  picker.style.left = `${event.clientX}px`;
+  picker.style.top = `${event.clientY}px`;
+
+  picker.innerHTML = chars
+    .map(
+      (c) =>
+        `<div class="char-picker-item" data-char-id="${c.id}" title="${c.name}">
+          <div class="char-picker-svg">${c.svg}</div>
+          <span>${c.name}</span>
+        </div>`
+    )
+    .join("");
+
+  document.body.appendChild(picker);
+
+  // Click handler on each item
+  picker.querySelectorAll(".char-picker-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      const charId = (item as HTMLElement).dataset.charId!;
+      charOverrides[sessionId] = charId;
+      saveCharOverrides();
+      log("panel", `char override: ${sessionId} → ${charId}`);
+      picker.remove();
+
+      // Push override to backend via HTTP
+      fetch("http://127.0.0.1:3335/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, character: charId }),
+      }).catch(() => {});
+
+      render();
+    });
+  });
+
+  // Close on click outside
+  setTimeout(() => {
+    document.addEventListener(
+      "click",
+      () => picker.remove(),
+      { once: true }
+    );
+  }, 10);
+}
+
+// ─── Session Rendering ──────────────────────────────────────────────────────
+
 function renderSession(session: Session): string {
-  const charId = session.character ?? "ghost";
+  // Use override if set, otherwise session's character or default
+  const charId = charOverrides[session.id] || session.character || "ghost";
   const char = getCharacter(charId);
   const attentionClass = session.attention ? "session-attention" : "";
 
@@ -102,13 +210,32 @@ function renderSession(session: Session): string {
   const actionDef = char.actions[action];
   const animClass = actionDef?.cssClass ?? "";
 
-  // Name (truncated with ellipsis via CSS)
   const name = session.name;
-
-  // Activity indicator dot (priority: red > amber > green > gray > none)
   const indicator = getIndicator(session);
 
-  // Tooltip content
+  // Health bar
+  const pct = session.maxTokens > 0 ? Math.min(100, Math.round((session.tokens / session.maxTokens) * 100)) : 0;
+  const barColor = pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#4ade80";
+  const healthBar = session.tokens > 0
+    ? `<div class="session-health"><div class="session-health-fill" style="width:${pct}%;background:${barColor}"></div></div>`
+    : "";
+
+  // Dot badge for revolve mode
+  const onScreenSec = session.attention_since
+    ? (Date.now() / 1000 - session.attention_since)
+    : 0;
+  const isDot = onScreenSec > 15 * 60;
+  const dotBadge = isDot ? ` <span class="dot-badge">⊙</span>` : "";
+
+  // Status line
+  let status = "";
+  if (session.tool) {
+    status = session.tool;
+  } else if (session.event) {
+    status = session.event;
+  }
+
+  // Tooltip
   const tooltipParts: string[] = [];
   tooltipParts.push(`<div class="tooltip-title">${session.name}</div>`);
   if (session.workspace) tooltipParts.push(`<div class="tooltip-row">${session.workspace}</div>`);
@@ -117,30 +244,8 @@ function renderSession(session: Session): string {
   if (session.file) tooltipParts.push(`<div class="tooltip-row">file: <span>${session.file}</span></div>`);
   if (session.attention_reason) tooltipParts.push(`<div class="tooltip-row">attention: <span>${session.attention_reason}</span></div>`);
   if (session.tokens > 0) tooltipParts.push(`<div class="tooltip-row">tokens: <span>${(session.tokens / 1000).toFixed(0)}k/${(session.maxTokens / 1000).toFixed(0)}k</span></div>`);
+  tooltipParts.push(`<div class="tooltip-row" style="opacity:0.5">right-click to change char</div>`);
 
-  // Health bar (context usage)
-  const pct = session.maxTokens > 0 ? Math.min(100, Math.round((session.tokens / session.maxTokens) * 100)) : 0;
-  const barColor = pct > 80 ? "#ef4444" : pct > 50 ? "#f59e0b" : "#4ade80";
-  const healthBar = session.tokens > 0
-    ? `<div class="session-health"><div class="session-health-fill" style="width:${pct}%;background:${barColor}"></div></div>`
-    : "";
-
-  // Is this session in dot/revolve mode on overlay? (on screen > 15 min)
-  const onScreenSec = session.attention_since
-    ? (Date.now() / 1000 - session.attention_since)
-    : 0;
-  const isDot = onScreenSec > 15 * 60;
-  const dotBadge = isDot ? ` <span class="dot-badge">⊙</span>` : "";
-
-  // Status line: event · tool
-  let status = "";
-  if (session.tool) {
-    status = session.tool;
-  } else if (session.event) {
-    status = session.event;
-  }
-
-  // data-char + animClass on the char container — CSS targets [data-char="X"].char-slot-Y svg
   return `<div class="session ${attentionClass}" data-id="${session.id}">
     <div class="session-char ${animClass}" data-char="${charId}">
       ${char.svg}
@@ -153,7 +258,6 @@ function renderSession(session: Session): string {
   </div>`;
 }
 
-/** Activity indicator dot. Priority: red > amber > green > gray > none. */
 function getIndicator(session: Session): string {
   if (session.event === "approval" || session.event === "stuck") {
     return `<div class="activity-dot dot-red"></div>`;
@@ -186,12 +290,12 @@ function sessionToAction(session: Session): CharacterAction {
 function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
   const groups: SessionGroup[] = [];
 
-  // "on-screen" pseudo-group: sessions with attention (on overlay)
+  // "On Screen" pseudo-group: sessions with attention
   const onScreen = sessions.filter((s) => s.attention);
   if (onScreen.length > 0) {
     groups.push({
       id: "on-screen",
-      label: "On Screen",
+      label: "ON SCREEN",
       source: "on-screen",
       sessions: onScreen,
     });
@@ -229,17 +333,7 @@ function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
     }
   }
 
-  // Unknown sources at end
-  const knownSources = new Set(order);
-  const unknown = sessions.filter((s) => !knownSources.has(s.source));
-  if (unknown.length > 0) {
-    groups.push({
-      id: "other",
-      label: "OTHER",
-      source: "other",
-      sessions: unknown,
-    });
-  }
+  // No "Other" group — only show configured sources
 
   return groups;
 }

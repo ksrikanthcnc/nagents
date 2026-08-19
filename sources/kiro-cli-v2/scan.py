@@ -22,6 +22,7 @@ from pathlib import Path
 
 HOME = Path.home()
 CLI_SESSIONS_DIR = HOME / ".kiro/sessions/cli"
+TITLES_FILE = Path(__file__).parent.parent / "titles.json"
 
 
 def log(msg: str) -> None:
@@ -32,6 +33,7 @@ def discover() -> list[dict]:
     """Return active v2 CLI sessions."""
     sessions = []
     seen_pids: set[str] = set()
+    titles_override = load_titles()
 
     ps_lines = get_ps_lines()
 
@@ -67,10 +69,13 @@ def discover() -> list[dict]:
 
         title, cwd, mtime = enrich(session_id)
 
+        session_nagents_id = f"cli2-{session_id[:8]}"
+        display_title = resolve_title(session_nagents_id, titles_override) or title or f"CLI ({session_id[:8]})"
+
         sessions.append({
-            "id": f"cli2-{session_id[:8]}",
+            "id": session_nagents_id,
             "source": "kiro-cli-v2",
-            "name": (title or f"CLI ({session_id[:8]})")[:50],
+            "name": display_title[:50],
             "workspace": cwd.replace(str(HOME), "~") if cwd else "",
             "group": "cli",
             "active": True,
@@ -152,6 +157,27 @@ def clean_title(raw: str) -> str:
     if len(raw) > 60:
         raw = raw[:57] + "..."
     return raw
+
+
+def load_titles() -> dict:
+    """Load user-assigned title overrides."""
+    if TITLES_FILE.exists():
+        try:
+            return json.loads(TITLES_FILE.read_text())
+        except Exception:
+            pass
+    return {}
+
+
+def resolve_title(session_id: str, titles: dict) -> str:
+    """Check if there's a title override (exact or prefix match)."""
+    if session_id in titles:
+        return titles[session_id]
+    # Prefix match
+    for key, title in titles.items():
+        if session_id.startswith(key):
+            return title
+    return ""
 
 
 def main():
