@@ -55,9 +55,32 @@ pub struct Session {
     /// Is this session currently shown on overlay?
     #[serde(default)]
     pub on_overlay: bool,
+    /// User-pinned: always visible on overlay, never dots/hides.
+    /// Set via panel context menu. Persisted.
+    #[serde(default)]
+    pub pinned: bool,
+    /// Last tool success/fail (true=ok, false=error). Cleared on new turn.
+    #[serde(default)]
+    pub tool_ok: Option<bool>,
+    /// Short result text from last tool (e.g. "3/5: Fix stale tool bug"). Cleared on new turn.
+    #[serde(default)]
+    pub tool_result: Option<String>,
+    /// User's latest prompt (full text). Cleared when agent finishes (Stop).
+    #[serde(default)]
+    pub prompt: Option<String>,
+    /// Agent's self-summary of current work (from update_session_information).
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Agent's declared status: "in_progress", "completed", "waiting_on_user", "idle".
+    #[serde(default)]
+    pub status: Option<String>,
+    /// Priority level: "normal" (default), "low" (task done). "high" is app-managed (pinned).
+    #[serde(default)]
+    pub priority: Option<String>,
 }
 
 /// Event update from hooks (partial update).
+/// Fields set to Some("") mean "clear to None". Fields set to None mean "don't touch".
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EventUpdate {
     pub session_id: String,
@@ -71,6 +94,18 @@ pub struct EventUpdate {
     pub file: Option<String>,
     #[serde(default)]
     pub mtime: Option<f64>,
+    #[serde(default)]
+    pub tool_ok: Option<bool>,
+    #[serde(default)]
+    pub tool_result: Option<String>,
+    #[serde(default)]
+    pub prompt: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub priority: Option<String>,
 }
 
 /// Full state snapshot (sent to frontend).
@@ -92,6 +127,23 @@ pub fn now_epoch() -> f64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs_f64()
+}
+
+/// Infer source from session ID prefix (e.g. "ide-abc123" → "kiro-ide").
+fn infer_source_from_id(session_id: &str) -> String {
+    if session_id.starts_with("ide-") {
+        "kiro-ide".into()
+    } else if session_id.starts_with("cli3-") {
+        "kiro-cli-v3".into()
+    } else if session_id.starts_with("cli2-") {
+        "kiro-cli-v2".into()
+    } else if session_id.starts_with("crew-") {
+        "kiro-crew".into()
+    } else if session_id.starts_with("test-") {
+        "kiro-ide".into()
+    } else {
+        String::new()
+    }
 }
 
 /// Thread-safe session store.
@@ -146,6 +198,12 @@ impl SessionStore {
                 new_session.file = None;
                 new_session.attention_since = None;
                 new_session.on_overlay = false;
+                new_session.tool_ok = None;
+                new_session.tool_result = None;
+                new_session.prompt = None;
+                new_session.description = None;
+                new_session.status = None;
+                new_session.priority = None;
                 store.insert(session.id.clone(), new_session);
                 info!("[state] new session: {} ({})", session.name, session.id);
             }
@@ -191,9 +249,10 @@ impl SessionStore {
             store.get_mut(&id).unwrap()
         } else {
             // Unknown session — create minimal entry (hook arrives before scanner)
+            let source = infer_source_from_id(&update.session_id);
             let minimal = Session {
                 id: update.session_id.clone(),
-                source: String::new(),
+                source,
                 name: update.session_id.clone(),
                 workspace: String::new(),
                 group: String::new(),
@@ -210,10 +269,17 @@ impl SessionStore {
                 character: None,
                 attention_since: None,
                 on_overlay: false,
+                pinned: false,
+                tool_ok: None,
+                tool_result: None,
+                prompt: None,
+                description: None,
+                status: None,
+                priority: None,
             };
             info!(
-                "[state] hook created minimal session: {}",
-                update.session_id
+                "[state] hook created minimal session: {} (source={})",
+                update.session_id, minimal.source
             );
             store.insert(update.session_id.clone(), minimal);
             store.get_mut(&update.session_id).unwrap()
@@ -238,12 +304,31 @@ impl SessionStore {
                 }
             }
         }
-        // attention=None in update → don't touch attention_source (leave as is)
+        // "" = clear to None, Some(value) = set, None = don't touch
         if let Some(ref tool) = update.tool {
-            session.tool = Some(tool.clone());
+            session.tool = if tool.is_empty() { None } else { Some(tool.clone()) };
         }
         if let Some(ref file) = update.file {
-            session.file = Some(file.clone());
+            session.file = if file.is_empty() { None } else { Some(file.clone()) };
+        }
+        if let Some(ref tool_result) = update.tool_result {
+            session.tool_result = if tool_result.is_empty() { None } else { Some(tool_result.clone()) };
+        }
+        if let Some(ref prompt) = update.prompt {
+            session.prompt = if prompt.is_empty() { None } else { Some(prompt.clone()) };
+        }
+        if let Some(ref description) = update.description {
+            session.description = if description.is_empty() { None } else { Some(description.clone()) };
+        }
+        if let Some(ref status) = update.status {
+            session.status = if status.is_empty() { None } else { Some(status.clone()) };
+        }
+        if let Some(ref priority) = update.priority {
+            session.priority = if priority.is_empty() { None } else { Some(priority.clone()) };
+        }
+        // tool_ok: None = don't touch (no Option<Option<bool>> needed, just always set when present)
+        if update.tool_ok.is_some() {
+            session.tool_ok = update.tool_ok;
         }
         if let Some(mtime) = update.mtime {
             session.mtime = mtime;
@@ -308,5 +393,25 @@ impl SessionStore {
     pub fn insert_test(&self, session: Session) {
         let mut store = self.inner.lock().unwrap();
         store.insert(session.id.clone(), session);
+    }
+
+    /// Restore sessions from a saved snapshot (startup).
+    /// Only inserts if session ID is not already present.
+    pub fn restore_sessions(&self, sessions: Vec<Session>) {
+        let mut store = self.inner.lock().unwrap();
+        let mut restored = 0;
+        for session in sessions {
+            if !store.contains_key(&session.id) {
+                store.insert(session.id.clone(), session);
+                restored += 1;
+            }
+        }
+        info!("[state] restored {} sessions from snapshot", restored);
+    }
+
+    /// Get all sessions as a Vec (for persistence on shutdown).
+    pub fn get_all(&self) -> Vec<Session> {
+        let store = self.inner.lock().unwrap();
+        store.values().cloned().collect()
     }
 }

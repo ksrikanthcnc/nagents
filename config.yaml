@@ -44,7 +44,6 @@ attention_rules:
   waiting_statuses:            # statuses that always trigger attention
     - waiting_on_user
     - waiting_for_approval
-    - idle
 
 # ─── Panel Order ─────────────────────────────────────────────────────────────
 # Order of groups in the panel. "on-screen" = sessions currently on overlay.
@@ -69,13 +68,22 @@ overlay:
   collision_distance: 100       # Min distance between chars (pixels, accounts for labels)
   revolve_radius: 50           # Dot orbit radius (pixels)
   revolve_speed: 0.015         # Dot orbit speed (radians/frame)
-  shrink_after_min: 1            # Minutes before char shrinks to dot (1 for testing, set to 15 for prod)
+  shrink_after_min: 5           # Minutes before non-attention roamers shrink to dot (0=disabled)
   dot_scale: 0.5               # How much to scale down dot chars (0.3-0.7)
   cursor_fps: 10               # Cursor poll rate (10=low CPU, 30=smooth)
   physics_fps: 60              # Physics/render loop rate (60=smooth, 30=battery saver)
   font_size_group: 9           # Group label font size (px)
   font_size_title: 10          # Session title font size (px)
   font_size_action: 10         # Action line font size (px)
+  # Zone system
+  max_followers: 2             # Max chars following cursor (pinned are extra by default)
+  max_roamers: 2              # Max roaming chars. Excess → dot (oldest first)
+  max_dots: 4                  # Max dots orbiting (oldest → hidden)
+  pin_counts_toward_max: false # If true, pinned chars consume max_followers slots
+  # Follower ordering: who gets the limited follow slots when more want to follow than max_followers
+  # Chained: "priority,fifo" = sort by urgency first, break ties with newest-first
+  # Options: fifo, lifo, lru, priority (comma-separated chain)
+  follower_mode: "priority,lifo"
 # Map source → default character ID for new sessions from that source.
 # ─── Characters ──────────────────────────────────────────────────────────────
 # Default char per source (flat). Pool assignment done in frontend.

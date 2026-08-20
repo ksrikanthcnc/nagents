@@ -2,20 +2,10 @@
 """
 Kiro CLI v3 hook handler.
 
-Called by Kiro's global hook system (~/.kiro/hooks/).
-Reads JSON from stdin, determines if session is v3 (exists in conversations_v2
-SQLite table but NOT in ~/.kiro/sessions/cli/), translates to nagents EventUpdate.
+Called via hook-dispatch.py for v3 sessions (has .history file with sess_ prefix
+or exists in conversations_v2 SQLite, but NOT a .json session file).
 
-v3 sessions use conversation_id as their identity. When the session has a unique
-CWD, the scanner maps it to cli3-{conv_id[:8]}. When multiple v3 sessions share
-a CWD, the scanner uses cli3-{PID} — in that case the hook can't match perfectly,
-but nagents's prefix matching + minimal session creation handles the gap.
-
-Protocol:
-  - Stdin: JSON with session_id, hook_event_name, tool_name, etc.
-  - Only processes sessions NOT in ~/.kiro/sessions/cli/ (those are v2)
-  - Also skips sessions with sess_ prefix (those are IDE)
-  - POSTs EventUpdate to http://127.0.0.1:3335/event
+ID scheme: cli3-{uuid[:8]}
 """
 
 import json
@@ -25,6 +15,9 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from translate import translate  # noqa: E402
 
 NAGENTS_URL = os.environ.get("NAGENTS_URL", "http://127.0.0.1:3335")
 HOME = Path.home()
@@ -52,23 +45,21 @@ def main():
     if not raw_session_id:
         sys.exit(0)
 
-    # IDE sessions without sess_ prefix and not in our systems — skip
-    # (they'll be handled by the IDE hook via the dispatcher)
-
     uuid = raw_session_id.replace("sess_", "")
 
-    # v2 sessions have .json files in ~/.kiro/sessions/cli/ — skip
+    # v2 sessions have .json files — skip
     if (CLI_SESSIONS_DIR / f"{uuid}.json").exists():
         sys.exit(0)
 
-    # Must be a v3 session — check for .history file or conversations_v2
+    # Must be v3: has .history file or exists in conversations_v2
     is_v3 = (CLI_SESSIONS_DIR / f"{raw_session_id}.history").exists()
     if not is_v3:
         is_v3 = is_v3_conversation(uuid)
     if not is_v3:
         sys.exit(0)
 
-    update = translate(trigger, payload, uuid)
+    session_id = f"cli3-{uuid[:8]}"
+    update = translate(trigger, payload, session_id)
     if not update:
         sys.exit(0)
 
@@ -92,58 +83,6 @@ def is_v3_conversation(conv_id: str) -> bool:
         return False
 
 
-def translate(trigger: str, payload: dict, uuid: str) -> dict | None:
-    """Translate hook event to nagents EventUpdate."""
-    # Use conv_id[:8] as session ID — matches scanner when CWD is unique
-    session_id = f"cli3-{uuid[:8]}"
-    tool_name = payload.get("tool_name", "") or payload.get("toolName", "")
-    file_path = payload.get("tool_input", {}).get("path") if isinstance(payload.get("tool_input"), dict) else None
-
-    if trigger == "PreToolUse":
-        return {
-            "session_id": session_id,
-            "event": "tool",
-            "tool": tool_name or "unknown",
-            "file": shorten_path(file_path),
-            "mtime": time.time(),
-        }
-    elif trigger == "PostToolUse":
-        return {
-            "session_id": session_id,
-            "event": "running",
-            "tool": None,
-            "mtime": time.time(),
-        }
-    elif trigger == "Stop":
-        return {
-            "session_id": session_id,
-            "event": "idle",
-            "attention": True,
-            "mtime": time.time(),
-        }
-    elif trigger == "UserPromptSubmit":
-        return {
-            "session_id": session_id,
-            "event": "running",
-            "attention": False,
-            "mtime": time.time(),
-        }
-    return None
-
-
-def shorten_path(path: str | None) -> str | None:
-    if not path:
-        return None
-    home = str(HOME)
-    if path.startswith(home):
-        path = path[len(home) + 1:]
-    for prefix in ("work/tasks/", "work/git/", "work/worktree/"):
-        if path.startswith(prefix):
-            path = path[len(prefix):]
-            break
-    return path
-
-
 def post_event(update: dict, trigger: str) -> None:
     try:
         data = json.dumps(update).encode()
@@ -154,7 +93,7 @@ def post_event(update: dict, trigger: str) -> None:
             method="POST",
         )
         resp = urllib.request.urlopen(req, timeout=3)
-        log(f"{trigger} -> {update.get('event', '?')} (session={update['session_id']}, status={resp.status})")
+        log(f"{trigger} → {update.get('event', '?')} (session={update['session_id']}, status={resp.status})")
     except Exception as e:
         log(f"POST failed: {e}")
 

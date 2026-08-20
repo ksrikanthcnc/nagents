@@ -44,6 +44,10 @@ let animFrameId: number | null = null;
 let globalRevolveAngle = 0;
 /** Have we received at least one cursor position from backend? */
 let cursorReady = false;
+/** Last time we printed the summary log */
+let lastSummaryLog = 0;
+/** Hidden count badge element */
+let hiddenBadgeEl: HTMLElement | null = null;
 
 // ─── Config (loaded from backend, with defaults) ────────────────────────────
 
@@ -58,11 +62,18 @@ let cfg: OverlayConfig = {
   revolve_speed: 0.015,
   shrink_after_min: 15,
   dot_scale: 0.5,
-  cursor_fps: 30,
+  cursor_fps: 10,
   physics_fps: 60,
   font_size_group: 9,
   font_size_title: 10,
   font_size_action: 10,
+  max_followers: 3,
+  max_dots: 4,
+  max_roamers: 5,
+  pin_counts_toward_max: false,
+  group_as_one: false,
+  source_as_group: false,
+  follower_mode: "priority,fifo",
 };
 
 const DAMPING = 0.88;
@@ -74,12 +85,18 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   container = el;
   log("overlay", "initializing");
 
+  // Create hidden count badge (shows how many chars are off-screen)
+  hiddenBadgeEl = document.createElement("div");
+  hiddenBadgeEl.className = "overlay-hidden-badge";
+  hiddenBadgeEl.style.display = "none";
+  el.appendChild(hiddenBadgeEl);
+
   // Load config
   try {
     const appConfig = await getConfig();
     if (appConfig.overlay) {
       cfg = appConfig.overlay;
-      log("overlay", "config loaded", cfg);
+      log("overlay", `config loaded: shrink_after_min=${cfg.shrink_after_min}, dot_scale=${cfg.dot_scale}, collision=${cfg.collision_distance}`);
     }
   } catch {
     log("overlay", "config load failed, using defaults");
@@ -113,7 +130,10 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
     if (configPollCount % 30 === 0) {
       try {
         const fresh = await getConfig();
-        if (fresh.overlay) cfg = fresh.overlay;
+        if (fresh.overlay) {
+          cfg = fresh.overlay;
+          console.log(`[config] re-read: shrink_after_min=${cfg.shrink_after_min}`);
+        }
       } catch {}
     }
     const showSessions = state.sessions.filter((s) => s.attention);
@@ -140,20 +160,12 @@ function syncChars(sessions: Session[]): void {
     }
   }
 
-  // Add or update
+  // Add new chars
   for (const session of sessions) {
     if (!chars.has(session.id)) {
       const el = createCharElement(session);
       container.appendChild(el);
-
-      // Spawn at random screen edge (walk in from off-screen)
       const edge = randomEdgePosition();
-
-      // Use attention_since from backend for on-screen time tracking
-      const spawnedAt = session.attention_since
-        ? session.attention_since * 1000
-        : Date.now();
-
       chars.set(session.id, {
         session,
         el,
@@ -161,35 +173,24 @@ function syncChars(sessions: Session[]): void {
         y: edge.y,
         vx: 0,
         vy: 0,
-        mode: eventToMode(session.event),
+        mode: "roam",
         roamTarget: randomRoamTarget(),
         roamTimer: 0,
-        spawnedAt,
+        spawnedAt: Date.now(),
         revolveAngle: Math.random() * Math.PI * 2,
       });
-      log("overlay", `added: ${session.name} (mode=${eventToMode(session.event)}, spawned at edge)`);
+      log("overlay", `added: ${session.name} (spawned at edge)`);
     } else {
+      // Update session data
       const char = chars.get(session.id)!;
       const prevEvent = char.session.event;
       char.session = session;
 
-      // If agent resumed working (was idle/done, now running/tool) → un-dot, reset timer
-      const wasIdle = prevEvent === "idle" || prevEvent === "approval" || prevEvent === "stuck";
-      const nowWorking = session.event === "running" || session.event === "tool";
-      if (wasIdle && nowWorking) {
-        char.spawnedAt = Date.now(); // Reset on-screen timer
-        char.mode = "roam";
-        char.el.classList.remove("char-dot");
-        char.el.style.transform = "";
-        log("overlay", `${session.name}: woke from dot → roam`);
-      } else {
-        // Normal mode check
-        const onScreenMs = Date.now() - char.spawnedAt;
-        if (onScreenMs > cfg.shrink_after_min * 60 * 1000) {
-          char.mode = "revolve";
-        } else {
-          char.mode = eventToMode(session.event);
-        }
+      // On event change, reset dot state so assignModes() can reassign cleanly.
+      const eventChanged = prevEvent !== session.event;
+      if (char.mode === "revolve" && eventChanged) {
+        setMode(char, "roam"); // assignModes() will put it in the right place
+        log("overlay", `${session.name}: event changed (${prevEvent}→${session.event}), reassigning`);
       }
 
       // Update labels
@@ -199,21 +200,215 @@ function syncChars(sessions: Session[]): void {
       if (actionEl) actionEl.innerHTML = `${actionIcon ? `<span class="action-icon">${actionIcon}</span>` : ""}${actionText}`;
     }
   }
+
+  // ─── Mode Assignment ───────────────────────────────────────────────
+  assignModes();
 }
 
-function eventToMode(event: string | null): CharMode {
-  // NOTE: This is only called when attention_source didn't explicitly set follow.
-  // The syncChars logic now uses session.attention directly for mode.
-  switch (event) {
-    case "idle":
-    case "approval":
-    case "stuck":
-      return "follow";
-    case "running":
-    case "tool":
-      return "roam";
+/**
+ * Assign overlay modes — clean waterfall.
+ *
+ * Goal: help user finish off sessions. Latest idle sessions get priority visibility.
+ *
+ * Waterfall (chars flow down, limited slots per tier):
+ *   1. PINNED  → always follow (user-marked, exempt from all limits)
+ *   2. FOLLOW  → approval/stuck first, then idle fills remaining slots (sorted by follower_mode)
+ *   3. ROAM    → everything else with attention (working + overflow)
+ *   4. DOT     → excess roamers (max_roamers) + stale (shrink_after_min, no attention)
+ *   5. HIDDEN  → excess dots (max_dots)
+ *
+ * Key: idle CAN follow if slots are available (LIFO = newest idle first).
+ */
+function assignModes(): void {
+  const allChars = Array.from(chars.values());
+
+  // ─── Step 1: Separate pinned from normal ──────────────────────────
+  const pinned: OverlayChar[] = [];
+  const normal: OverlayChar[] = [];
+  for (const char of allChars) {
+    if (char.session.pinned) {
+      pinned.push(char);
+    } else {
+      normal.push(char);
+    }
+  }
+
+  // Pinned → always follow
+  for (const char of pinned) {
+    setMode(char, "follow");
+  }
+
+  // ─── Step 2: Determine who WANTS to follow ────────────────────────
+  const followSlots = cfg.pin_counts_toward_max
+    ? Math.max(0, cfg.max_followers - pinned.length)
+    : cfg.max_followers;
+
+  // Candidates: anyone with attention + idle/approval/stuck
+  const candidates: OverlayChar[] = [];
+  const workers: OverlayChar[] = []; // running/tool — always roam
+
+  for (const char of normal) {
+    const event = char.session.event;
+    const attention = char.session.attention;
+
+    if (!attention) continue; // No attention = will be handled as stale below
+
+    if (event === "approval" || event === "stuck") {
+      candidates.push(char); // High priority — blocked
+    } else if (event === "idle") {
+      candidates.push(char); // Can follow if slots available
+    } else {
+      workers.push(char); // running/tool → roam
+    }
+  }
+
+  // Sort candidates by follower_mode (e.g. "priority,lifo")
+  sortFollowers(candidates);
+
+  // ─── Step 3: Assign follow/roam ───────────────────────────────────
+  const roamers: OverlayChar[] = [];
+
+  for (let i = 0; i < candidates.length; i++) {
+    if (i < followSlots) {
+      setMode(candidates[i], "follow");
+    } else {
+      setMode(candidates[i], "roam");
+      roamers.push(candidates[i]);
+    }
+  }
+
+  // Workers → roam
+  for (const char of workers) {
+    setMode(char, "roam");
+    roamers.push(char);
+  }
+
+  // ─── Step 4: Stale chars (no attention) ───────────────────────────
+  // Chars without attention that are still on overlay (not yet GC'd by syncChars)
+  // They're already dotted or should become dots
+  const stale = normal.filter(c =>
+    !c.session.attention &&
+    !candidates.includes(c) &&
+    !workers.includes(c)
+  );
+  for (const char of stale) {
+    setMode(char, "revolve");
+  }
+
+  // ─── Step 5: Count-based dotting (max_roamers) ────────────────────
+  const maxRoamers = cfg.max_roamers ?? 999;
+  const allRoaming = normal.filter(c => c.mode === "roam");
+  if (allRoaming.length > maxRoamers) {
+    allRoaming.sort((a, b) => a.spawnedAt - b.spawnedAt); // oldest roam first
+    for (let i = 0; i < allRoaming.length - maxRoamers; i++) {
+      setMode(allRoaming[i], "revolve");
+    }
+  }
+
+  // ─── Step 6: Time-based dotting (shrink_after_min) ────────────────
+  // Only non-attention roamers. Active sessions stay visible.
+  if (cfg.shrink_after_min > 0) {
+    const threshold = cfg.shrink_after_min * 60 * 1000;
+    const now = Date.now();
+    for (const char of normal.filter(c => c.mode === "roam" && !c.session.attention)) {
+      if (now - char.spawnedAt > threshold) {
+        setMode(char, "revolve");
+      }
+    }
+  }
+
+  // ─── Step 7: Cap dots → hidden ────────────────────────────────────
+  const dots = allChars.filter(c => c.mode === "revolve");
+  dots.sort((a, b) => a.spawnedAt - b.spawnedAt); // oldest hidden first
+
+  let hiddenCount = 0;
+  for (let i = 0; i < dots.length; i++) {
+    if (i < dots.length - cfg.max_dots) {
+      dots[i].el.style.display = "none";
+      hiddenCount++;
+    } else {
+      dots[i].el.style.display = "";
+    }
+  }
+  updateHiddenBadge(hiddenCount);
+}
+
+/** Set a char's mode, handling all DOM cleanup for transitions. */
+function setMode(char: OverlayChar, newMode: CharMode): void {
+  const prev = char.mode;
+  if (prev === newMode) return;
+
+  // Leaving dot mode → clean up dot DOM state
+  if (prev === "revolve") {
+    char.el.classList.remove("char-dot");
+    char.el.style.transform = "";
+    char.el.style.transformOrigin = "";
+    char.el.style.display = "";
+  }
+
+  // Entering roam → reset timer (fresh countdown before dotting)
+  if (newMode === "roam" && prev !== "roam") {
+    char.spawnedAt = Date.now();
+  }
+
+  char.mode = newMode;
+  log("overlay", `${char.session.name}: ${prev} → ${newMode}`);
+}
+
+/**
+ * Sort followers based on configured follower_mode.
+ * Supports chained modes: "priority,fifo" = sort by urgency, break ties with newest-first.
+ *
+ * Available criteria:
+ *   fifo     — newest attention first
+ *   lifo     — oldest attention first (fairness)
+ *   lru      — least recently interacted first (oldest mtime)
+ *   priority — by event urgency: approval > stuck > idle
+ */
+function sortFollowers(list: OverlayChar[]): void {
+  const modeStr = cfg.follower_mode || "priority,fifo";
+  const modes = modeStr.split(",").map(s => s.trim());
+
+  list.sort((a, b) => {
+    for (const mode of modes) {
+      const diff = compareByMode(a, b, mode);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  });
+}
+
+/** Compare two chars by a single sort criterion. Returns <0, 0, or >0. */
+function compareByMode(a: OverlayChar, b: OverlayChar, mode: string): number {
+  switch (mode) {
+    case "fifo": {
+      // First In First Out: oldest attention gets priority (waited longest → served first)
+      const aTime = a.session.attention_since ?? a.spawnedAt;
+      const bTime = b.session.attention_since ?? b.spawnedAt;
+      return aTime - bTime; // oldest first
+    }
+    case "lifo": {
+      // Last In First Out: newest attention gets priority (latest task = most relevant)
+      const aTime = a.session.attention_since ?? a.spawnedAt;
+      const bTime = b.session.attention_since ?? b.spawnedAt;
+      return bTime - aTime; // newest first
+    }
+    case "lru":
+      // Least recently used: oldest mtime first (neglected sessions prioritized)
+      return a.session.mtime - b.session.mtime;
+    case "priority": {
+      const urgency = (event: string | null): number => {
+        switch (event) {
+          case "approval": return 3;
+          case "stuck": return 2;
+          case "idle": return 1;
+          default: return 0;
+        }
+      };
+      return urgency(b.session.event) - urgency(a.session.event);
+    }
     default:
-      return "follow";
+      return 0;
   }
 }
 
@@ -388,6 +583,24 @@ function drawConnections(svg: SVGSVGElement): void {
 function updatePhysics(): void {
   const charArray = Array.from(chars.values());
 
+  // Periodic summary log (every 10 seconds)
+  const now = Date.now();
+  if (now - lastSummaryLog > 10000 && charArray.length > 0) {
+    lastSummaryLog = now;
+    const following = charArray.filter(c => c.mode === "follow");
+    const roaming = charArray.filter(c => c.mode === "roam");
+    const dots = charArray.filter(c => c.mode === "revolve");
+    const hidden = charArray.filter(c => c.el.style.display === "none");
+    const working = charArray.filter(c => c.el.classList.contains("char-working"));
+    log("overlay", `[summary] total=${charArray.length} follow=${following.length}/${cfg.max_followers} roam=${roaming.length} dot=${dots.length}/${cfg.max_dots} hidden=${hidden.length} working=${working.length}`);
+    if (following.length > 0) {
+      log("overlay", `  followers: ${following.map(c => c.session.name).join(", ")}`);
+    }
+    if (dots.length > 0) {
+      log("overlay", `  dots: ${dots.map(c => c.session.name).join(", ")}`);
+    }
+  }
+
   // Smoothly interpolate cursor for smooth dot movement at low cursor_fps
   smoothCursor.x += (cursor.x - smoothCursor.x) * 0.2;
   smoothCursor.y += (cursor.y - smoothCursor.y) * 0.2;
@@ -404,16 +617,18 @@ function updatePhysics(): void {
       const dotIndex = dotChars.indexOf(char);
       const angle = globalRevolveAngle + (2 * Math.PI * dotIndex) / Math.max(1, dotCount);
 
-      // Position dot centered on cursor (account for element height: labels + SVG)
-      const elemCenterX = CHAR_SIZE / 2;
-      const elemCenterY = 40; // approx center of full element (group+title+SVG+action)
-      char.x = smoothCursor.x + Math.cos(angle) * cfg.revolve_radius - elemCenterX;
-      char.y = smoothCursor.y + Math.sin(angle) * cfg.revolve_radius - elemCenterY;
+      // Position dot centered on cursor
+      // Scaled element: visual center is at (width*scale/2, height*scale/2) from top-left
+      // But we position by top-left, so offset by half the VISUAL size
+      const dotVisualHalf = CHAR_SIZE * (cfg.dot_scale || 0.5) / 2;
+      char.x = smoothCursor.x + Math.cos(angle) * cfg.revolve_radius - dotVisualHalf;
+      char.y = smoothCursor.y + Math.sin(angle) * cfg.revolve_radius - dotVisualHalf;
 
       char.el.style.left = `${Math.round(char.x)}px`;
       char.el.style.top = `${Math.round(char.y)}px`;
       char.el.classList.add("char-dot");
       char.el.style.transform = `scale(${cfg.dot_scale || 0.5})`;
+      char.el.style.transformOrigin = "center center";
       char.el.classList.remove("char-following", "char-roaming");
       // Dots don't participate in collision — skip physics below
       continue;
@@ -498,9 +713,13 @@ function updatePhysics(): void {
     char.el.style.top = `${Math.round(char.y)}px`;
     char.el.classList.toggle("char-following", char.mode === "follow");
     char.el.classList.toggle("char-roaming", char.mode === "roam");
+    // Workers (running/tool) get a visual distinction — lower opacity via CSS
+    const isWorking = char.session.event === "running" || char.session.event === "tool";
+    char.el.classList.toggle("char-working", char.mode === "roam" && isWorking);
 
     // Apply character-specific animation slot based on mode
-    const slotForMode = char.mode === "follow" ? "char-slot-alert" : "char-slot-idle";
+    const actionForMode: import("../characters/types").CharacterAction = char.mode === "follow" ? "alert" : "walk";
+    const slotForMode = char.mode === "follow" ? "char-slot-alert" : "char-slot-walk";
     const svgWrap = char.el.querySelector(".overlay-char-svg") as HTMLElement | null;
     if (svgWrap && !svgWrap.classList.contains(slotForMode)) {
       svgWrap.classList.remove("char-slot-idle", "char-slot-active", "char-slot-alert", "char-slot-walk");
@@ -510,6 +729,18 @@ function updatePhysics(): void {
     if (!char.el.classList.contains(slotForMode)) {
       char.el.classList.remove("char-slot-idle", "char-slot-active", "char-slot-alert", "char-slot-walk");
       char.el.classList.add(slotForMode);
+    }
+
+    // Apply per-character action CSS class (ghost wavy walk, flame flicker, etc.)
+    const charId = char.el.dataset.char || "ghost";
+    const charDef = getCharacter(charId);
+    const actionDef = charDef.actions[actionForMode];
+    const charActionClass = actionDef?.cssClass ?? "";
+    const prevCharAction = char.el.dataset.charAction || "";
+    if (charActionClass !== prevCharAction) {
+      if (prevCharAction) char.el.classList.remove(prevCharAction);
+      if (charActionClass) char.el.classList.add(charActionClass);
+      char.el.dataset.charAction = charActionClass;
     }
 
     // Face toward cursor (follow) or movement direction (roam)
@@ -566,6 +797,20 @@ function randomRoamTarget(): { x: number; y: number } {
     x: 50 + Math.random() * (window.innerWidth - 100),
     y: 50 + Math.random() * (window.innerHeight - 100),
   };
+}
+
+/** Show/hide the hidden count badge near cursor. */
+function updateHiddenBadge(count: number): void {
+  if (!hiddenBadgeEl) return;
+  if (count > 0) {
+    hiddenBadgeEl.textContent = `+${count} hidden`;
+    hiddenBadgeEl.style.display = "";
+    // Position near bottom-right of screen (fixed, unobtrusive)
+    hiddenBadgeEl.style.left = `${window.innerWidth - 100}px`;
+    hiddenBadgeEl.style.top = `${window.innerHeight - 30}px`;
+  } else {
+    hiddenBadgeEl.style.display = "none";
+  }
 }
 
 /** Pick a random position along a screen edge (for walk-in spawn). */

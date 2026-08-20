@@ -37,8 +37,7 @@ fn compute(store: &SessionStore, config: &ConfigHandle) {
             if let Some(source_attention) = session.attention_source {
                 session.attention = source_attention;
                 if source_attention {
-                    session.attention_reason =
-                        Some("source".into());
+                    session.attention_reason = Some("source".into());
                 } else {
                     session.attention_reason = None;
                 }
@@ -49,31 +48,43 @@ fn compute(store: &SessionStore, config: &ConfigHandle) {
                 if session.event.as_deref() == Some("tool") && age_sec > rules.tool_stuck_sec as f64
                 {
                     // Tool event is old — probably waiting for approval
-                    session.attention = true;
-                    session.attention_reason = Some(format!(
-                        "tool waiting {}s (threshold: {}s)",
-                        age_sec as u32, rules.tool_stuck_sec
-                    ));
-                    // Promote event to "approval" for frontend to show
-                    session.event = Some("approval".into());
-                    debug!(
-                        "[attention] {} → approval (tool {}s)",
-                        session.name, age_sec as u32
-                    );
+                    // But only if it's recent enough to actually be stuck (not hours-old stale data)
+                    if age_sec < 3600.0 {
+                        session.attention = true;
+                        session.attention_reason = Some(format!(
+                            "tool waiting {}s (threshold: {}s)",
+                            age_sec as u32, rules.tool_stuck_sec
+                        ));
+                        // Promote event to "approval" for frontend to show
+                        session.event = Some("approval".into());
+                        debug!(
+                            "[attention] {} → approval (tool {}s)",
+                            session.name, age_sec as u32
+                        );
+                    } else {
+                        // Stale event from hours ago — not stuck, just abandoned
+                        session.attention = false;
+                        session.attention_reason = None;
+                    }
                 } else if session.event.as_deref() == Some("running")
                     && age_sec > rules.running_stuck_sec as f64
                 {
-                    // Running too long — probably stuck
-                    session.attention = true;
-                    session.attention_reason = Some(format!(
-                        "running {}s (threshold: {}s)",
-                        age_sec as u32, rules.running_stuck_sec
-                    ));
-                    session.event = Some("stuck".into());
-                    debug!(
-                        "[attention] {} → stuck (running {}s)",
-                        session.name, age_sec as u32
-                    );
+                    // Running too long — probably stuck (but only if recent)
+                    if age_sec < 3600.0 {
+                        session.attention = true;
+                        session.attention_reason = Some(format!(
+                            "running {}s (threshold: {}s)",
+                            age_sec as u32, rules.running_stuck_sec
+                        ));
+                        session.event = Some("stuck".into());
+                        debug!(
+                            "[attention] {} → stuck (running {}s)",
+                            session.name, age_sec as u32
+                        );
+                    } else {
+                        session.attention = false;
+                        session.attention_reason = None;
+                    }
                 } else if session.active
                     && age_sec > rules.idle_threshold_sec as f64
                     && session.event.is_none()

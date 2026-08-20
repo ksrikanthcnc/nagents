@@ -64,6 +64,14 @@ pub struct OverlayPhysics {
     pub font_size_title: f64,
     #[serde(default = "default_font_size_action")]
     pub font_size_action: f64,
+    #[serde(default = "default_max_followers")]
+    pub max_followers: u32,
+    #[serde(default = "default_max_dots")]
+    pub max_dots: u32,
+    #[serde(default)]
+    pub group_as_one: bool,
+    #[serde(default)]
+    pub source_as_group: bool,
 }
 
 impl Default for OverlayPhysics {
@@ -84,6 +92,10 @@ impl Default for OverlayPhysics {
             font_size_group: 9.0,
             font_size_title: 10.0,
             font_size_action: 10.0,
+            max_followers: 3,
+            max_dots: 4,
+            group_as_one: false,
+            source_as_group: false,
         }
     }
 }
@@ -273,3 +285,6 @@ fn read_config(path: &Path) -> Config {
 }
 
 fn default_dot_scale() -> f64 { 0.5 }
+
+fn default_max_followers() -> u32 { 3 }
+fn default_max_dots() -> u32 { 4 }

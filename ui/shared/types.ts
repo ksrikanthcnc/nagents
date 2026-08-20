@@ -34,6 +34,8 @@ export interface Session {
   attention_since: number | null;
   /** Is this session currently on the overlay? */
   on_overlay: boolean;
+  /** User-pinned: always visible, never dots/hides. Set via panel context menu. */
+  pinned: boolean;
 }
 
 // ─── State Snapshot ─────────────────────────────────────────────────────────
@@ -77,6 +79,19 @@ export interface OverlayConfig {
   font_size_group: number;
   font_size_title: number;
   font_size_action: number;
+  // Zone system
+  max_followers: number;
+  max_dots: number;
+  max_roamers: number;
+  /** If true, pinned chars consume max_followers slots. If false (default), pinned are extra. */
+  pin_counts_toward_max: boolean;
+  group_as_one: boolean;
+  source_as_group: boolean;
+  /** How to pick which sessions get the limited follow slots.
+   * Single: fifo | lifo | lru | priority
+   * Chained (comma-separated): "priority,fifo" = sort by urgency, break ties with newest-first
+   */
+  follower_mode: string;
 }
 
 export interface Config {

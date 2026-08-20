@@ -71,12 +71,16 @@ pub fn run() {
             // Only exit app when the main panel window is closed
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" {
-                    // Write close timestamp for hibernate/resume
+                    // Persist session state + close timestamp for restart recovery
                     let manifest_dir = env!("CARGO_MANIFEST_DIR");
                     let project_root = PathBuf::from(manifest_dir)
                         .parent()
                         .unwrap_or_else(|| std::path::Path::new("."))
                         .to_path_buf();
+                    // Save full session state
+                    if let Some(store) = window.app_handle().try_state::<state::SessionStore>() {
+                        persist_sessions(&store, &project_root);
+                    }
                     write_close_timestamp(&project_root);
                     info!("[nagents] main window closed, exiting");
                     std::process::exit(0);
@@ -163,18 +167,12 @@ fn resolve_config_path(app: &tauri::App) -> PathBuf {
         .join("config.yaml")
 }
 
-/// Reload last event per session from persisted JSONL files.
-/// Only replays events whose mtime is recent (< 1 hour) to avoid stale state.
-/// Also reads app close timestamp to calculate elapsed time for hibernate/resume.
+/// Reload session state from persisted snapshot + event cache.
+/// Reads data/sessions.json (full state) first, then overlays recent events from JSONL.
+/// Only reloads if downtime < 1 hour.
 fn reload_event_cache(store: &state::SessionStore, project_root: &PathBuf) {
     use std::fs;
     use std::io::{BufRead, BufReader};
-
-    let events_dir = project_root.join("data/events");
-    if !events_dir.exists() {
-        info!("[cache] no events dir, skipping reload");
-        return;
-    }
 
     // Read app close timestamp (written on shutdown)
     let close_file = project_root.join("data/app_closed_at");
@@ -189,14 +187,55 @@ fn reload_event_cache(store: &state::SessionStore, project_root: &PathBuf) {
     // Only reload if downtime < 1 hour
     if downtime > 3600.0 {
         info!("[cache] downtime > 1hr, starting fresh");
+        let _ = fs::remove_file(&close_file);
+        return;
+    }
+
+    // Step 1: Load full session snapshot (persisted on last shutdown)
+    let sessions_path = project_root.join("data/sessions.json");
+    if sessions_path.exists() {
+        match fs::read_to_string(&sessions_path) {
+            Ok(json) => {
+                let sessions: Vec<state::Session> = match serde_json::from_str(&json) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log::warn!("[cache] failed to parse sessions.json: {}", e);
+                        vec![]
+                    }
+                };
+                if !sessions.is_empty() {
+                    // Also load titles to apply any saved overrides
+                    let titles = load_titles(project_root);
+                    let mut enriched = sessions;
+                    for session in &mut enriched {
+                        if let Some(title) = titles.get(&session.id) {
+                            session.name = title.clone();
+                        }
+                    }
+                    store.restore_sessions(enriched);
+                }
+            }
+            Err(e) => {
+                log::warn!("[cache] failed to read sessions.json: {}", e);
+            }
+        }
+    }
+
+    // Step 2: Overlay any recent events from JSONL cache (in case hooks fired after last snapshot)
+    let events_dir = project_root.join("data/events");
+    if !events_dir.exists() {
+        info!("[cache] no events dir, skipping event overlay");
+        let _ = fs::remove_file(&close_file);
         return;
     }
 
     let mut loaded = 0;
-
     let entries = match fs::read_dir(&events_dir) {
         Ok(e) => e,
-        Err(_) => return,
+        Err(_) => {
+            let _ = fs::remove_file(&close_file);
+            return;
+        }
     };
 
     for entry in entries.flatten() {
@@ -242,10 +281,39 @@ fn reload_event_cache(store: &state::SessionStore, project_root: &PathBuf) {
     let _ = fs::remove_file(&close_file);
 }
 
-/// Write app close timestamp (called on shutdown).
+/// Load titles from data/titles.json.
+fn load_titles(project_root: &PathBuf) -> std::collections::HashMap<String, String> {
+    use std::fs;
+    let path = project_root.join("data/titles.json");
+    if !path.exists() {
+        return std::collections::HashMap::new();
+    }
+    match fs::read_to_string(&path) {
+        Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
+        Err(_) => std::collections::HashMap::new(),
+    }
+}
+
+/// Write app close timestamp and full session state (called on shutdown).
 fn write_close_timestamp(project_root: &PathBuf) {
     use std::fs;
-    let close_file = project_root.join("data/app_closed_at");
     let _ = fs::create_dir_all(project_root.join("data"));
+    let close_file = project_root.join("data/app_closed_at");
     let _ = fs::write(&close_file, format!("{}", state::now_epoch()));
+}
+
+/// Persist all sessions to data/sessions.json (called on shutdown).
+fn persist_sessions(store: &state::SessionStore, project_root: &PathBuf) {
+    use std::fs;
+    let sessions = store.get_all();
+    let path = project_root.join("data/sessions.json");
+    match serde_json::to_string_pretty(&sessions) {
+        Ok(json) => {
+            let _ = fs::write(&path, json);
+            info!("[shutdown] persisted {} sessions to data/sessions.json", sessions.len());
+        }
+        Err(e) => {
+            log::warn!("[shutdown] failed to persist sessions: {}", e);
+        }
+    }
 }

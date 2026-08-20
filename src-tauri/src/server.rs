@@ -86,6 +86,13 @@ pub fn start(store: SessionStore, port: u16) {
                         character: None,
                         attention_since: None,
                         on_overlay: false,
+                        pinned: false,
+                        tool_ok: None,
+                        tool_result: None,
+                        prompt: None,
+                        description: None,
+                        status: None,
+                        priority: None,
                     };
                     store.insert_test(test);
                     info!("[server] TEST: created test session");
