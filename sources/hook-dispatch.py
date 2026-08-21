@@ -44,7 +44,8 @@ def main():
         sys.exit(0)
 
     # Debug: full payload dump
-    debug_file = Path("/tmp/nagents-dispatch-debug.log")
+    debug_file = Path(__file__).parent.parent / "logs/dispatch-debug.log"
+    debug_file.parent.mkdir(parents=True, exist_ok=True)
     with open(debug_file, "a") as f:
         f.write(f"[{__import__('time').strftime('%H:%M:%S')}] {raw[:3000]}\n")
 

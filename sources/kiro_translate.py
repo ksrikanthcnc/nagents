@@ -58,7 +58,15 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
             desc = tool_input.get("description")
             status = tool_input.get("status")
             if desc:
-                update["description"] = desc
+                cleaned = clean_description(desc, status)
+                update["description"] = cleaned
+                # Format action_text based on status
+                if status == "waiting_on_user":
+                    update["action_text"] = f"? {cleaned}"
+                elif status == "completed":
+                    update["action_text"] = f"✓ {cleaned}"
+                else:
+                    update["action_text"] = cleaned
             if status:
                 update["status"] = status
 
@@ -73,6 +81,7 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
             "tool": "",        # clear
             "file": "",        # clear
             "tool_result": "", # clear
+            "action_text": "", # clear (app will derive from description/status)
             "mtime": time.time(),
         }
 
@@ -89,6 +98,7 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
             "description": "",  # clear stale
             "status": "",       # clear stale
             "priority": "",     # clear
+            "action_text": "",  # clear (agent working now)
             "mtime": time.time(),
         }
 
@@ -179,3 +189,38 @@ def shorten_path(path: str | None) -> str | None:
             path = path[len(prefix):]
             break
     return path
+
+
+def clean_description(desc: str, status: str | None) -> str:
+    """
+    Strip common prefixes from description, preserve punctuation (? ! etc).
+
+    Input:  "Waiting on user decision: should idle follow cursor?"
+    Output: "should idle follow cursor?"
+
+    Input:  "Blocked on user: need approval for prod deploy!"
+    Output: "need approval for prod deploy!"
+    """
+    if not desc:
+        return ""
+
+    # Common prefixes agents add before the actual content
+    prefixes = [
+        "Waiting on user decision: ",
+        "Waiting on user: ",
+        "Blocked on user: ",
+        "Waiting for user: ",
+        "Need user input: ",
+        "Question: ",
+    ]
+
+    for prefix in prefixes:
+        if desc.startswith(prefix):
+            desc = desc[len(prefix):]
+            break
+        # Case-insensitive check
+        if desc.lower().startswith(prefix.lower()):
+            desc = desc[len(prefix):]
+            break
+
+    return desc

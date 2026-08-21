@@ -28,3 +28,10 @@ data/events/
 __pycache__/
 *.pyc
 .venv/
+
+# Local hook config (has absolute paths)
+sources/kiro-ide/haive-hook.json
+data/sessions.json
+data/app_closed_at
+data/titles.json
+logs/

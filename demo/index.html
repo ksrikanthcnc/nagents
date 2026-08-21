@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nagents — demo</title>
+  <link rel="stylesheet" href="demo.css" />
+</head>
+<body>
+  <!-- Overlay canvas (full screen, behind controls) -->
+  <div id="overlay"></div>
+
+  <!-- Control panel (bottom-right popup) -->
+  <div id="controls">
+    <h2>nagents demo</h2>
+    <p class="subtitle">Nagging AI Agents — animated desktop companions</p>
+
+    <div class="control-section">
+      <label>Source</label>
+      <select id="source">
+        <option value="cli">CLI</option>
+        <option value="ide">IDE</option>
+        <option value="crew">Crew</option>
+      </select>
+    </div>
+
+    <div class="control-section">
+      <label>Group:Title</label>
+      <input type="text" id="name" placeholder="PPTP:fix-pipeline" />
+    </div>
+
+    <div class="control-section">
+      <label>State</label>
+      <div class="btn-group">
+        <button data-state="working">Working</button>
+        <button data-state="done">Done</button>
+        <button data-state="approval">? Approval</button>
+        <button data-state="stuck">Stuck</button>
+      </div>
+    </div>
+
+    <div class="control-section">
+      <button id="btn-add" class="primary">Add Session</button>
+      <button id="btn-random">Random (5)</button>
+      <button id="btn-lifecycle">Auto Lifecycle</button>
+      <button id="btn-clear">Clear All</button>
+    </div>
+
+    <div class="control-section">
+      <label>Config</label>
+      <div class="config-row">
+        <span>Followers</span>
+        <input type="number" id="cfg-followers" value="2" min="1" max="10" />
+      </div>
+      <div class="config-row">
+        <span>Roamers</span>
+        <input type="number" id="cfg-roamers" value="3" min="1" max="10" />
+      </div>
+      <div class="config-row">
+        <span>Dots</span>
+        <input type="number" id="cfg-dots" value="5" min="1" max="10" />
+      </div>
+      <div class="config-row">
+        <span>Mode</span>
+        <select id="cfg-mode">
+          <option value="priority,lifo">priority,lifo</option>
+          <option value="fifo">fifo</option>
+          <option value="lifo">lifo</option>
+          <option value="lru">lru</option>
+          <option value="freq">freq</option>
+          <option value="round_robin">round_robin</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="status-bar"></div>
+  </div>
+
+  <script type="module" src="demo.ts"></script>
+</body>
+</html>

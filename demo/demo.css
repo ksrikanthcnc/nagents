@@ -1,0 +1,104 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a1a;
+  color: #e8e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+#controls {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: rgba(20, 20, 40, 0.95);
+  border: 1px solid rgba(100, 100, 150, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  width: 300px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+#controls h2 {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 16px;
+}
+
+.control-section {
+  margin-bottom: 12px;
+}
+
+.control-section label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 4px;
+}
+
+select, input[type="text"], input[type="number"] {
+  width: 100%;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #e8e8f0;
+  font-size: 13px;
+}
+
+input[type="number"] { width: 60px; }
+
+.btn-group {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+button {
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  color: #e8e8f0;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover { background: rgba(255,255,255,0.15); }
+button.primary { background: rgba(99, 102, 241, 0.3); border-color: rgba(99, 102, 241, 0.5); }
+button.primary:hover { background: rgba(99, 102, 241, 0.5); }
+
+.config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.config-row span { font-size: 12px; }
+
+#status-bar {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+}

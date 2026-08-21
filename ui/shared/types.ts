@@ -36,6 +36,23 @@ export interface Session {
   on_overlay: boolean;
   /** User-pinned: always visible, never dots/hides. Set via panel context menu. */
   pinned: boolean;
+  // ─── Enriched fields (from hooks) ───────────────────────────────────
+  /** Tool exit success (true=0, false=nonzero). Null = not applicable. */
+  tool_ok: boolean | null;
+  /** Short result text (e.g. "3/5: Fix bug") */
+  tool_result: string | null;
+  /** User's latest prompt */
+  prompt: string | null;
+  /** Agent self-summary */
+  description: string | null;
+  /** Agent status: "in_progress", "completed", "waiting_on_user" */
+  status: string | null;
+  /** Priority: "high", "normal", "low". Null = app derives. */
+  priority: string | null;
+  /** Timestamp of last USER interaction (UserPromptSubmit). For LRU/FIFO ordering. */
+  last_user_ts: number | null;
+  /** Number of user interactions. For frequency-based sorting. */
+  interaction_count: number;
 }
 
 // ─── State Snapshot ─────────────────────────────────────────────────────────
@@ -75,6 +92,7 @@ export interface OverlayConfig {
   shrink_after_min: number;
   dot_scale: number;
   cursor_fps: number;
+  cursor_smoothing: number;
   physics_fps: number;
   font_size_group: number;
   font_size_title: number;
@@ -83,15 +101,11 @@ export interface OverlayConfig {
   max_followers: number;
   max_dots: number;
   max_roamers: number;
-  /** If true, pinned chars consume max_followers slots. If false (default), pinned are extra. */
   pin_counts_toward_max: boolean;
   group_as_one: boolean;
   source_as_group: boolean;
-  /** How to pick which sessions get the limited follow slots.
-   * Single: fifo | lifo | lru | priority
-   * Chained (comma-separated): "priority,fifo" = sort by urgency, break ties with newest-first
-   */
   follower_mode: string;
+  round_robin_sec: number;
 }
 
 export interface Config {
@@ -112,6 +126,10 @@ export interface SessionGroup {
   label: string;
   source: Source;
   sessions: Session[];
+  /** Nested sub-groups (for meta groups). */
+  subGroups?: SessionGroup[];
+  /** True = meta-level, render sub-groups not sessions directly. */
+  isMeta?: boolean;
 }
 
 // ─── Cursor Position ────────────────────────────────────────────────────────

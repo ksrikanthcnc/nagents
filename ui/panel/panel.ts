@@ -264,6 +264,12 @@ function showCharPicker(sessionId: string, event: MouseEvent): void {
       const charId = (item as HTMLElement).dataset.charId!;
       charOverrides[sessionId] = charId;
       saveCharOverrides();
+      // Also update backend so overlay picks it up
+      fetch("http://127.0.0.1:3335/character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, character: charId }),
+      }).catch(() => {});
       log("panel", `char override: ${sessionId} → ${charId}`);
       picker.remove();
 
@@ -300,7 +306,8 @@ function renderSession(session: Session): string {
   const actionDef = char.actions[action];
   const animClass = actionDef?.cssClass ?? "";
 
-  const name = session.name;
+  // Display name: if "group:title" format, show just title part
+  const name = session.name.includes(":") ? session.name.split(":").slice(1).join(":") : session.name;
   const indicator = getIndicator(session);
 
   // Health bar
@@ -378,54 +385,53 @@ function sessionToAction(session: Session): CharacterAction {
 // ─── Grouping ───────────────────────────────────────────────────────────────
 
 function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
-  const groups: SessionGroup[] = [];
+  const metas: SessionGroup[] = [];
 
-  // "On Screen" pseudo-group: sessions with attention
-  const onScreen = sessions.filter((s) => s.attention);
+  // ─── ON SCREEN meta: all active sessions, sub-grouped by group ────
+  const onScreen = sessions.filter(s => s.active);
   if (onScreen.length > 0) {
-    groups.push({
-      id: "on-screen",
-      label: "ON SCREEN",
-      source: "on-screen",
-      sessions: onScreen,
+    const subGroups = subGroupByField(onScreen, "on-screen");
+    metas.push({
+      id: "on-screen", label: `ON SCREEN`, source: "on-screen" as any,
+      sessions: onScreen, subGroups, isMeta: true,
     });
   }
 
-  // Group by source, IDE sub-grouped by workspace
+  // ─── Source metas: cli-v2, cli-v3, crew, ide ──────────────────────
   for (const sourceId of order) {
     if (sourceId === "on-screen") continue;
-
-    const sourceSessions = sessions.filter((s) => s.source === sourceId);
+    const sourceSessions = sessions.filter(s => s.source === sourceId);
     if (sourceSessions.length === 0) continue;
 
-    if (sourceId === "kiro-ide") {
-      const byGroup = new Map<string, Session[]>();
-      for (const s of sourceSessions) {
-        const key = s.group || "ide";
-        if (!byGroup.has(key)) byGroup.set(key, []);
-        byGroup.get(key)!.push(s);
-      }
-      for (const [groupName, groupSessions] of byGroup) {
-        groups.push({
-          id: `ide-${groupName}`,
-          label: groupName.toUpperCase(),
-          source: sourceId,
-          sessions: groupSessions,
-        });
-      }
-    } else {
-      groups.push({
-        id: sourceId,
-        label: sourceLabel(sourceId),
-        source: sourceId,
-        sessions: sourceSessions,
-      });
-    }
+    const subGroups = subGroupByField(sourceSessions, sourceId);
+    const label = sourceLabel(sourceId);
+    metas.push({
+      id: sourceId, label, source: sourceId as any,
+      sessions: sourceSessions, subGroups, isMeta: true,
+    });
   }
 
-  // No "Other" group — only show configured sources
+  return metas;
+}
 
-  return groups;
+/** Sub-group sessions by their group field (IDE=workspace, CLI/Crew=name prefix). */
+function subGroupByField(sessions: Session[], parentId: string): SessionGroup[] {
+  const byGroup = new Map<string, Session[]>();
+  for (const s of sessions) {
+    let groupKey: string;
+    if (s.name.includes(":")) {
+      groupKey = s.name.split(":")[0]; // "misc:hi" → "misc"
+    } else {
+      groupKey = s.group || parentId;
+    }
+    if (!byGroup.has(groupKey)) byGroup.set(groupKey, []);
+    byGroup.get(groupKey)!.push(s);
+  }
+  const result: SessionGroup[] = [];
+  for (const [name, sess] of byGroup) {
+    result.push({ id: `${parentId}-${name}`, label: name.toUpperCase(), source: parentId as any, sessions: sess });
+  }
+  return result;
 }
 
 function sourceLabel(source: string): string {

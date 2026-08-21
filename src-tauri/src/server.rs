@@ -66,6 +66,9 @@ pub fn start(store: SessionStore, port: u16) {
                 ("POST", "/title") => {
                     handle_title(request, &store);
                 }
+                ("POST", "/character") => {
+                    handle_character(request, &store);
+                }
                 ("GET", "/test/start") => {
                     let test = Session {
                         id: "test-001".into(),
@@ -93,6 +96,9 @@ pub fn start(store: SessionStore, port: u16) {
                         description: None,
                         status: None,
                         priority: None,
+                        action_text: None,
+                        last_user_ts: None,
+                        interaction_count: 0,
                     };
                     store.insert_test(test);
                     info!("[server] TEST: created test session");
@@ -206,6 +212,33 @@ fn handle_title(mut request: Request, store: &SessionStore) {
         "[server] POST /title: {} → {:?}",
         update.session_id, update.title
     );
+    respond_json(request, 200, r#"{"ok":true}"#);
+}
+
+fn handle_character(mut request: Request, store: &SessionStore) {
+    let mut body = String::new();
+    if std::io::Read::read_to_string(request.as_reader(), &mut body).is_err() {
+        respond_json(request, 400, r#"{"error":"bad body"}"#);
+        return;
+    }
+
+    #[derive(serde::Deserialize)]
+    struct CharUpdate {
+        session_id: String,
+        character: String,
+    }
+
+    let update: CharUpdate = match serde_json::from_str(&body) {
+        Ok(u) => u,
+        Err(e) => {
+            error!("[server] POST /character: invalid JSON: {}", e);
+            respond_json(request, 400, r#"{"error":"invalid json"}"#);
+            return;
+        }
+    };
+
+    store.set_character(&update.session_id, &update.character);
+    info!("[server] POST /character: {} → {:?}", update.session_id, update.character);
     respond_json(request, 200, r#"{"ok":true}"#);
 }
 

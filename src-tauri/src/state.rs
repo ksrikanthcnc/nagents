@@ -77,6 +77,15 @@ pub struct Session {
     /// Priority level: "normal" (default), "low" (task done). "high" is app-managed (pinned).
     #[serde(default)]
     pub priority: Option<String>,
+    /// Timestamp of last USER interaction (UserPromptSubmit). For LRU/FIFO ordering.
+    #[serde(default)]
+    pub last_user_ts: Option<f64>,
+    /// Number of user interactions (prompts sent). For frequency-based sorting.
+    #[serde(default)]
+    pub interaction_count: u32,
+    /// Pre-formatted action display text. Rendered as-is by overlay. "" = clear.
+    #[serde(default)]
+    pub action_text: Option<String>,
 }
 
 /// Event update from hooks (partial update).
@@ -106,6 +115,8 @@ pub struct EventUpdate {
     pub status: Option<String>,
     #[serde(default)]
     pub priority: Option<String>,
+    #[serde(default)]
+    pub action_text: Option<String>,
 }
 
 /// Full state snapshot (sent to frontend).
@@ -144,6 +155,28 @@ fn infer_source_from_id(session_id: &str) -> String {
     } else {
         String::new()
     }
+}
+
+/// Available character pool for random assignment.
+const CHAR_POOL: &[&str] = &[
+    "ghost", "cat", "skeleton", "robot", "owl",
+    "mushroom", "flame", "crystal", "cloud", "blob",
+];
+
+/// Pick a random character from the pool.
+fn random_character() -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    use std::time::SystemTime;
+    // Simple pseudo-random based on current time nanoseconds
+    let seed = SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
+    let mut hasher = DefaultHasher::new();
+    seed.hash(&mut hasher);
+    let idx = (hasher.finish() as usize) % CHAR_POOL.len();
+    CHAR_POOL[idx].to_string()
 }
 
 /// Thread-safe session store.
@@ -204,6 +237,11 @@ impl SessionStore {
                 new_session.description = None;
                 new_session.status = None;
                 new_session.priority = None;
+                new_session.action_text = None;
+                // Assign random character if none set
+                if new_session.character.is_none() {
+                    new_session.character = Some(random_character());
+                }
                 store.insert(session.id.clone(), new_session);
                 info!("[state] new session: {} ({})", session.name, session.id);
             }
@@ -276,6 +314,9 @@ impl SessionStore {
                 description: None,
                 status: None,
                 priority: None,
+                action_text: None,
+                last_user_ts: None,
+                interaction_count: 0,
             };
             info!(
                 "[state] hook created minimal session: {} (source={})",
@@ -291,9 +332,11 @@ impl SessionStore {
         }
         if let Some(attention) = update.attention {
             session.attention_source = Some(attention);
-            // Immediately apply attention change (don't wait for 5s loop)
             session.attention = attention;
             if !attention {
+                // User responded (clearing attention) → update last_user_ts
+                session.last_user_ts = Some(now_epoch());
+                session.interaction_count += 1;
                 session.attention_reason = None;
                 session.attention_since = None;
                 session.on_overlay = false;
@@ -316,6 +359,11 @@ impl SessionStore {
         }
         if let Some(ref prompt) = update.prompt {
             session.prompt = if prompt.is_empty() { None } else { Some(prompt.clone()) };
+            // Non-empty prompt = user interaction (UserPromptSubmit) → update last_user_ts
+            if !prompt.is_empty() {
+                session.last_user_ts = Some(now_epoch());
+                session.interaction_count += 1;
+            }
         }
         if let Some(ref description) = update.description {
             session.description = if description.is_empty() { None } else { Some(description.clone()) };
@@ -329,6 +377,9 @@ impl SessionStore {
         // tool_ok: None = don't touch (no Option<Option<bool>> needed, just always set when present)
         if update.tool_ok.is_some() {
             session.tool_ok = update.tool_ok;
+        }
+        if let Some(ref action_text) = update.action_text {
+            session.action_text = if action_text.is_empty() { None } else { Some(action_text.clone()) };
         }
         if let Some(mtime) = update.mtime {
             session.mtime = mtime;
@@ -366,13 +417,10 @@ impl SessionStore {
     /// Set title/name for a session (user or agent assigned).
     pub fn set_title(&self, session_id: &str, title: &str) {
         let mut store = self.inner.lock().unwrap();
-
-        // Try exact match first, then prefix match
         let matching_id = store
             .get(session_id)
             .map(|_| session_id.to_string())
             .or_else(|| store.keys().find(|k| k.starts_with(session_id)).cloned());
-
         if let Some(id) = matching_id {
             if let Some(session) = store.get_mut(&id) {
                 session.name = title.to_string();
@@ -380,6 +428,21 @@ impl SessionStore {
             }
         } else {
             info!("[state] title set for unknown session: {}", session_id);
+        }
+    }
+
+    /// Set character for a session (user picked in panel).
+    pub fn set_character(&self, session_id: &str, character: &str) {
+        let mut store = self.inner.lock().unwrap();
+        let matching_id = store
+            .get(session_id)
+            .map(|_| session_id.to_string())
+            .or_else(|| store.keys().find(|k| k.starts_with(session_id)).cloned());
+        if let Some(id) = matching_id {
+            if let Some(session) = store.get_mut(&id) {
+                session.character = Some(character.to_string());
+                info!("[state] character set: {} → {:?}", id, character);
+            }
         }
     }
 

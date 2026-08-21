@@ -17,7 +17,7 @@ from pathlib import Path
 
 # Add parent dir to path for shared translate module
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from translate import translate  # noqa: E402
+from kiro_translate import translate  # noqa: E402
 
 NAGENTS_URL = os.environ.get("NAGENTS_URL", "http://127.0.0.1:3335")
 

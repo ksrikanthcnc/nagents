@@ -50,7 +50,6 @@ attention_rules:
 # IDE sessions are further sub-grouped by workspace.
 
 panel_order:
-  - on-screen
   - kiro-cli-v2
   - kiro-cli-v3
   - kiro-crew
@@ -70,20 +69,24 @@ overlay:
   revolve_speed: 0.015         # Dot orbit speed (radians/frame)
   shrink_after_min: 5           # Minutes before non-attention roamers shrink to dot (0=disabled)
   dot_scale: 0.5               # How much to scale down dot chars (0.3-0.7)
-  cursor_fps: 10               # Cursor poll rate (10=low CPU, 30=smooth)
-  physics_fps: 60              # Physics/render loop rate (60=smooth, 30=battery saver)
+  cursor_fps: 5               # Cursor poll rate (HTTP calls, keep low)
+  cursor_smoothing: 0.07      # Lerp factor for smooth cursor follow (lower=smoother, higher=snappier)
+  physics_fps: 60              # Physics/render loop (pure JS math, keep smooth)
   font_size_group: 9           # Group label font size (px)
   font_size_title: 10          # Session title font size (px)
   font_size_action: 10         # Action line font size (px)
   # Zone system
-  max_followers: 2             # Max chars following cursor (pinned are extra by default)
-  max_roamers: 2              # Max roaming chars. Excess → dot (oldest first)
-  max_dots: 4                  # Max dots orbiting (oldest → hidden)
+  max_followers: 2             # Max chars following cursor
+  max_roamers: 3              # Max free-roaming chars
+  max_dots: 5                  # Max dots orbiting cursor
   pin_counts_toward_max: false # If true, pinned chars consume max_followers slots
-  # Follower ordering: who gets the limited follow slots when more want to follow than max_followers
-  # Chained: "priority,fifo" = sort by urgency first, break ties with newest-first
-  # Options: fifo, lifo, lru, priority (comma-separated chain)
-  follower_mode: "priority,lifo"
+  group_as_one: false          # Merge same-group sessions into one visual unit
+  # group_display: cluster (all visible, close), single (one rep), carousel (rotate)
+  group_display: cluster
+  # Follower ordering (based on last_user_ts, not agent mtime)
+  # Options: fifo, lifo, lru, priority, round_robin (comma-separated chain)
+  follower_mode: "lifo"
+  round_robin_sec: 10          # Rotation interval for round_robin mode
 # Map source → default character ID for new sessions from that source.
 # ─── Characters ──────────────────────────────────────────────────────────────
 # Default char per source (flat). Pool assignment done in frontend.
