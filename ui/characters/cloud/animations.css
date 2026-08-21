@@ -108,6 +108,35 @@
   animation: cloud-rainbow 2s ease-in-out;
 }
 
+/* ─── walk (faster drift, puffs billow) ───────────────────────────────────── */
+
+@keyframes cloud-billow {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(4px) translateY(-1px); }
+  75% { transform: translateX(-2px) translateY(-1px); }
+}
+
+@keyframes cloud-puff-billow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+[data-char="cloud"].char-slot-walk svg {
+  animation: cloud-billow 3s ease-in-out infinite;
+}
+
+[data-char="cloud"].char-slot-walk svg .puff {
+  animation: cloud-puff-billow 2s ease-in-out infinite;
+}
+[data-char="cloud"].char-slot-walk svg .puff-2 { animation-delay: 0.4s; }
+[data-char="cloud"].char-slot-walk svg .puff-3 { animation-delay: 0.8s; }
+
+[data-char="cloud"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cloud-blink 5s ease-in-out infinite;
+}
+
 /* ─── fading ─────────────────────────────────────────────────────────────── */
 
 [data-char="cloud"].char-slot-fading svg {

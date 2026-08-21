@@ -112,6 +112,29 @@
   animation: cat-stretch 1.5s ease-in-out;
 }
 
+/* ─── walk (prowl — low, fast tail, hunting) ─────────────────────────────── */
+
+@keyframes cat-prowl {
+  0%, 100% { transform: translateY(0) scaleY(0.95) scaleX(1); }
+  25% { transform: translateY(1px) scaleY(0.93) scaleX(1.02); }
+  75% { transform: translateY(1px) scaleY(0.93) scaleX(0.98); }
+}
+
+[data-char="cat"].char-slot-walk svg {
+  animation: cat-prowl 0.5s ease-in-out infinite;
+}
+
+[data-char="cat"].char-slot-walk svg .tail {
+  transform-origin: 48px 42px;
+  animation: cat-tail-fast 0.6s ease-in-out infinite;
+}
+
+[data-char="cat"].char-slot-walk svg .ear-left,
+[data-char="cat"].char-slot-walk svg .ear-right {
+  transform-origin: center;
+  animation: cat-ear-twitch 2s ease-in-out infinite;
+}
+
 /* ─── fading (disappear) ─────────────────────────────────────────────────── */
 
 [data-char="cat"].char-slot-fading svg {

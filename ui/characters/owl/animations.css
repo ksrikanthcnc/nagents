@@ -124,6 +124,36 @@
   animation: owl-wing-flutter 0.5s ease-in-out 4;
 }
 
+/* ─── walk (glide — wings spread, majestic bob) ──────────────────────────── */
+
+@keyframes owl-glide {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-3px) rotate(-1deg); }
+  70% { transform: translateY(-3px) rotate(1deg); }
+}
+
+@keyframes owl-wing-spread {
+  0%, 100% { transform: scaleX(1.1) rotate(-2deg); }
+  50% { transform: scaleX(1.15) rotate(2deg); }
+}
+
+[data-char="owl"].char-slot-walk svg {
+  animation: owl-glide 2s ease-in-out infinite;
+}
+
+[data-char="owl"].char-slot-walk svg .wing-left,
+[data-char="owl"].char-slot-walk svg .wing-right {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: owl-wing-spread 1.5s ease-in-out infinite;
+}
+
+[data-char="owl"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: owl-slow-blink 6s ease-in-out infinite;
+}
+
 /* ─── fading ─────────────────────────────────────────────────────────────── */
 
 [data-char="owl"].char-slot-fading svg {

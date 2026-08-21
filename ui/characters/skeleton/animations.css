@@ -117,6 +117,38 @@
   animation: skeleton-spin-skull 1.5s ease-in-out;
 }
 
+/* ─── walk (jaunty rattle march) ──────────────────────────────────────────── */
+
+@keyframes skeleton-march {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(2deg); }
+  75% { transform: translateY(-2px) rotate(-2deg); }
+}
+
+[data-char="skeleton"].char-slot-walk svg {
+  animation: skeleton-march 1s ease-in-out infinite;
+}
+
+[data-char="skeleton"].char-slot-walk svg .jaw {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: skeleton-jaw-clack 2s ease-in-out infinite;
+}
+
+[data-char="skeleton"].char-slot-walk svg .rib-1 {
+  animation: skeleton-rib-jitter 1.5s ease-in-out infinite;
+}
+
+[data-char="skeleton"].char-slot-walk svg .rib-2 {
+  animation: skeleton-rib-jitter 1.5s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+[data-char="skeleton"].char-slot-walk svg .rib-3 {
+  animation: skeleton-rib-jitter 1.5s ease-in-out infinite;
+  animation-delay: 0.4s;
+}
+
 /* ─── fading ─────────────────────────────────────────────────────────────── */
 
 @keyframes skeleton-fade {

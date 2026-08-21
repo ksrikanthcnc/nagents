@@ -58,6 +58,19 @@
   animation: blob-squish 0.5s ease-in-out 4;
 }
 
+/* ─── walk (squish-roll toward movement) ──────────────────────────────────── */
+
+@keyframes blob-roll {
+  0%, 100% { transform: scaleX(1) scaleY(1) rotate(0deg) translateY(0); }
+  25% { transform: scaleX(1.1) scaleY(0.9) rotate(3deg) translateY(1px); }
+  50% { transform: scaleX(0.95) scaleY(1.05) rotate(0deg) translateY(-2px); }
+  75% { transform: scaleX(1.08) scaleY(0.92) rotate(-3deg) translateY(1px); }
+}
+
+[data-char="blob"].char-slot-walk svg {
+  animation: blob-roll 1.5s ease-in-out infinite;
+}
+
 /* ─── fading ─────────────────────────────────────────────────────────────── */
 
 [data-char="blob"].char-slot-fading svg {

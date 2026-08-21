@@ -113,6 +113,27 @@
   animation: robot-antenna-spin 0.5s linear 3;
 }
 
+/* ─── walk (mechanical waddle + antenna spin) ─────────────────────────────── */
+
+@keyframes robot-waddle {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25% { transform: rotate(2deg) translateY(-1px); }
+  75% { transform: rotate(-2deg) translateY(-1px); }
+}
+
+[data-char="robot"].char-slot-walk svg {
+  animation: robot-waddle 1.5s ease-in-out infinite;
+}
+
+[data-char="robot"].char-slot-walk svg .antenna-tip {
+  transform-origin: 32px 3px;
+  animation: robot-antenna-spin 6s linear infinite;
+}
+
+[data-char="robot"].char-slot-walk svg .indicator {
+  animation: robot-indicator-pulse 1.5s ease-in-out infinite;
+}
+
 /* ─── fading ─────────────────────────────────────────────────────────────── */
 
 [data-char="robot"].char-slot-fading svg {

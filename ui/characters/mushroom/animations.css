@@ -105,6 +105,28 @@
   animation: mushroom-celebrate-spin 2s ease-in-out;
 }
 
+/* ─── walk (bouncy hop) ───────────────────────────────────────────────────── */
+
+@keyframes mushroom-hop {
+  0%, 100% { transform: translateY(0) scaleY(1) scaleX(1); }
+  30% { transform: translateY(-6px) scaleY(1.08) scaleX(0.95); }
+  50% { transform: translateY(-8px) scaleY(1.05) scaleX(0.97); }
+  70% { transform: translateY(-3px) scaleY(0.95) scaleX(1.05); }
+  85% { transform: translateY(0) scaleY(0.92) scaleX(1.08); }
+}
+
+[data-char="mushroom"].char-slot-walk svg {
+  animation: mushroom-hop 0.8s ease-in-out infinite;
+}
+
+[data-char="mushroom"].char-slot-walk svg .cap {
+  animation: mushroom-cap-pulse 1.5s ease-in-out infinite;
+}
+
+[data-char="mushroom"].char-slot-walk svg .spot {
+  animation: mushroom-spot-twinkle 1.5s ease-in-out infinite;
+}
+
 /* ─── fading ─────────────────────────────────────────────────────────────── */
 
 [data-char="mushroom"].char-slot-fading svg {
