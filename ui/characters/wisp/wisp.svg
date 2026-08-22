@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Trail (wispy tail) -->
+  <path class="trail" d="M32 40 Q26 48 20 52 Q16 56 18 58" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+  <path class="trail trail-2" d="M32 40 Q38 46 42 52 Q44 54 42 56" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <!-- Body (soft glow sphere) -->
+  <circle class="body glow" cx="32" cy="28" r="12" fill="#a78bfa" fill-opacity="0.2"/>
+  <circle class="body core" cx="32" cy="28" r="8" fill="#c4b5fd" fill-opacity="0.6"/>
+  <!-- Eye (single large eye) -->
+  <circle class="eye-white" cx="32" cy="26" r="6" fill="white" fill-opacity="0.9"/>
+  <circle class="eye" cx="32" cy="26" r="3.5" fill="#1a1a1a"/>
+  <circle class="eye-highlight" cx="30" cy="24" r="1.5" fill="white" opacity="0.8"/>
+</svg>

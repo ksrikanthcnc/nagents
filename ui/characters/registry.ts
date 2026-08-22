@@ -19,6 +19,9 @@ import { flame } from "./flame/manifest";
 import { crystal } from "./crystal/manifest";
 import { cloud } from "./cloud/manifest";
 import { blob } from "./blob/manifest";
+import { wisp } from "./wisp/manifest";
+import { spark } from "./spark/manifest";
+import { orb } from "./orb/manifest";
 
 // ─── Registry ───────────────────────────────────────────────────────────────
 
@@ -33,6 +36,9 @@ const CHARACTERS: CharacterDef[] = [
   crystal,
   cloud,
   blob,
+  wisp,
+  spark,
+  orb,
 ];
 
 const charMap = new Map<string, CharacterDef>(

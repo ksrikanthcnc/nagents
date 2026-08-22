@@ -17,6 +17,9 @@ import "./characters/flame/animations.css";
 import "./characters/crystal/animations.css";
 import "./characters/cloud/animations.css";
 import "./characters/blob/animations.css";
+import "./characters/wisp/animations.css";
+import "./characters/spark/animations.css";
+import "./characters/orb/animations.css";
 import "./panel/panel.css";
 
 async function main() {

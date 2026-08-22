@@ -1,0 +1,124 @@
+/* Wisp — floating eye, trails behind, curious */
+
+@keyframes wisp-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-3px) rotate(2deg); }
+  70% { transform: translateY(-2px) rotate(-2deg); }
+}
+
+@keyframes wisp-blink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  92% { transform: scaleY(0.1); }
+}
+
+@keyframes wisp-glow-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.05); }
+}
+
+@keyframes wisp-trail-wave {
+  0%, 100% { d: path("M32 40 Q26 48 20 52 Q16 56 18 58"); }
+  50% { d: path("M32 40 Q28 46 22 50 Q18 54 20 58"); }
+}
+
+@keyframes wisp-alert-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.15); filter: brightness(1.4) drop-shadow(0 0 8px rgba(167, 139, 250, 0.8)); }
+}
+
+@keyframes wisp-zoom {
+  0%, 100% { transform: translateX(0) scaleX(1); }
+  25% { transform: translateX(2px) scaleX(0.95); }
+  75% { transform: translateX(-1px) scaleX(1.02); }
+}
+
+@keyframes wisp-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.5) translateY(-10px); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="wisp"].char-slot-idle svg {
+  animation: wisp-float 3s ease-in-out infinite;
+}
+
+[data-char="wisp"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: wisp-blink 4s ease-in-out infinite;
+}
+
+[data-char="wisp"].char-slot-idle svg .glow {
+  animation: wisp-glow-pulse 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="wisp"].char-slot-active svg {
+  animation: wisp-float 2s ease-in-out infinite;
+  filter: brightness(1.2);
+}
+
+[data-char="wisp"].char-slot-active svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: wisp-blink 2.5s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="wisp"].char-slot-alert svg {
+  animation: wisp-alert-pulse 1s ease-in-out infinite;
+}
+
+[data-char="wisp"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.2);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="wisp"].char-slot-sleep svg {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+}
+
+[data-char="wisp"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+[data-char="wisp"].char-slot-sleep svg .glow {
+  opacity: 0.1;
+}
+
+/* ─── walk (zoom forward) ────────────────────────────────────────────────── */
+
+[data-char="wisp"].char-slot-walk svg {
+  animation: wisp-zoom 2s ease-in-out infinite;
+}
+
+[data-char="wisp"].char-slot-walk svg .trail {
+  opacity: 0.6;
+}
+
+[data-char="wisp"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: wisp-blink 5s ease-in-out infinite;
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="wisp"].char-slot-celebrate svg {
+  animation: wisp-alert-pulse 0.5s ease-in-out 3;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="wisp"].char-slot-fading svg {
+  animation: wisp-fade 3s ease-out forwards;
+}

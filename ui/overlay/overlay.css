@@ -233,6 +233,134 @@ html, body {
   animation: alert-pulse-ring 2.5s ease-out infinite;
 }
 
+/* ─── Sub-agent satellites ────────────────────────────────────────────────── */
+/* Two modes: orbit (circling parent) and pet (walking behind parent)       */
+
+@keyframes satellite-orbit {
+  0% { transform: rotate(0deg) translateX(var(--orbit-radius, 22px)) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(var(--orbit-radius, 22px)) rotate(-360deg); }
+}
+
+@keyframes satellite-pulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+@keyframes satellite-appear {
+  0% { opacity: 0; transform: rotate(0deg) translateX(0) rotate(0deg) scale(0.3); }
+  100% { opacity: 0.8; transform: rotate(0deg) translateX(var(--orbit-radius, 22px)) rotate(0deg) scale(1); }
+}
+
+@keyframes pet-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes pet-appear {
+  0% { opacity: 0; transform: scale(0.2); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0.85; transform: scale(1); }
+}
+
+/* ─── Container ──────────────────────────────────────────────────────────── */
+
+.char-satellites {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ─── Mode 1: Orbit — dots circling parent ───────────────────────────────── */
+
+.char-satellite {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -4px 0 0 -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sat-color, #a78bfa);
+  opacity: 0.8;
+  animation:
+    satellite-orbit var(--orbit-speed, 4s) linear infinite,
+    satellite-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+  box-shadow: 0 0 5px var(--sat-color, rgba(167, 139, 250, 0.6));
+}
+
+/* Stagger for multiple — equidistant */
+.char-satellite:nth-child(1) { animation-delay: 0s; }
+.char-satellite:nth-child(2) { animation-delay: calc(var(--orbit-speed, 4s) * -0.33); }
+.char-satellite:nth-child(3) { animation-delay: calc(var(--orbit-speed, 4s) * -0.66); }
+.char-satellite:nth-child(4) { animation-delay: calc(var(--orbit-speed, 4s) * -0.25); --orbit-radius: 26px; }
+
+/* ─── Mode 2: Pet — mini char SVG following parent ───────────────────────── */
+
+.char-pet {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  opacity: 0.85;
+  animation: pet-appear 0.4s ease-out forwards, pet-bob 2s ease-in-out infinite 0.4s;
+  filter: drop-shadow(0 0 2px var(--sat-color, rgba(167, 139, 250, 0.4)));
+}
+
+.char-pet svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Pet positioning — offset from parent center (JS sets --pet-x, --pet-y) */
+.char-pet {
+  top: calc(50% + var(--pet-y, 20px));
+  left: calc(50% + var(--pet-x, -10px));
+}
+
+/* Pets stagger positions */
+.char-pet:nth-child(1) { --pet-x: -14px; --pet-y: 18px; }
+.char-pet:nth-child(2) { --pet-x: 14px; --pet-y: 20px; }
+.char-pet:nth-child(3) { --pet-x: 0px; --pet-y: 24px; }
+
+/* Pet walk animation (reuses char-specific walk if data-char is set) */
+.char-pet[data-char] svg {
+  animation: pet-bob 1.5s ease-in-out infinite;
+}
+
+/* ─── Source-colored variants ────────────────────────────────────────────── */
+
+.char-satellite[data-source="kiro-crew"],
+.char-pet[data-source="kiro-crew"] { --sat-color: #a78bfa; }
+
+.char-satellite[data-source="kiro-cli"],
+.char-pet[data-source="kiro-cli"] { --sat-color: #4ade80; }
+
+.char-satellite[data-source="kiro-ide"],
+.char-pet[data-source="kiro-ide"] { --sat-color: #60a5fa; }
+
+/* ─── Sub-agent count badge ──────────────────────────────────────────────── */
+
+.sub-agent-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 7px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--sat-color, #a78bfa);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 0 4px rgba(167, 139, 250, 0.5);
+  z-index: 3;
+}
+
 /* ─── Connection Lines (SVG overlay) ─────────────────────────────────────── */
 /* Lines are rendered in JS (drawConnections) but styled here */
 

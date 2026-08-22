@@ -1,0 +1,125 @@
+/* Spark — tiny energetic worker, buzzes and flashes */
+
+@keyframes spark-buzz {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  20% { transform: translateX(1px) translateY(-1px); }
+  40% { transform: translateX(-1px) translateY(0.5px); }
+  60% { transform: translateX(0.5px) translateY(-0.5px); }
+  80% { transform: translateX(-0.5px) translateY(1px); }
+}
+
+@keyframes spark-ray-pulse {
+  0%, 100% { opacity: 0.5; transform: scaleY(1); }
+  50% { opacity: 0.9; transform: scaleY(1.3); }
+}
+
+@keyframes spark-core-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.1); filter: brightness(1.3); }
+}
+
+@keyframes spark-overdrive {
+  0%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1.2); }
+  25% { transform: scale(1.1) rotate(5deg); filter: brightness(1.5); }
+  50% { transform: scale(0.95) rotate(-3deg); filter: brightness(1.8); }
+  75% { transform: scale(1.05) rotate(2deg); filter: brightness(1.4); }
+}
+
+@keyframes spark-flash-alert {
+  0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 4px rgba(251, 191, 36, 0.4)); }
+  50% { transform: scale(1.2); filter: brightness(1.6) drop-shadow(0 0 10px rgba(251, 191, 36, 0.8)); }
+}
+
+@keyframes spark-dim {
+  0% { opacity: 1; filter: brightness(1); }
+  100% { opacity: 0.2; filter: brightness(0.4) saturate(0.3); }
+}
+
+@keyframes spark-zip {
+  0%, 100% { transform: translateX(0) scaleX(1); }
+  30% { transform: translateX(3px) scaleX(0.9); }
+  70% { transform: translateX(-2px) scaleX(1.05); }
+}
+
+@keyframes spark-burst {
+  0% { transform: scale(1); filter: brightness(1); }
+  40% { transform: scale(1.6); filter: brightness(2) hue-rotate(20deg); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes spark-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3); filter: brightness(2); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="spark"].char-slot-idle svg {
+  animation: spark-buzz 2s ease-in-out infinite;
+}
+
+[data-char="spark"].char-slot-idle svg .core {
+  animation: spark-core-pulse 2s ease-in-out infinite;
+}
+
+[data-char="spark"].char-slot-idle svg .ray {
+  transform-origin: center;
+  animation: spark-ray-pulse 3s ease-in-out infinite;
+}
+[data-char="spark"].char-slot-idle svg .ray-2 { animation-delay: 0.5s; }
+[data-char="spark"].char-slot-idle svg .ray-3 { animation-delay: 1s; }
+[data-char="spark"].char-slot-idle svg .ray-4 { animation-delay: 1.5s; }
+[data-char="spark"].char-slot-idle svg .ray-5 { animation-delay: 2s; }
+[data-char="spark"].char-slot-idle svg .ray-6 { animation-delay: 2.5s; }
+
+/* ─── active (think) — overdrive ─────────────────────────────────────────── */
+
+[data-char="spark"].char-slot-active svg {
+  animation: spark-overdrive 1s ease-in-out infinite;
+}
+
+[data-char="spark"].char-slot-active svg .ray {
+  transform-origin: center;
+  animation: spark-ray-pulse 1s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="spark"].char-slot-alert svg {
+  animation: spark-flash-alert 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="spark"].char-slot-sleep svg {
+  animation: spark-dim 2s ease-out forwards;
+}
+
+[data-char="spark"].char-slot-sleep svg .ray {
+  opacity: 0;
+}
+
+/* ─── walk (zip around) ──────────────────────────────────────────────────── */
+
+[data-char="spark"].char-slot-walk svg {
+  animation: spark-zip 0.6s ease-in-out infinite;
+  filter: brightness(1.2);
+}
+
+[data-char="spark"].char-slot-walk svg .ray {
+  transform-origin: center;
+  animation: spark-ray-pulse 0.8s ease-in-out infinite;
+  opacity: 0.8;
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="spark"].char-slot-celebrate svg {
+  animation: spark-burst 1.5s ease-in-out;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="spark"].char-slot-fading svg {
+  animation: spark-fade 2s ease-out forwards;
+}
