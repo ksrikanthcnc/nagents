@@ -145,6 +145,52 @@ function updateSessionElement(session: Session): void {
 }
 
 
+/** Recursively render sub-groups. depth controls indentation CSS class. */
+function renderSubGroups(groups: SessionGroup[], depth: number): string {
+  let html = "";
+  for (const sub of groups) {
+    const isSubCollapsed = collapsed.has(sub.id);
+    const subArrow = isSubCollapsed ? "▸" : "▾";
+    const sessionCount = countSessions(sub);
+    const attentionCount = sub.sessions.filter(s => s.attention).length;
+    const attentionBadge = attentionCount > 0 ? `<span class="attention-badge">${attentionCount}!</span>` : "";
+
+    html += `<div class="group group-depth-${depth} ${isSubCollapsed ? "group-collapsed" : ""}" data-group="${sub.id}">
+      <div class="group-header" data-toggle="${sub.id}">
+        <span class="group-arrow">${subArrow}</span>
+        <span class="group-label">${sub.label}</span>
+        ${attentionBadge}
+        <span class="group-count">${sessionCount}</span>
+      </div>`;
+
+    if (!isSubCollapsed) {
+      if (sub.subGroups && sub.subGroups.length > 0) {
+        // Has nested sub-groups — recurse
+        html += `<div class="group-content">`;
+        html += renderSubGroups(sub.subGroups, depth + 1);
+        html += `</div>`;
+      } else {
+        // Leaf level — render sessions
+        html += `<div class="group-sessions">`;
+        for (const session of sub.sessions) {
+          html += renderSession(session);
+        }
+        html += `</div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  return html;
+}
+
+/** Count all sessions in a group (recursively through sub-groups). */
+function countSessions(group: SessionGroup): number {
+  if (group.subGroups && group.subGroups.length > 0) {
+    return group.subGroups.reduce((acc, sg) => acc + countSessions(sg), 0);
+  }
+  return group.sessions.length;
+}
+
 function render(): void {
   if (!container || !currentState || !config) return;
 
@@ -157,32 +203,42 @@ function render(): void {
     </button>
   </header>`;
 
-  html += `<div class="panel-groups">`;
+  // Group display mode toggle
+  const groupAsOne = localStorage.getItem("nagents:group_as_one") === "true" || (config as any).overlay?.group_as_one || false;
+  const groupDisplay = localStorage.getItem("nagents:group_display") || (config as any).overlay?.group_display || "cluster";
+  html += `<div class="panel-toolbar">
+    <label class="toolbar-toggle" title="Merge same-group sessions">
+      <input type="checkbox" id="group-as-one-toggle" ${groupAsOne ? "checked" : ""} />
+      <span>Group</span>
+    </label>
+    <select class="toolbar-select" id="group-display-select" ${!groupAsOne ? "disabled" : ""}>
+      <option value="cluster" ${groupDisplay === "cluster" ? "selected" : ""}>Cluster</option>
+      <option value="single" ${groupDisplay === "single" ? "selected" : ""}>Single</option>
+      <option value="carousel" ${groupDisplay === "carousel" ? "selected" : ""}>Carousel</option>
+    </select>
+  </div>`;
 
-  for (const group of groups) {
-    const isCollapsed = collapsed.has(group.id);
-    const attentionCount = group.sessions.filter((s) => s.attention).length;
-    const attentionBadge = attentionCount > 0
-      ? `<span class="attention-badge">${attentionCount}!</span>`
-      : "";
-    const arrow = isCollapsed ? "▸" : "▾";
+  const panelMode = (config as any).overlay?.panel_mode || "comfortable";
+  html += `<div class="panel-groups panel-${panelMode}">`;
 
-    html += `<div class="group ${isCollapsed ? "group-collapsed" : ""}" data-group="${group.id}">
-      <div class="group-header" data-toggle="${group.id}">
+  for (const meta of groups) {
+    const isMetaCollapsed = collapsed.has(meta.id);
+    const arrow = isMetaCollapsed ? "▸" : "▾";
+    const count = meta.sessions.length;
+
+    // Meta header
+    html += `<div class="meta-group ${isMetaCollapsed ? "meta-collapsed" : ""}" data-group="${meta.id}">
+      <div class="meta-header" data-toggle="${meta.id}">
         <span class="group-arrow">${arrow}</span>
-        <span class="group-label">${group.label}</span>
-        ${attentionBadge}
-        <span class="group-count">${group.sessions.length}</span>
+        <span class="meta-label">${meta.label}</span>
+        <span class="group-count">${count}</span>
       </div>`;
 
-    if (!isCollapsed) {
-      html += `<div class="group-sessions">`;
-      for (const session of group.sessions) {
-        html += renderSession(session);
-      }
+    if (!isMetaCollapsed && meta.subGroups) {
+      html += `<div class="meta-content">`;
+      html += renderSubGroups(meta.subGroups, 1);
       html += `</div>`;
     }
-
     html += `</div>`;
   }
 
@@ -195,8 +251,8 @@ function render(): void {
 function attachEventHandlers(): void {
   if (!container) return;
 
-  // Group collapse toggle
-  container.querySelectorAll(".group-header[data-toggle]").forEach((el) => {
+  // Group/meta collapse toggle
+  container.querySelectorAll("[data-toggle]").forEach((el) => {
     el.addEventListener("click", () => {
       const groupId = (el as HTMLElement).dataset.toggle!;
       if (collapsed.has(groupId)) {
@@ -230,6 +286,26 @@ function attachEventHandlers(): void {
       } catch (e) {
         log("panel", `overlay edit toggle error: ${e}`);
       }
+    });
+  }
+
+  // Group-as-one toggle
+  const groupToggle = container.querySelector("#group-as-one-toggle") as HTMLInputElement | null;
+  if (groupToggle) {
+    groupToggle.addEventListener("change", () => {
+      localStorage.setItem("nagents:group_as_one", groupToggle.checked ? "true" : "false");
+      log("panel", `group_as_one: ${groupToggle.checked}`);
+      render();
+    });
+  }
+
+  // Group display mode select
+  const groupSelect = container.querySelector("#group-display-select") as HTMLSelectElement | null;
+  if (groupSelect) {
+    groupSelect.addEventListener("change", () => {
+      localStorage.setItem("nagents:group_display", groupSelect.value);
+      log("panel", `group_display: ${groupSelect.value}`);
+      render();
     });
   }
 }
@@ -324,12 +400,37 @@ function renderSession(session: Session): string {
   const isDot = onScreenSec > 15 * 60;
   const dotBadge = isDot ? ` <span class="dot-badge">⊙</span>` : "";
 
-  // Status line
+  // Status line — rich action text (same as overlay speech bubble)
   let status = "";
   if (session.tool) {
-    status = session.tool;
-  } else if (session.event) {
-    status = session.event;
+    const toolMap: Record<string, string> = {
+      read_file: "reading", read_files: "reading", read_code: "reading",
+      fs_write: "writing", str_replace: "writing",
+      execute_bash: "bash", grep_search: "searching", file_search: "searching",
+      list_directory: "listing", invoke_sub_agent: "sub-agent",
+      update_session_information: "status", todo_list: "todo",
+    };
+    const toolText = toolMap[session.tool] || (session.tool.length > 12 ? session.tool.slice(0, 11) + "\u2026" : session.tool);
+    const fileHint = session.file ? ` ${session.file.split("/").pop()}` : "";
+    status = `\uD83D\uDD27 ${toolText}${fileHint}`;
+  } else if (session.event === "idle") {
+    if ((session as any).action_text) {
+      status = (session as any).action_text;
+    } else if (session.description) {
+      const desc = session.description.trimEnd();
+      const icon = desc.endsWith("?") ? "?" : "\u2713";
+      status = `${icon} ${desc.length > 18 ? desc.slice(0, 17) + "\u2026" : desc}`;
+    } else {
+      status = "\u2713 done";
+    }
+  } else if (session.event === "running") {
+    status = "\u2699\uFE0F working";
+  } else if (session.event === "approval") {
+    status = "? approval";
+  } else if (session.event === "stuck") {
+    status = "\uD83D\uDEA8 stuck";
+  } else if (session.active) {
+    status = session.event || "active";
   }
 
   // Tooltip
@@ -343,13 +444,16 @@ function renderSession(session: Session): string {
   if (session.tokens > 0) tooltipParts.push(`<div class="tooltip-row">tokens: <span>${(session.tokens / 1000).toFixed(0)}k/${(session.maxTokens / 1000).toFixed(0)}k</span></div>`);
   tooltipParts.push(`<div class="tooltip-row" style="opacity:0.5">right-click to change char</div>`);
 
+  const groupLabel = session.group || session.source;
+
   return `<div class="session ${attentionClass}" data-id="${session.id}">
+    <div class="session-group-label">${groupLabel}</div>
+    <div class="session-name-short">${name}${dotBadge}</div>
     <div class="session-char ${animClass}" data-char="${charId}">
       ${char.svg}
     </div>
     ${indicator}
     ${healthBar}
-    <div class="session-name-short">${name}${dotBadge}</div>
     ${status ? `<div class="session-status">${status}</div>` : ""}
     <div class="session-tooltip">${tooltipParts.join("")}</div>
   </div>`;
@@ -387,10 +491,48 @@ function sessionToAction(session: Session): CharacterAction {
 function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
   const metas: SessionGroup[] = [];
 
-  // ─── ON SCREEN meta: all active sessions, sub-grouped by group ────
+  // ─── ON SCREEN meta: 3-level nesting (ZONE/STATE → sub-groups → sessions) ─
   const onScreen = sessions.filter(s => s.active);
   if (onScreen.length > 0) {
-    const subGroups = subGroupByField(onScreen, "on-screen");
+    const subGroups: SessionGroup[] = [];
+
+    // ── ZONE (mid-level): FOLLOWING / ROAMING / DOT/HIDDEN ──
+    const zoneChildren: SessionGroup[] = [];
+    const withAttention = onScreen.filter(s => s.attention);
+    const followCandidates = withAttention.filter(s => s.event === "approval" || s.event === "stuck" || s.event === "idle");
+    const maxF = 2; // approximate — matches config
+    const following = followCandidates.slice(0, maxF);
+    const roaming = [...followCandidates.slice(maxF), ...withAttention.filter(s => s.event === "running" || s.event === "tool")];
+    const dotHidden = onScreen.filter(s => !following.includes(s) && !roaming.includes(s));
+
+    if (following.length > 0) zoneChildren.push({ id: "on-zone-follow", label: "FOLLOWING", source: "on-screen" as any, sessions: following });
+    if (roaming.length > 0) zoneChildren.push({ id: "on-zone-roam", label: "ROAMING", source: "on-screen" as any, sessions: roaming });
+    if (dotHidden.length > 0) zoneChildren.push({ id: "on-zone-dot", label: "DOT/HIDDEN", source: "on-screen" as any, sessions: dotHidden });
+
+    if (zoneChildren.length > 0) {
+      subGroups.push({
+        id: "on-zone", label: "ZONE", source: "on-screen" as any,
+        sessions: onScreen, subGroups: zoneChildren, isMeta: true,
+      });
+    }
+
+    // ── STATE (mid-level): NEEDS YOU / DONE / WORKING ──
+    const stateChildren: SessionGroup[] = [];
+    const blocked = onScreen.filter(s => s.event === "approval" || s.event === "stuck");
+    const idle = onScreen.filter(s => s.event === "idle");
+    const working = onScreen.filter(s => s.event === "running" || s.event === "tool");
+
+    if (blocked.length > 0) stateChildren.push({ id: "on-state-blocked", label: "NEEDS YOU", source: "on-screen" as any, sessions: blocked });
+    if (idle.length > 0) stateChildren.push({ id: "on-state-idle", label: "DONE", source: "on-screen" as any, sessions: idle });
+    if (working.length > 0) stateChildren.push({ id: "on-state-working", label: "WORKING", source: "on-screen" as any, sessions: working });
+
+    if (stateChildren.length > 0) {
+      subGroups.push({
+        id: "on-state", label: "STATE", source: "on-screen" as any,
+        sessions: onScreen, subGroups: stateChildren, isMeta: true,
+      });
+    }
+
     metas.push({
       id: "on-screen", label: `ON SCREEN`, source: "on-screen" as any,
       sessions: onScreen, subGroups, isMeta: true,

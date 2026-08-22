@@ -211,6 +211,19 @@ body {
   line-height: 1.2;
 }
 
+.session-group-label {
+  font-size: 7px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+}
+
 .dot-badge {
   font-size: 8px;
   color: var(--accent);
@@ -234,17 +247,29 @@ body {
   transition: width 0.3s;
 }
 
-/* ─── Event/tool status below name ───────────────────────────────────────── */
+/* ─── Event/tool status below name (speech bubble) ───────────────────────── */
 
 .session-status {
   font-size: 8px;
-  color: var(--accent);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 60px;
+  max-width: 62px;
   text-align: center;
-  margin-top: 1px;
+  margin-top: 2px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  line-height: 1.3;
+}
+
+/* Color by state */
+.session-attention .session-status {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
 }
 
 /* ─── Tooltip on hover ───────────────────────────────────────────────────── */
@@ -367,3 +392,200 @@ body {
   color: var(--text-secondary);
   margin-top: 2px;
 }
+
+/* ─── Meta Groups (top-level collapsible sections) ───────────────────────── */
+
+.meta-group {
+  margin-bottom: 2px;
+}
+
+.meta-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
+}
+
+.meta-header:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.meta-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+.meta-content {
+  padding-left: 12px;
+  border-left: 2px solid rgba(100, 100, 150, 0.2);
+  margin-left: 10px;
+}
+
+.meta-collapsed .meta-content {
+  display: none;
+}
+
+/* ─── Depth-based indentation & styling ──────────────────────────────────── */
+
+/* Depth 1 = mid-level (ZONE, STATE) */
+.group-depth-1 {
+  margin-bottom: 4px;
+  border: none;
+  border-radius: 6px;
+}
+.group-depth-1 > .group-header {
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 5px;
+  font-size: 10px;
+}
+.group-depth-1 > .group-header .group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+.group-depth-1 > .group-content {
+  padding-left: 14px;
+  border-left: 2px solid rgba(100, 100, 150, 0.12);
+  margin-left: 8px;
+  margin-top: 3px;
+}
+
+/* Depth 2 = leaf groups (FOLLOWING, ROAMING, NEEDS YOU, etc.) */
+.group-depth-2 {
+  margin-bottom: 3px;
+  border: none;
+  border-radius: 4px;
+}
+.group-depth-2 > .group-header {
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+.group-depth-2 > .group-header .group-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.group-depth-2 > .group-sessions {
+  padding: 6px 8px;
+  margin-left: 6px;
+}
+
+/* ─── Per-meta color schemes ─────────────────────────────────────────────── */
+
+/* ON SCREEN: warm amber/gold */
+.meta-group[data-group="on-screen"] .meta-header {
+  background: rgba(245, 158, 11, 0.06);
+  border-bottom-color: rgba(245, 158, 11, 0.12);
+}
+.meta-group[data-group="on-screen"] .meta-label {
+  color: #fbbf24;
+}
+.meta-group[data-group="on-screen"] .meta-content {
+  border-left-color: rgba(245, 158, 11, 0.25);
+}
+.meta-group[data-group="on-screen"] .group-depth-1 > .group-header {
+  background: rgba(245, 158, 11, 0.05);
+}
+.meta-group[data-group="on-screen"] .group-depth-1 > .group-content {
+  border-left-color: rgba(245, 158, 11, 0.15);
+}
+.meta-group[data-group="on-screen"] .group-depth-2 > .group-header {
+  background: rgba(245, 158, 11, 0.03);
+}
+
+/* IDE: cool blue */
+.meta-group[data-group="kiro-ide"] .meta-header {
+  background: rgba(96, 165, 250, 0.06);
+  border-bottom-color: rgba(96, 165, 250, 0.12);
+}
+.meta-group[data-group="kiro-ide"] .meta-label {
+  color: #60a5fa;
+}
+.meta-group[data-group="kiro-ide"] .meta-content {
+  border-left-color: rgba(96, 165, 250, 0.25);
+}
+.meta-group[data-group="kiro-ide"] .group-depth-1 > .group-header {
+  background: rgba(96, 165, 250, 0.04);
+}
+
+/* CLI: teal/green */
+.meta-group[data-group="kiro-cli"] .meta-header,
+.meta-group[data-group="kiro-cli-v2"] .meta-header,
+.meta-group[data-group="kiro-cli-v3"] .meta-header {
+  background: rgba(45, 212, 191, 0.06);
+  border-bottom-color: rgba(45, 212, 191, 0.12);
+}
+.meta-group[data-group="kiro-cli"] .meta-label,
+.meta-group[data-group="kiro-cli-v2"] .meta-label,
+.meta-group[data-group="kiro-cli-v3"] .meta-label {
+  color: #2dd4bf;
+}
+.meta-group[data-group="kiro-cli"] .meta-content,
+.meta-group[data-group="kiro-cli-v2"] .meta-content,
+.meta-group[data-group="kiro-cli-v3"] .meta-content {
+  border-left-color: rgba(45, 212, 191, 0.25);
+}
+.meta-group[data-group="kiro-cli"] .group-depth-1 > .group-header,
+.meta-group[data-group="kiro-cli-v2"] .group-depth-1 > .group-header,
+.meta-group[data-group="kiro-cli-v3"] .group-depth-1 > .group-header {
+  background: rgba(45, 212, 191, 0.04);
+}
+
+/* CREW: purple/violet */
+.meta-group[data-group="kiro-crew"] .meta-header {
+  background: rgba(167, 139, 250, 0.06);
+  border-bottom-color: rgba(167, 139, 250, 0.12);
+}
+.meta-group[data-group="kiro-crew"] .meta-label {
+  color: #a78bfa;
+}
+.meta-group[data-group="kiro-crew"] .meta-content {
+  border-left-color: rgba(167, 139, 250, 0.25);
+}
+.meta-group[data-group="kiro-crew"] .group-depth-1 > .group-header {
+  background: rgba(167, 139, 250, 0.04);
+}
+
+/* ─── Compact Mode ───────────────────────────────────────────────────────── */
+
+.panel-compact .group-sessions {
+  gap: 3px;
+  padding: 6px 8px;
+}
+
+.panel-compact .session {
+  width: 44px;
+  padding: 3px 2px;
+}
+
+.panel-compact .session-char {
+  width: 32px;
+  height: 32px;
+}
+
+.panel-compact .session-health,
+.panel-compact .activity-dot {
+  display: none;
+}
+
+.panel-compact .session-status {
+  font-size: 7px;
+  padding: 0 3px;
+  max-width: 44px;
+}
+
+.panel-compact .session-name-short {
+  font-size: 8px;
+  max-width: 44px;
+}
+
+/* ─── Comfortable Mode (default, no changes needed) ──────────────────────── */

@@ -220,12 +220,18 @@ function sortByPriority(list: CharState[], modeStr: string, rrSec: number): void
     const diff = getPriorityLevel(b) - getPriorityLevel(a);
     if (diff !== 0) return diff;
 
+    // Stability bonus: prefer chars already in follow mode to stay (avoids flapping)
+    const aFollow = a.currentMode === "follow" ? 1 : 0;
+    const bFollow = b.currentMode === "follow" ? 1 : 0;
+    if (aFollow !== bFollow) return bFollow - aFollow;
+
     // Tie-break by configured mode
     for (const mode of tieBreakers) {
       const d = compareTieBreak(a, b, mode);
       if (d !== 0) return d;
     }
-    return 0;
+    // Final deterministic tie-break: sessionId (prevents unstable sort flapping)
+    return a.sessionId.localeCompare(b.sessionId);
   });
 }
 

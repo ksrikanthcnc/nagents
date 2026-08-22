@@ -31,17 +31,16 @@
 }
 
 @keyframes ghost-attention-jump {
-  0%, 100% { transform: translateY(0); filter: drop-shadow(0 0 0 transparent); }
-  50% { transform: translateY(-8px); filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.8)); }
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.4)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(167, 139, 250, 0.8)); }
 }
 
 @keyframes ghost-walk-wave {
-  0%, 100% { transform: translateX(0) scaleY(1); }
-  15% { transform: translateX(1px) scaleY(0.97); }
-  30% { transform: translateX(0) scaleY(1.01); }
-  45% { transform: translateX(-1px) scaleY(0.98); }
-  60% { transform: translateX(0) scaleY(1.02); }
-  75% { transform: translateX(1px) scaleY(0.97); }
+  0%, 100% { transform: translateY(0) scaleY(1) scaleX(1); }
+  20% { transform: translateY(-3px) scaleY(1.04) scaleX(0.96); }
+  40% { transform: translateY(0) scaleY(0.96) scaleX(1.04); }
+  60% { transform: translateY(-2px) scaleY(1.03) scaleX(0.97); }
+  80% { transform: translateY(1px) scaleY(0.97) scaleX(1.03); }
 }
 
 @keyframes ghost-tail-wave {
@@ -141,13 +140,19 @@
 /* ─── walk (roam on overlay) ──────────────────────────────────────────────── */
 
 [data-char="ghost"].char-slot-walk svg {
-  animation: ghost-walk-wave 1.2s ease-in-out infinite;
+  animation: ghost-walk-wave 1s ease-in-out infinite;
 }
 
 [data-char="ghost"].char-slot-walk svg .body {
   transform-box: fill-box;
   transform-origin: center bottom;
-  animation: ghost-wave 1.5s ease-in-out infinite;
+  animation: ghost-wave 1.2s ease-in-out infinite;
+}
+
+[data-char="ghost"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ghost-blink 4s ease-in-out infinite;
 }
 
 /* ─── fading (disappear) ─────────────────────────────────────────────────── */

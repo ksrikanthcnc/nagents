@@ -72,6 +72,9 @@ pub struct OverlayPhysics {
     pub group_as_one: bool,
     #[serde(default)]
     pub source_as_group: bool,
+    // Pass through all additional config fields to frontend
+    #[serde(flatten)]
+    pub extra: HashMap<String, serde_json::Value>,
 }
 
 impl Default for OverlayPhysics {
@@ -96,6 +99,7 @@ impl Default for OverlayPhysics {
             max_dots: 4,
             group_as_one: false,
             source_as_group: false,
+            extra: HashMap::new(),
         }
     }
 }

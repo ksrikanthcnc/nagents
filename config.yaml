@@ -65,12 +65,12 @@ overlay:
   follow_max_speed: 6          # Max follow speed (pixels/frame)
   min_cursor_distance: 80      # Min distance from cursor (follow mode)
   collision_distance: 100       # Min distance between chars (pixels, accounts for labels)
-  revolve_radius: 50           # Dot orbit radius (pixels)
+  revolve_radius: 40           # Dot orbit radius (larger = more space between dots and followers)
   revolve_speed: 0.015         # Dot orbit speed (radians/frame)
   shrink_after_min: 5           # Minutes before non-attention roamers shrink to dot (0=disabled)
   dot_scale: 0.5               # How much to scale down dot chars (0.3-0.7)
-  cursor_fps: 5               # Cursor poll rate (HTTP calls, keep low)
-  cursor_smoothing: 0.07      # Lerp factor for smooth cursor follow (lower=smoother, higher=snappier)
+  cursor_fps: 10              # Cursor poll rate (higher=smoother follow, costs one HTTP call per tick)
+  cursor_smoothing: 0.12      # Lerp factor (tuned for 10fps cursor: 0.12 at 60fps ≈ 7 frames to target)
   physics_fps: 60              # Physics/render loop (pure JS math, keep smooth)
   font_size_group: 9           # Group label font size (px)
   font_size_title: 10          # Session title font size (px)
@@ -83,6 +83,8 @@ overlay:
   group_as_one: false          # Merge same-group sessions into one visual unit
   # group_display: cluster (all visible, close), single (one rep), carousel (rotate)
   group_display: cluster
+  # Panel display mode: compact (32px chars, tight) or comfortable (48px, spacious)
+  panel_mode: compact
   # Follower ordering (based on last_user_ts, not agent mtime)
   # Options: fifo, lifo, lru, priority, round_robin (comma-separated chain)
   follower_mode: "lifo"

@@ -158,11 +158,13 @@ html, body {
 .char-dot {
   opacity: 0.8;
   filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.5));
-  transition: width 0.3s, opacity 0.3s;
+  transition: transform 0.3s, opacity 0.3s;
 }
-.char-dot .overlay-char-svg {
-  width: 100%;
-  height: auto;
+
+/* Clustered chars (group_as_one: cluster mode) */
+.char-clustered {
+  opacity: 0.75;
+  transition: transform 0.3s, opacity 0.3s;
 }
 /* ─── Transitions: appear / disappear ────────────────────────────────────── */
 
@@ -207,14 +209,14 @@ html, body {
   pointer-events: none;
 }
 
-/* ─── Alert pulse ring ───────────────────────────────────────────────────── */
+/* ─── Alert pulse ring (any char with attention, any mode) ───────────────── */
 
 @keyframes alert-pulse-ring {
   0% { transform: scale(1); opacity: 0.6; }
   100% { transform: scale(1.8); opacity: 0; }
 }
 
-.char-following .overlay-char-svg::before {
+.char-attention .overlay-char-svg::before {
   content: '';
   position: absolute;
   inset: -4px;
@@ -222,6 +224,13 @@ html, body {
   border: 2px solid rgba(245, 158, 11, 0.5);
   animation: alert-pulse-ring 2s ease-out infinite;
   pointer-events: none;
+}
+
+/* Subtler ring for dots with attention */
+.char-dot.char-attention .overlay-char-svg::before {
+  inset: -2px;
+  border-width: 1.5px;
+  animation: alert-pulse-ring 2.5s ease-out infinite;
 }
 
 /* ─── Connection Lines (SVG overlay) ─────────────────────────────────────── */
