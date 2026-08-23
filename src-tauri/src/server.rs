@@ -104,7 +104,6 @@ pub fn start(store: SessionStore, port: u16, project_root: std::path::PathBuf) {
                         workers: Vec::new(),
                         last_user_ts: None,
                         interaction_count: 0,
-                        attention_toggled_at: None,
                     };
                     store.insert_test(test);
                     info!("[server] TEST: created test session");

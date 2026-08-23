@@ -207,7 +207,6 @@ fn default_waiting_statuses() -> Vec<String> {
     vec![
         "waiting_on_user".into(),
         "waiting_for_approval".into(),
-        "idle".into(),
     ]
 }
 
@@ -219,9 +218,9 @@ pub struct ConfigHandle {
 }
 
 impl ConfigHandle {
-    /// Load config from path. Returns default if file doesn't exist.
+    /// Load config from path. Merges with config.local.yaml if present (local takes priority).
     pub fn load(path: &Path) -> Self {
-        let config = read_config(path);
+        let config = load_merged_config(path);
         info!("[config] loaded from {:?}", path);
         Self {
             inner: Arc::new(Mutex::new(config)),
@@ -235,6 +234,7 @@ impl ConfigHandle {
     }
 
     /// Start watching for changes (spawns background thread).
+    /// Watches both config.yaml and config.local.yaml.
     pub fn watch(&self) {
         let inner = self.inner.clone();
         let path = self.path.clone();
@@ -256,15 +256,16 @@ impl ConfigHandle {
                 return;
             }
 
-            info!("[config] watching {:?} for changes", path);
+            let local_path = local_config_path(&path);
+            info!("[config] watching {:?} for changes (+ local override)", path);
 
             for event in rx.into_iter().flatten() {
                 if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-                    if event.paths.iter().any(|p| p == &path) {
-                        let new_config = read_config(&path);
+                    if event.paths.iter().any(|p| p == &path || p == &local_path) {
+                        let new_config = load_merged_config(&path);
                         let mut cfg = inner.lock().unwrap();
                         *cfg = new_config;
-                        info!("[config] hot-reloaded");
+                        info!("[config] hot-reloaded (merged with local)");
                     }
                 }
             }
@@ -285,6 +286,68 @@ fn read_config(path: &Path) -> Config {
             info!("[config] file not found, using defaults");
             Config::default()
         }
+    }
+}
+
+/// Derive the local override path: config.yaml → config.local.yaml
+fn local_config_path(base: &Path) -> PathBuf {
+    let stem = base.file_stem().unwrap_or_default().to_string_lossy();
+    let ext = base.extension().unwrap_or_default().to_string_lossy();
+    base.with_file_name(format!("{}.local.{}", stem, ext))
+}
+
+/// Load config.yaml, then deep-merge config.local.yaml on top (local wins).
+fn load_merged_config(base_path: &Path) -> Config {
+    let base_value = read_yaml_value(base_path);
+    let local_path = local_config_path(base_path);
+    let local_value = read_yaml_value(&local_path);
+
+    let merged = deep_merge_yaml(base_value, local_value);
+
+    match serde_yaml::from_value(merged) {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("[config] merge parse error: {} — using base only", e);
+            read_config(base_path)
+        }
+    }
+}
+
+/// Read a YAML file as a serde_yaml::Value (returns Null if missing/invalid).
+fn read_yaml_value(path: &Path) -> serde_yaml::Value {
+    match fs::read_to_string(path) {
+        Ok(content) => serde_yaml::from_str(&content).unwrap_or(serde_yaml::Value::Null),
+        Err(_) => serde_yaml::Value::Null,
+    }
+}
+
+/// Deep merge two YAML values. `overlay` keys take priority over `base`.
+pub fn deep_merge_yaml_pub(base: serde_yaml::Value, overlay: serde_yaml::Value) -> serde_yaml::Value {
+    deep_merge_yaml(base, overlay)
+}
+
+/// Deep merge two YAML values. `overlay` keys take priority over `base`.
+fn deep_merge_yaml(base: serde_yaml::Value, overlay: serde_yaml::Value) -> serde_yaml::Value {
+    use serde_yaml::Value;
+    match (base, overlay) {
+        // If overlay is null/missing, keep base
+        (base, Value::Null) => base,
+        // If base is null, use overlay
+        (Value::Null, overlay) => overlay,
+        // Both are mappings: deep merge
+        (Value::Mapping(mut base_map), Value::Mapping(overlay_map)) => {
+            for (key, overlay_val) in overlay_map {
+                let merged_val = if let Some(base_val) = base_map.remove(&key) {
+                    deep_merge_yaml(base_val, overlay_val)
+                } else {
+                    overlay_val
+                };
+                base_map.insert(key, merged_val);
+            }
+            Value::Mapping(base_map)
+        }
+        // Scalar/array: overlay wins
+        (_, overlay) => overlay,
     }
 }
 

@@ -408,7 +408,7 @@ function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
     for (const c of charArray) c.el.style.display = "none";
     if (hiddenBadgeEl) hiddenBadgeEl.style.display = "none";
     if (container) container.style.opacity = "0";
-    hideBsbWindow();
+    hideBsbBox();
     return;
   } else if (container && container.style.opacity === "0") {
     container.style.opacity = "";
@@ -416,20 +416,18 @@ function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
   }
 
   // Skip physics entirely if no visible chars (power saving)
-  if (charArray.length === 0) { hideBsbWindow(); return; }
+  if (charArray.length === 0) { hideBsbBox(); return; }
 
-  // Battery saver v2: show separate BSB window (no physics in overlay)
+  // Battery saver: show separate BSB window (small transparent, draggable)
   if (batterySaver) {
-    // Hide animated chars, satellites, and +N badge
     for (const c of charArray) c.el.style.display = "none";
     for (const [, el] of satellites) el.style.display = "none";
     if (hiddenBadgeEl) hiddenBadgeEl.style.display = "none";
-    // Show BSB window (separate interactive window)
     showBsbWindow();
     return;
   } else {
     hideBsbWindow();
-    // Restore satellite visibility when exiting battery saver
+    hideBsbBox();
     for (const [, el] of satellites) el.style.display = "";
   }
 
@@ -870,19 +868,111 @@ function renderSatellites(charArray: OverlayChar[]): void {
   }
 }
 
-// ─── Battery Saver Window (separate Tauri window) ───────────────────────────
+// ─── Battery Saver Box (inline in overlay, fixed position, read-only) ────────
+
+let bsbBoxEl: HTMLElement | null = null;
+let bsbPrevHtml = "";
+
+function renderBsbBox(charArray: OverlayChar[]): void {
+  if (!container) return;
+
+  if (!bsbBoxEl) {
+    bsbBoxEl = document.createElement("div");
+    bsbBoxEl.className = "bsb-box";
+    container.appendChild(bsbBoxEl);
+  }
+  bsbBoxEl.style.display = "";
+
+  const maxChars = (cfg as any).bsb_max_chars ?? 5;
+  const fGroup = cfg.font_size_group ?? 9;
+  const fTitle = cfg.font_size_title ?? 10;
+  const fAction = cfg.font_size_action ?? 10;
+
+  // Group by state for display
+  const working: OverlayChar[] = [];
+  const needsYou: OverlayChar[] = [];
+  const done: OverlayChar[] = [];
+  const other: OverlayChar[] = [];
+
+  for (const c of charArray) {
+    const s = c.session;
+    if (s.event === "approval" || s.event === "stuck" || s.attention) needsYou.push(c);
+    else if (s.event === "running" || s.event === "tool") working.push(c);
+    else if (s.event === "idle") done.push(c);
+    else other.push(c);
+  }
+
+  // Sort each group by time (newest first)
+  const byTime = (a: OverlayChar, b: OverlayChar) => {
+    const aTs = a.session.last_user_ts || a.session.mtime || 0;
+    const bTs = b.session.last_user_ts || b.session.mtime || 0;
+    return bTs - aTs;
+  };
+  needsYou.sort(byTime);
+  working.sort(byTime);
+  done.sort(byTime);
+  other.sort(byTime);
+
+  const groups = [
+    { label: "NEEDS YOU", items: needsYou },
+    { label: "WORKING", items: working },
+    { label: "DONE", items: done },
+    { label: "OTHER", items: other },
+  ].filter(g => g.items.length > 0);
+
+  let total = 0;
+  let html = "";
+  for (const g of groups) {
+    const shown = g.items.slice(0, Math.max(1, maxChars - total));
+    if (shown.length === 0) break;
+    total += shown.length;
+
+    html += `<div class="bsb-section"><div class="bsb-section-label">${g.label}</div><div class="bsb-section-chars">`;
+    for (const c of shown) {
+      const s = c.session;
+      const charId = s.character || "ghost";
+      const charDef = getCharacter(charId);
+      const group = s.group || s.source;
+      const action = getActionText(s);
+      html += `<div class="bsb-char" style="width:${CHAR_SIZE}px">
+        <div class="bsb-group" style="font-size:${fGroup}px">${group}</div>
+        <div class="bsb-title" style="font-size:${fTitle}px">${s.name}</div>
+        <div class="bsb-svg" style="width:${CHAR_SIZE}px;height:${CHAR_SIZE}px">${charDef.svg}</div>
+        ${action ? `<div class="bsb-action" style="font-size:${fAction}px">${action}</div>` : ""}
+      </div>`;
+    }
+    html += `</div></div>`;
+
+    if (total >= maxChars) break;
+  }
+
+  const overflow = charArray.length - total;
+  if (overflow > 0) {
+    html += `<div class="bsb-overflow">+${overflow}</div>`;
+  }
+
+  if (html !== bsbPrevHtml) {
+    bsbPrevHtml = html;
+    bsbBoxEl.innerHTML = html;
+  }
+}
+
+function hideBsbBox(): void {
+  if (bsbBoxEl) bsbBoxEl.style.display = "none";
+}
+
+// ─── BSB Window (small transparent window, Peeky-style) ─────────────────────
 
 let bsbWindowShown = false;
 
 async function showBsbWindow(): Promise<void> {
   if (bsbWindowShown) return;
   bsbWindowShown = true;
-  log("overlay", "BSB: showing window");
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("show_bsb_window");
   } catch (e) {
-    log("overlay", `BSB window show failed: ${e}`);
+    log("overlay", `BSB show failed: ${e}`);
     bsbWindowShown = false;
   }
 }
@@ -890,13 +980,10 @@ async function showBsbWindow(): Promise<void> {
 async function hideBsbWindow(): Promise<void> {
   if (!bsbWindowShown) return;
   bsbWindowShown = false;
-  log("overlay", "BSB: hiding window");
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("hide_bsb_window");
-  } catch (e) {
-    log("overlay", `BSB window hide failed: ${e}`);
-  }
+  } catch {}
 }
 
 // ─── Connections ────────────────────────────────────────────────────────────

@@ -11,6 +11,8 @@ import { getCharacter } from "../characters/registry";
 export interface CharRenderOptions {
   /** Character size in px */
   charSize: number;
+  /** Total char cell width (can be wider than charSize for text) */
+  charWidth?: number;
   /** Font size for group label */
   fontGroup: number;
   /** Font size for title */
@@ -23,6 +25,7 @@ export interface CharRenderOptions {
 
 const DEFAULT_OPTS: CharRenderOptions = {
   charSize: 44,
+  charWidth: undefined,
   fontGroup: 9,
   fontTitle: 10,
   fontAction: 10,
@@ -64,8 +67,9 @@ export function renderCharHtml(s: Session, opts?: Partial<CharRenderOptions>): s
   const group = s.group || s.source;
   const srcClass = `${o.srcClassPrefix}${s.source.replace(/[^a-z0-9]/g, "")}`;
   const action = getActionText(s);
+  const cellWidth = o.charWidth || o.charSize;
 
-  return `<div class="char-tpl ${srcClass}" style="width:${o.charSize}px">
+  return `<div class="char-tpl ${srcClass}" style="width:${cellWidth}px">
     <div class="char-tpl-group" style="font-size:${o.fontGroup}px">${group}</div>
     <div class="char-tpl-title" style="font-size:${o.fontTitle}px">${s.name}</div>
     <div class="char-tpl-svg" style="width:${o.charSize}px;height:${o.charSize}px">${charDef.svg}</div>

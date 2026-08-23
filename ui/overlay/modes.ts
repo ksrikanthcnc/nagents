@@ -262,7 +262,7 @@ function getPriorityLevel(c: CharState): number {
     if (priority === "low") return 2; // done, no urgency
   }
 
-  // running/tool = working
+  // running/tool with attention = working
   return 1;
 }
 

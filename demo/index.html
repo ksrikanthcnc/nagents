@@ -3,77 +3,115 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>nagents — demo</title>
+  <title>nagents — nagging AI agents</title>
   <link rel="stylesheet" href="demo.css" />
 </head>
 <body>
-  <!-- Overlay canvas (full screen, behind controls) -->
+  <!-- Generic desktop menu bar -->
+  <div id="macos-menubar">
+    <div class="menubar-left">
+      <span class="menu-item active">Desktop</span>
+      <span class="menu-item">File</span>
+      <span class="menu-item">Edit</span>
+      <span class="menu-item">View</span>
+      <span class="menu-item">Window</span>
+      <span class="menu-item">Help</span>
+    </div>
+    <div class="menubar-right">
+      <span class="menu-time" id="menu-time">Fri 22:15</span>
+    </div>
+  </div>
+
+  <!-- Overlay canvas (full screen, characters render here) -->
   <div id="overlay"></div>
 
-  <!-- Control panel (bottom-right popup) -->
-  <div id="controls">
-    <h2>nagents demo</h2>
-    <p class="subtitle">Nagging AI Agents — animated desktop companions</p>
+  <!-- Generic taskbar (bottom) -->
+  <div id="macos-dock">
+    <div class="dock-item" title="Files">
+      <svg viewBox="0 0 32 32"><rect rx="7" width="32" height="32" fill="rgba(255,255,255,0.1)"/><path d="M8 10h16v14H8z" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/><path d="M8 10l4-4h8l4 4" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/></svg>
+    </div>
+    <div class="dock-item" title="Terminal">
+      <svg viewBox="0 0 32 32"><rect rx="7" width="32" height="32" fill="rgba(255,255,255,0.1)"/><text x="7" y="20" fill="rgba(255,255,255,0.7)" font-size="11" font-family="monospace">&gt;_</text></svg>
+    </div>
+    <div class="dock-item" title="Browser">
+      <svg viewBox="0 0 32 32"><rect rx="7" width="32" height="32" fill="rgba(255,255,255,0.1)"/><circle cx="16" cy="16" r="9" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/><line x1="7" y1="16" x2="25" y2="16" stroke="rgba(255,255,255,0.4)" stroke-width="1"/><ellipse cx="16" cy="16" rx="5" ry="9" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/></svg>
+    </div>
+    <div class="dock-item" title="Editor">
+      <svg viewBox="0 0 32 32"><rect rx="7" width="32" height="32" fill="rgba(255,255,255,0.1)"/><path d="M10 8v16h12V12l-4-4z" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/><path d="M13 14h6M13 17h4" stroke="rgba(255,255,255,0.4)" stroke-width="1"/></svg>
+    </div>
+    <div class="dock-item" title="Settings">
+      <svg viewBox="0 0 32 32"><rect rx="7" width="32" height="32" fill="rgba(255,255,255,0.1)"/><circle cx="16" cy="16" r="4" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/><path d="M16 8v3M16 21v3M8 16h3M21 16h3M10.3 10.3l2.1 2.1M19.6 19.6l2.1 2.1M10.3 21.7l2.1-2.1M19.6 12.4l2.1-2.1" stroke="rgba(255,255,255,0.5)" stroke-width="1" stroke-linecap="round"/></svg>
+    </div>
+  </div>
 
-    <div class="control-section">
-      <label>Source</label>
-      <select id="source">
-        <option value="cli">CLI</option>
-        <option value="ide">IDE</option>
-        <option value="crew">Crew</option>
-      </select>
+  <!-- Status card (floating, bottom-right) -->
+  <div id="status-card">
+    <div class="card-header">
+      <span class="card-title">nagents</span>
+      <span class="card-subtitle">nagging AI agents</span>
+    </div>
+    <div class="card-counts">
+      <div class="count-item follow"><span class="count-num" id="count-follow">0</span><span class="count-label">following</span></div>
+      <div class="count-item roam"><span class="count-num" id="count-roam">0</span><span class="count-label">roaming</span></div>
+      <div class="count-item dot"><span class="count-num" id="count-dot">0</span><span class="count-label">dots</span></div>
+      <div class="count-item hidden"><span class="count-num" id="count-hidden">0</span><span class="count-label">hidden</span></div>
+    </div>
+    <div class="card-log" id="event-log"></div>
+
+    <!-- Attention queue: click to respond -->
+    <div class="card-attention" id="attention-queue">
+      <div class="attention-header">Needs your attention <span class="attention-hint">(click to respond)</span></div>
+      <div class="attention-list" id="attention-list"></div>
     </div>
 
-    <div class="control-section">
-      <label>Group:Title</label>
-      <input type="text" id="name" placeholder="PPTP:fix-pipeline" />
+    <div class="card-footer">
+      <span>move your cursor &mdash; they follow</span>
     </div>
 
-    <div class="control-section">
-      <label>State</label>
-      <div class="btn-group">
-        <button data-state="working">Working</button>
-        <button data-state="done">Done</button>
-        <button data-state="approval">? Approval</button>
-        <button data-state="stuck">Stuck</button>
-      </div>
-    </div>
-
-    <div class="control-section">
-      <button id="btn-add" class="primary">Add Session</button>
-      <button id="btn-random">Random (5)</button>
-      <button id="btn-lifecycle">Auto Lifecycle</button>
-      <button id="btn-clear">Clear All</button>
-    </div>
-
-    <div class="control-section">
-      <label>Config</label>
+    <!-- Config tuning -->
+    <div class="card-config">
       <div class="config-row">
-        <span>Followers</span>
-        <input type="number" id="cfg-followers" value="2" min="1" max="10" />
+        <label>Followers</label>
+        <input type="range" id="cfg-followers" min="1" max="5" value="2" />
+        <span class="cfg-val" id="cfg-followers-val">2</span>
       </div>
       <div class="config-row">
-        <span>Roamers</span>
-        <input type="number" id="cfg-roamers" value="3" min="1" max="10" />
+        <label>Roamers</label>
+        <input type="range" id="cfg-roamers" min="1" max="6" value="3" />
+        <span class="cfg-val" id="cfg-roamers-val">3</span>
       </div>
       <div class="config-row">
-        <span>Dots</span>
-        <input type="number" id="cfg-dots" value="5" min="1" max="10" />
+        <label>Dots</label>
+        <input type="range" id="cfg-dots" min="1" max="8" value="5" />
+        <span class="cfg-val" id="cfg-dots-val">5</span>
       </div>
       <div class="config-row">
-        <span>Mode</span>
+        <label>Max agents</label>
+        <input type="range" id="cfg-max" min="4" max="20" value="12" />
+        <span class="cfg-val" id="cfg-max-val">12</span>
+      </div>
+      <div class="config-row">
+        <label>Mode</label>
         <select id="cfg-mode">
-          <option value="priority,lifo">priority,lifo</option>
-          <option value="fifo">fifo</option>
-          <option value="lifo">lifo</option>
-          <option value="lru">lru</option>
-          <option value="freq">freq</option>
-          <option value="round_robin">round_robin</option>
+          <option value="lifo" selected>LIFO (newest first)</option>
+          <option value="fifo">FIFO (oldest first)</option>
+          <option value="lru">LRU (neglected first)</option>
+          <option value="priority,lifo">Priority + LIFO</option>
+          <option value="round_robin">Round Robin</option>
         </select>
       </div>
+      <div class="config-row" style="margin-top:6px">
+        <button id="btn-burst" class="burst-btn">Spawn +5</button>
+        <button id="btn-clear" class="burst-btn">Clear all</button>
+      </div>
     </div>
+  </div>
 
-    <div id="status-bar"></div>
+  <!-- Title overlay (top-left) -->
+  <div id="title-overlay">
+    <h1>nagents</h1>
+    <p>Desktop companions that nag you about your AI agents</p>
+    <p class="hint">Characters follow your cursor, orbit when overflow, roam when working</p>
   </div>
 
   <script type="module" src="demo.ts"></script>

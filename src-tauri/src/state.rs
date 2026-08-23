@@ -92,9 +92,6 @@ pub struct Session {
     /// Names of active workers/sub-agents.
     #[serde(default)]
     pub workers: Vec<String>,
-    /// Epoch when attention was last toggled (for hysteresis — don't re-toggle within 30s).
-    #[serde(default)]
-    pub attention_toggled_at: Option<f64>,
 }
 
 /// Event update from hooks (partial update).
@@ -380,7 +377,6 @@ impl SessionStore {
                 workers: Vec::new(),
                 last_user_ts: None,
                 interaction_count: 0,
-                attention_toggled_at: None,
             };
             info!(
                 "[state] hook created minimal session: {} (source={})",

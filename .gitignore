@@ -35,3 +35,6 @@ data/sessions.json
 data/app_closed_at
 data/titles.json
 logs/
+
+# Local config override (user-specific, not committed)
+config.local.yaml

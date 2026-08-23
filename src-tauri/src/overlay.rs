@@ -95,8 +95,8 @@ pub fn show_bsb_window(app: AppHandle) -> Result<(), String> {
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        .resizable(true)
-        .inner_size(400.0, 140.0)
+        .resizable(false)
+        .inner_size(360.0, 130.0)
         .visible_on_all_workspaces(true)
         .build()
         .map_err(|e| e.to_string())?;

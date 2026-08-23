@@ -53,6 +53,12 @@ export interface Session {
   last_user_ts: number | null;
   /** Number of user interactions. For frequency-based sorting. */
   interaction_count: number;
+  /** Number of active sub-agents (invoke_sub_agent in progress). */
+  sub_agents: number;
+  /** Names of active sub-agents/workers. */
+  sub_agent_names: string[];
+  /** Worker names from backend (alias for sub_agent_names). */
+  workers?: string[];
 }
 
 // ─── State Snapshot ─────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-/* BSB — Battery Saver Box */
+/* BSB — small transparent floating window */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -6,26 +6,46 @@ html, body {
   background: transparent;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   user-select: none;
-  cursor: grab;
 }
-body:active { cursor: grabbing; }
 
 #bsb {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px;
-  background: rgba(20, 20, 36, 0.8);
-  border-radius: 12px;
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: transparent;
+  cursor: grab;
 }
 
-#bsb[data-layout="vertical"] { flex-direction: column; flex-wrap: nowrap; align-items: center; }
-#bsb[data-layout="grid"] { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, max-content)); }
+#bsb:active { cursor: grabbing; }
 
-/* ─── Shared char template styles ────────────────────────────────────────── */
+/* ─── State sections ─────────────────────────────────────────────────────── */
+
+.bsb-section { display: flex; flex-direction: column; gap: 4px; }
+
+.bsb-label {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(167, 139, 250, 0.6);
+  padding-left: 2px;
+}
+
+.bsb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bsb-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(167, 139, 250, 0.2);
+  margin: 2px 0;
+}
+
+/* ─── Char template styles ───────────────────────────────────────────────── */
 
 .char-tpl {
   display: flex;
@@ -59,7 +79,9 @@ body:active { cursor: grabbing; }
   width: 100%;
 }
 
-.char-tpl-svg { position: relative; }
+.char-tpl-svg {
+  margin: 0 auto;
+}
 .char-tpl-svg svg { width: 100%; height: 100%; }
 
 .char-tpl-action {
@@ -74,25 +96,12 @@ body:active { cursor: grabbing; }
   max-width: 100%;
 }
 
-/* ─── BSB-specific ───────────────────────────────────────────────────────── */
-
-.bsb-divider {
-  width: 1px;
-  align-self: stretch;
-  background: rgba(167, 139, 250, 0.3);
-  min-height: 30px;
-}
-
-#bsb[data-layout="vertical"] .bsb-divider {
-  width: 80%; height: 1px; min-height: unset; align-self: center;
-}
-
 .bsb-overflow {
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 600;
+  font-size: 11px;
+  font-weight: 600;
   color: rgba(167, 139, 250, 0.8);
-  background: rgba(167, 139, 250, 0.08);
-  padding: 4px 8px; border-radius: 6px; align-self: center;
+  text-align: center;
+  padding: 4px;
 }
 
 /* Source hue on group badge */

@@ -1,104 +1,607 @@
+/* nagents demo — macOS Sequoia-inspired wallpaper + overlay */
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-body {
-  background: #0a0a1a;
-  color: #e8e8f0;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  overflow: hidden;
+html, body {
+  width: 100vw;
   height: 100vh;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  cursor: default;
 }
+
+/* ─── macOS Tahoe-style desktop ─────────────────────────────────────────── */
+
+body {
+  /* Abstract underwater wave gradient inspired by macOS Tahoe's color palette */
+  background:
+    /* Light refraction highlights */
+    radial-gradient(ellipse at 30% 30%, rgba(120, 220, 255, 0.25) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 60%, rgba(100, 200, 240, 0.15) 0%, transparent 35%),
+    radial-gradient(ellipse at 50% 80%, rgba(80, 160, 220, 0.2) 0%, transparent 45%),
+    /* Deep water tones */
+    radial-gradient(ellipse at 20% 70%, rgba(20, 60, 120, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 30%, rgba(30, 100, 160, 0.3) 0%, transparent 45%),
+    /* Base gradient: deep turquoise to dark blue */
+    linear-gradient(165deg, #0c3d5f 0%, #0a5e7a 20%, #0d7d96 40%, #0a6b8a 60%, #073f5c 80%, #041e30 100%);
+  background-attachment: fixed;
+}
+
+/* Subtle caustic light pattern overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 40% 25%, rgba(180, 240, 255, 0.06) 0%, transparent 30%),
+    radial-gradient(ellipse at 65% 45%, rgba(160, 230, 250, 0.04) 0%, transparent 25%),
+    radial-gradient(ellipse at 25% 65%, rgba(140, 220, 245, 0.05) 0%, transparent 30%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Overlay (characters) ─────────────────────────────────────────────────── */
 
 #overlay {
   position: fixed;
   inset: 0;
-  z-index: 1;
+  z-index: 10;
   pointer-events: none;
 }
 
-#controls {
+/* ─── Generic Menu Bar ──────────────────────────────────────────────────────── */
+
+#macos-menubar {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1000;
-  background: rgba(20, 20, 40, 0.95);
-  border: 1px solid rgba(100, 100, 150, 0.3);
-  border-radius: 12px;
-  padding: 20px;
-  width: 300px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  user-select: none;
 }
 
-#controls h2 {
-  font-size: 16px;
-  margin-bottom: 4px;
+.menubar-left, .menubar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.subtitle {
+.menu-item {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.menu-item.active {
+  font-weight: 600;
+}
+
+.menubar-right {
+  gap: 12px;
+  font-size: 12px;
+}
+
+.menu-time { font-weight: 400; font-size: 13px; }
+
+/* ─── Generic Taskbar / Dock ────────────────────────────────────────────────── */
+
+#macos-dock {
+  position: fixed;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.dock-item {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.dock-item svg {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+}
+
+/* ─── Title (top-left) ─────────────────────────────────────────────────────── */
+
+#title-overlay {
+  position: fixed;
+  top: 40px;
+  left: 40px;
+  z-index: 100;
+  pointer-events: none;
+  user-select: none;
+}
+
+#title-overlay h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: -0.5px;
+  margin-bottom: 6px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+#title-overlay p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  max-width: 300px;
+  line-height: 1.4;
+}
+
+#title-overlay .hint {
+  margin-top: 8px;
   font-size: 11px;
-  color: rgba(255,255,255,0.5);
-  margin-bottom: 16px;
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
 }
 
-.control-section {
+/* ─── Status Card (bottom-right) ───────────────────────────────────────────── */
+
+#status-card {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  width: 260px;
+  background: rgba(20, 20, 36, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  pointer-events: auto;
+}
+
+.card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
-.control-section label {
-  display: block;
+.card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+
+.card-subtitle {
   font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ─── Counts Grid ──────────────────────────────────────────────────────────── */
+
+.card-counts {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.count-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.count-num {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.count-label {
+  font-size: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.3px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.count-item.follow .count-num { color: #f59e0b; }
+.count-item.roam .count-num { color: #a78bfa; }
+.count-item.dot .count-num { color: #60a5fa; }
+.count-item.hidden .count-num { color: rgba(255, 255, 255, 0.3); }
+
+/* ─── Event Log ────────────────────────────────────────────────────────────── */
+
+.card-log {
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 10px;
+  font-family: "SF Mono", "Menlo", monospace;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.5;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.card-log::-webkit-scrollbar { width: 4px; }
+.card-log::-webkit-scrollbar-track { background: transparent; }
+.card-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+.log-entry { margin-bottom: 2px; }
+.log-entry .log-time { color: rgba(255, 255, 255, 0.25); }
+.log-entry .log-spawn { color: #4ade80; }
+.log-entry .log-transition { color: #fbbf24; }
+.log-entry .log-mode { color: #60a5fa; }
+.log-entry .log-remove { color: #f87171; }
+
+/* ─── Footer ───────────────────────────────────────────────────────────────── */
+
+.card-footer {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+/* ─── Attention Queue ──────────────────────────────────────────────────────── */
+
+.card-attention {
+  margin-bottom: 10px;
+}
+
+.attention-header {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: rgba(245, 158, 11, 0.7);
   margin-bottom: 4px;
 }
 
-select, input[type="text"], input[type="number"] {
-  width: 100%;
-  padding: 6px 10px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 6px;
-  color: #e8e8f0;
-  font-size: 13px;
+.attention-hint {
+  font-weight: 400;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.3);
 }
 
-input[type="number"] { width: 60px; }
-
-.btn-group {
+.attention-list {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
+  min-height: 28px;
 }
 
-button {
-  padding: 6px 12px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
+.attention-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
   border-radius: 6px;
-  color: #e8e8f0;
-  font-size: 11px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.1s;
+  pointer-events: auto;
 }
 
-button:hover { background: rgba(255,255,255,0.15); }
-button.primary { background: rgba(99, 102, 241, 0.3); border-color: rgba(99, 102, 241, 0.5); }
-button.primary:hover { background: rgba(99, 102, 241, 0.5); }
+.attention-item:hover {
+  background: rgba(245, 158, 11, 0.25);
+  transform: scale(1.05);
+}
+
+.attention-item:active {
+  transform: scale(0.95);
+}
+
+.attention-item .att-char {
+  width: 18px;
+  height: 18px;
+}
+
+.attention-item .att-char svg {
+  width: 100%;
+  height: 100%;
+}
+
+.attention-item .att-name {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attention-item .att-state {
+  font-size: 8px;
+  color: rgba(245, 158, 11, 0.8);
+}
+
+/* ─── Config Sliders ───────────────────────────────────────────────────────── */
+
+.card-config {
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
 
 .config-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
-.config-row span { font-size: 12px; }
+.config-row label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.45);
+  width: 54px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
 
-#status-bar {
-  margin-top: 12px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255,255,255,0.1);
+.config-row input[type="range"] {
+  flex: 1;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  outline: none;
+}
+
+.config-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #a78bfa;
+  cursor: pointer;
+}
+
+.config-row select {
+  flex: 1;
+  padding: 3px 6px;
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.8);
+  outline: none;
+  cursor: pointer;
+}
+
+.cfg-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  width: 14px;
+  text-align: right;
+}
+
+.burst-btn {
+  flex: 1;
+  padding: 5px 8px;
   font-size: 10px;
-  color: rgba(255,255,255,0.4);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(167, 139, 250, 0.2);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.burst-btn:hover {
+  background: rgba(167, 139, 250, 0.35);
+}
+
+/* ─── Character styles (imported from overlay) ─────────────────────────────── */
+/* These duplicate overlay.css since we import character SVGs directly */
+
+.overlay-char {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  transition: transform 0.4s ease, opacity 0.3s ease;
+}
+
+.overlay-char-group {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+}
+
+.overlay-char-title {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 1px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.overlay-char-svg {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.overlay-char-svg svg {
+  width: 100%;
+  height: 100%;
+}
+
+.overlay-char-action {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 8px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  margin-top: 0px;
+  pointer-events: none;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.overlay-char-action:empty { display: none; }
+.action-icon { margin-right: 3px; font-size: 11px; }
+
+/* ─── Mode visual states ───────────────────────────────────────────────────── */
+
+.char-following {
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
+}
+
+.char-following[data-source="kiro-crew"] { filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.7)); }
+.char-following[data-source="kiro-cli"] { filter: drop-shadow(0 0 8px rgba(168, 230, 207, 0.7)); }
+.char-following[data-source="kiro-ide"] { filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.7)); }
+
+.char-roaming {
+  opacity: 0.75;
+  filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.4));
+}
+
+.char-working { opacity: 0.55; }
+
+.char-dot {
+  opacity: 0.8;
+  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.5));
+  transition: transform 0.3s, opacity 0.3s;
+}
+
+/* ─── Animations ───────────────────────────────────────────────────────────── */
+
+@keyframes char-appear {
+  0% { opacity: 0; transform: scale(0.3); }
+  60% { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes char-disappear {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.4) translateY(10px); }
+}
+
+.char-appearing {
+  animation: char-appear 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.char-hiding {
+  animation: char-disappear 0.3s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Zzz for idle roaming */
+@keyframes zzz-float {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+  30% { transform: translateY(-6px) translateX(2px); opacity: 0.7; }
+  60% { transform: translateY(-12px) translateX(-1px); opacity: 0.5; }
+  100% { transform: translateY(-16px) translateX(3px); opacity: 0; }
+}
+
+.char-roaming .overlay-char-svg::after {
+  content: 'z z';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font: bold 7px/1 system-ui;
+  color: rgba(167, 139, 250, 0.6);
+  letter-spacing: 2px;
+  animation: zzz-float 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Alert pulse ring */
+@keyframes alert-pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.char-following .overlay-char-svg::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(245, 158, 11, 0.5);
+  animation: alert-pulse-ring 2s ease-out infinite;
+  pointer-events: none;
+}
+
+/* ─── Hidden badge ─────────────────────────────────────────────────────────── */
+
+.overlay-hidden-badge {
+  position: fixed;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* ─── Anti-flip fix ────────────────────────────────────────────────────────── */
+.overlay-char-group,
+.overlay-char-title,
+.overlay-char-action {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }

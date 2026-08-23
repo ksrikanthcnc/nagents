@@ -725,3 +725,31 @@ body {
 .settings-save-btn:hover {
   background: rgba(167, 139, 250, 0.25);
 }
+
+/* ─── Sub-agents ─────────────────────────────────────────────────────────── */
+
+.session-sub-agents {
+  font-size: 8px;
+  color: var(--accent);
+  text-align: center;
+  margin-top: 2px;
+}
+
+.sub-agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+}
+
+.sub-agent-name {
+  font-size: 7px;
+  color: var(--text-muted);
+  background: rgba(167, 139, 250, 0.08);
+  padding: 0 3px;
+  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+}
