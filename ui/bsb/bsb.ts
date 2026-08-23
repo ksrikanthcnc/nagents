@@ -1,12 +1,12 @@
 /**
  * BSB — Battery Saver Box.
- * Small transparent window. Shows sessions grouped by state.
- * Uses same group names as panel (NEEDS YOU / WORKING / DONE).
+ * Reads config from Tauri IPC. Re-reads every 30s for hot-reload changes.
+ * Shows sessions grouped by state, ordered by waterfall.
  */
 
 import type { Session, OverlayConfig } from "../shared/types";
 import { pollState, getConfig, log } from "../shared/bridge";
-import { renderCharHtml, getActionText } from "../shared/char-template";
+import { renderCharHtml } from "../shared/char-template";
 
 let container: HTMLElement | null = null;
 let cfg: OverlayConfig | null = null;
@@ -15,12 +15,10 @@ let prevHtml = "";
 export async function initBsb(el: HTMLElement): Promise<void> {
   container = el;
 
-  try {
-    const appConfig = await getConfig();
-    cfg = appConfig.overlay;
-  } catch {}
+  cfg = (await getConfig()).overlay;
+  log("bsb", `config: max=${(cfg as any).bsb_max_chars} layout=${(cfg as any).bsb_layout} charSize=${(cfg as any).char_size}`);
 
-  // Drag via startDragging (works on small non-fullscreen transparent windows)
+  // Drag
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const win = getCurrentWindow();
@@ -29,7 +27,9 @@ export async function initBsb(el: HTMLElement): Promise<void> {
     });
   } catch {}
 
-  pollState((state) => {
+  // Poll state + re-read config each cycle (config is cached in Rust memory, cheap)
+  pollState(async (state) => {
+    try { cfg = (await getConfig()).overlay; } catch {}
     render(state.sessions.filter(s => s.active));
   }, 2000);
 }
@@ -37,41 +37,39 @@ export async function initBsb(el: HTMLElement): Promise<void> {
 function render(sessions: Session[]): void {
   if (!container || !cfg) return;
 
-  const maxChars = (cfg as any).bsb_max_chars ?? 8;
-  const charSize = (cfg as any).char_size ?? 44;
-  // Wider than char to fit text
-  const charWidth = charSize + 20;
+  // Read from localStorage (panel writes on change) → config fallback
+  const maxChars = Number(localStorage.getItem("nagents:bsb_max_chars")) || (cfg as any).bsb_max_chars || 5;
+  const layout = localStorage.getItem("nagents:bsb_layout") || (cfg as any).bsb_layout || "grid";
+  const charSize = Number(localStorage.getItem("nagents:char_size")) || (cfg as any).char_size || 44;
+  const charWidth = charSize + 16;
+
+  container.dataset.layout = layout;
 
   const opts = {
     charSize,
+    charWidth,
     fontGroup: cfg.font_size_group ?? 9,
     fontTitle: cfg.font_size_title ?? 10,
     fontAction: cfg.font_size_action ?? 9,
-    charWidth,
   };
 
-  // Group by state (same as panel)
+  // Group by state (waterfall: attention > done > working > other)
   const needsYou = sessions.filter(s => s.attention || s.event === "approval" || s.event === "stuck");
-  const working = sessions.filter(s => !s.attention && (s.event === "running" || s.event === "tool"));
   const done = sessions.filter(s => !s.attention && s.event === "idle");
-  const other = sessions.filter(s => !needsYou.includes(s) && !working.includes(s) && !done.includes(s));
+  const working = sessions.filter(s => !s.attention && (s.event === "running" || s.event === "tool"));
+  const other = sessions.filter(s => !needsYou.includes(s) && !done.includes(s) && !working.includes(s));
 
-  // Sort each group by time
-  const byTime = (a: Session, b: Session) => {
-    const aTs = a.last_user_ts || a.mtime || 0;
-    const bTs = b.last_user_ts || b.mtime || 0;
-    return bTs - aTs;
-  };
+  const byTime = (a: Session, b: Session) => (b.last_user_ts || b.mtime || 0) - (a.last_user_ts || a.mtime || 0);
   needsYou.sort(byTime);
-  working.sort(byTime);
   done.sort(byTime);
+  working.sort(byTime);
   other.sort(byTime);
 
   const groups = [
-    { label: "NEEDS YOU", items: needsYou },
-    { label: "WORKING", items: working },
-    { label: "DONE", items: done },
-    { label: "OTHER", items: other },
+    { label: "NEEDS YOU", cls: "bsb-g-attention", items: needsYou },
+    { label: "DONE", cls: "bsb-g-done", items: done },
+    { label: "WORKING", cls: "bsb-g-working", items: working },
+    { label: "OTHER", cls: "bsb-g-other", items: other },
   ].filter(g => g.items.length > 0);
 
   let total = 0;
@@ -82,25 +80,19 @@ function render(sessions: Session[]): void {
     if (shown.length === 0) break;
     total += shown.length;
 
-    // Divider between groups
     if (gi > 0) html += `<div class="bsb-divider"></div>`;
-
-    // Section label
-    html += `<div class="bsb-section">`;
+    html += `<div class="bsb-section ${g.cls}">`;
     html += `<div class="bsb-label">${g.label}</div>`;
     html += `<div class="bsb-row">`;
     for (const s of shown) {
       html += renderCharHtml(s, { ...opts, srcClassPrefix: "bsb-src-" });
     }
     html += `</div></div>`;
-
     if (total >= maxChars) break;
   }
 
   const overflow = sessions.length - total;
-  if (overflow > 0) {
-    html += `<div class="bsb-overflow">+${overflow}</div>`;
-  }
+  if (overflow > 0) html += `<div class="bsb-overflow">+${overflow}</div>`;
 
   if (html !== prevHtml) {
     prevHtml = html;
@@ -110,11 +102,13 @@ function render(sessions: Session[]): void {
 }
 
 async function resizeWindow(): Promise<void> {
+  if (!container) return;
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     const { LogicalSize } = await import("@tauri-apps/api/dpi");
-    const w = Math.max(150, document.body.scrollWidth + 4);
-    const h = Math.max(80, document.body.scrollHeight + 4);
+    // Measure content's natural size (not constrained by window)
+    const w = Math.max(150, container.scrollWidth + 20);
+    const h = Math.max(80, container.scrollHeight + 20);
     await getCurrentWindow().setSize(new LogicalSize(w, h));
   } catch {}
 }

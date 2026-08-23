@@ -259,6 +259,7 @@ function applyModes(): void {
     pin_counts_toward_max: cfg.pin_counts_toward_max ?? MODE_DEFAULTS.pin_counts_toward_max,
     group_as_one: localStorage.getItem("nagents:group_as_one") === "true" || (cfg.group_as_one ?? MODE_DEFAULTS.group_as_one),
     group_display: localStorage.getItem("nagents:group_display") || (cfg as any).group_display || "cluster",
+    working_mode: (cfg as any).working_mode || "roam",
   };
 
   // Only recompute modes if something meaningful changed:

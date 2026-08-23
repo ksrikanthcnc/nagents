@@ -91,10 +91,12 @@ overlay:
   # Options: fifo, lifo, lru, priority, round_robin (comma-separated chain)
   follower_mode: "lifo"
   round_robin_sec: 3          # Rotation interval for cluster center (seconds)
+  # Working sessions: "roam" (always roam, don't take follow slots) or "queue" (normal waterfall)
+  working_mode: roam
   # Battery saver box settings
   bsb_max_chars: 5            # Max chars shown in battery saver box
   bsb_opacity: 0              # Background opacity (0.0 = fully transparent, 1.0 = opaque)
-  bsb_layout: horizontal      # Layout: horizontal, vertical, grid
+  bsb_layout: horizontal      # Layout: horizontal (one row), vertical (one column), grid (wrapping rows)
 # Map source → default character ID for new sessions from that source.
 # ─── Characters ──────────────────────────────────────────────────────────────
 # Default char per source (flat). Pool assignment done in frontend.

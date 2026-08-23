@@ -37,10 +37,16 @@ export async function getState(): Promise<StateSnapshot> {
 
 /** Fetch config. */
 export async function getConfig(): Promise<Config> {
+  // Use HTTP endpoint (works for all windows, always fresh from Rust config cache)
+  try {
+    const resp = await fetch(`${HTTP_BASE}/config`);
+    if (resp.ok) return resp.json();
+  } catch {}
+  // Fallback: Tauri IPC
   if (isTauri()) {
     return tauriInvoke<Config>("get_config");
   }
-  // No HTTP fallback for config — return defaults
+  // Final fallback: defaults
   return {
     sources: {},
     attention_rules: {

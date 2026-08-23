@@ -53,6 +53,8 @@ export interface ModeConfig {
   group_as_one: boolean;
   /** How to display merged groups: "single" | "cluster" | "carousel" */
   group_display: string;
+  /** Working sessions behavior: "roam" (skip follow, always roam) | "queue" (normal waterfall) */
+  working_mode?: string;
 }
 
 export const MODE_DEFAULTS: ModeConfig = {
@@ -64,6 +66,7 @@ export const MODE_DEFAULTS: ModeConfig = {
   pin_counts_toward_max: false,
   group_as_one: false,
   group_display: "cluster",
+  working_mode: "roam",
 };
 
 // ─── Round-robin state ──────────────────────────────────────────────────────
@@ -173,7 +176,21 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
 
   for (const c of normal) {
     let mode: CharMode;
-    if (followUsed < followSlots) {
+    const isWorking = !c.session.attention && (c.session.event === "running" || c.session.event === "tool");
+
+    // Working sessions: skip follow, go to roam (if working_mode = "roam")
+    if (isWorking && cfg.working_mode !== "queue") {
+      // Always roam (or dot/hidden if roam is full)
+      if (roamUsed < cfg.max_roamers) {
+        mode = "roam";
+        roamUsed++;
+      } else if (dotUsed < cfg.max_dots) {
+        mode = "revolve";
+        dotUsed++;
+      } else {
+        mode = "hidden";
+      }
+    } else if (followUsed < followSlots) {
       mode = "follow";
       followUsed++;
     } else if (roamUsed < cfg.max_roamers) {

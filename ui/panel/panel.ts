@@ -187,9 +187,9 @@ function renderSettings(): string {
     </label>
     <label>BSB chars<input type="number" class="cfg-input" data-key="bsb_max_chars" value="${(ov as any).bsb_max_chars ?? 5}" min="1" max="20"></label>
     <label>BSB layout<select class="cfg-input" data-key="bsb_layout">
-      <option value="horizontal" ${(ov as any).bsb_layout === "horizontal" || !(ov as any).bsb_layout ? "selected" : ""}>Horizontal</option>
+      <option value="grid" ${((ov as any).bsb_layout || "grid") === "grid" ? "selected" : ""}>Grid</option>
+      <option value="horizontal" ${(ov as any).bsb_layout === "horizontal" ? "selected" : ""}>Horizontal</option>
       <option value="vertical" ${(ov as any).bsb_layout === "vertical" ? "selected" : ""}>Vertical</option>
-      <option value="grid" ${(ov as any).bsb_layout === "grid" ? "selected" : ""}>Grid</option>
     </select></label>
   </div>
   <button class="settings-save-btn" id="settings-save-btn">Save to config.local.yaml</button>`;

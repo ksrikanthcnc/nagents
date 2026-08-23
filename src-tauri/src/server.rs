@@ -24,7 +24,7 @@ const EVENTS_DIR: &str = "data/events";
 const TITLES_FILE: &str = "data/titles.json";
 
 /// Start the HTTP server on the given port (background thread).
-pub fn start(store: SessionStore, port: u16, project_root: std::path::PathBuf) {
+pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16, project_root: std::path::PathBuf) {
     let addr = format!("127.0.0.1:{}", port);
 
     thread::spawn(move || {
@@ -50,6 +50,11 @@ pub fn start(store: SessionStore, port: u16, project_root: std::path::PathBuf) {
                 ("GET", "/state") => {
                     let state = store.snapshot();
                     let json = serde_json::to_string(&state).unwrap_or_default();
+                    respond_json(request, 200, &json);
+                }
+                ("GET", "/config") => {
+                    let cfg = config.get();
+                    let json = serde_json::to_string(&cfg).unwrap_or_default();
                     respond_json(request, 200, &json);
                 }
                 ("GET", "/cursor") => {

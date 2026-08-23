@@ -126,7 +126,7 @@ pub fn run() {
 
             // Start HTTP server for external hook pushes
             let http_port = config.get().http_port;
-            server::start(store.clone(), http_port, project_root.clone());
+            server::start(store.clone(), config.clone(), http_port, project_root.clone());
 
             // Start scanner orchestrator (spawns source executables)
             scanner::start(store.clone(), config.clone(), project_root);

@@ -1,4 +1,4 @@
-/* BSB — small transparent floating window */
+/* BSB — compact transparent floating window */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -11,53 +11,81 @@ html, body {
 #bsb {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 6px 8px;
   background: transparent;
+  border: 1px solid rgba(167, 139, 250, 0.12);
+  border-radius: 10px;
   cursor: grab;
 }
-
 #bsb:active { cursor: grabbing; }
 
-/* ─── State sections ─────────────────────────────────────────────────────── */
+/* ─── Layout modes ───────────────────────────────────────────────────────── */
 
-.bsb-section { display: flex; flex-direction: column; gap: 4px; }
+/* Grid (default): sections stack vertically, chars wrap in rows (like panel) */
+#bsb[data-layout="grid"] .bsb-row { flex-wrap: wrap; }
+
+/* Horizontal: everything in one single row (all chars side by side) */
+#bsb[data-layout="horizontal"] { flex-direction: row; flex-wrap: nowrap; align-items: flex-start; width: max-content; }
+#bsb[data-layout="horizontal"] .bsb-section { flex-direction: column; flex-shrink: 0; }
+#bsb[data-layout="horizontal"] .bsb-row { flex-wrap: nowrap; flex-shrink: 0; }
+#bsb[data-layout="horizontal"] .bsb-divider { width: 1px; height: auto; align-self: stretch; min-width: 1px; }
+
+/* Vertical: one single column (all chars stacked) */
+#bsb[data-layout="vertical"] .bsb-row { flex-direction: column; align-items: center; }
+
+/* ─── Sections ───────────────────────────────────────────────────────────── */
+
+.bsb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 4px;
+  border-radius: 6px;
+}
 
 .bsb-label {
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: rgba(167, 139, 250, 0.6);
-  padding-left: 2px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  color: rgba(167, 139, 250, 0.5);
 }
 
 .bsb-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
+  justify-content: center;
 }
 
+/* Dividers */
 .bsb-divider {
-  width: 100%;
-  height: 1px;
-  background: rgba(167, 139, 250, 0.2);
-  margin: 2px 0;
+  width: 100%; height: 1px;
+  background: rgba(167, 139, 250, 0.12);
 }
 
-/* ─── Char template styles ───────────────────────────────────────────────── */
+/* ─── Section hues (light background tint per state) ─────────────────────── */
+
+.bsb-g-attention { background: rgba(239, 68, 68, 0.06); }
+.bsb-g-done { background: rgba(74, 222, 128, 0.05); }
+.bsb-g-working { background: rgba(96, 165, 250, 0.05); }
+.bsb-g-other { background: rgba(167, 139, 250, 0.03); }
+
+/* ─── Char template ──────────────────────────────────────────────────────── */
 
 .char-tpl {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
 }
 
 .char-tpl-group {
   color: rgba(167, 139, 250, 0.9);
-  background: rgba(167, 139, 250, 0.12);
-  padding: 1px 5px;
+  background: rgba(167, 139, 250, 0.1);
+  padding: 0px 4px;
   border-radius: 3px;
   white-space: nowrap;
   overflow: hidden;
@@ -79,16 +107,14 @@ html, body {
   width: 100%;
 }
 
-.char-tpl-svg {
-  margin: 0 auto;
-}
+.char-tpl-svg { margin: 0 auto; }
 .char-tpl-svg svg { width: 100%; height: 100%; }
 
 .char-tpl-action {
   color: rgba(232, 232, 240, 0.7);
-  background: rgba(26, 26, 46, 0.85);
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: rgba(26, 26, 46, 0.7);
+  padding: 1px 4px;
+  border-radius: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -97,15 +123,14 @@ html, body {
 }
 
 .bsb-overflow {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  color: rgba(167, 139, 250, 0.8);
+  color: rgba(167, 139, 250, 0.7);
   text-align: center;
-  padding: 4px;
 }
 
 /* Source hue on group badge */
-.bsb-src-kirocrew .char-tpl-group { color: rgba(167, 139, 250, 0.95); background: rgba(167, 139, 250, 0.15); }
+.bsb-src-kirocrew .char-tpl-group { color: rgba(167, 139, 250, 0.95); background: rgba(167, 139, 250, 0.12); }
 .bsb-src-kirocliv2 .char-tpl-group,
-.bsb-src-kirocliv3 .char-tpl-group { color: rgba(168, 230, 207, 0.95); background: rgba(168, 230, 207, 0.12); }
-.bsb-src-kiroide .char-tpl-group { color: rgba(96, 165, 250, 0.95); background: rgba(96, 165, 250, 0.12); }
+.bsb-src-kirocliv3 .char-tpl-group { color: rgba(168, 230, 207, 0.95); background: rgba(168, 230, 207, 0.1); }
+.bsb-src-kiroide .char-tpl-group { color: rgba(96, 165, 250, 0.95); background: rgba(96, 165, 250, 0.1); }
