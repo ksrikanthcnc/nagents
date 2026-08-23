@@ -61,7 +61,7 @@ pub fn start(store: SessionStore, port: u16, project_root: std::path::PathBuf) {
                     handle_sessions(request, &store);
                 }
                 ("POST", "/event") => {
-                    handle_event(request, &store);
+                    handle_event(request, &store, &project_root);
                 }
                 ("POST", "/title") => {
                     handle_title(request, &store);
@@ -157,7 +157,7 @@ fn handle_sessions(mut request: Request, store: &SessionStore) {
     respond_json(request, 200, r#"{"ok":true}"#);
 }
 
-fn handle_event(mut request: Request, store: &SessionStore) {
+fn handle_event(mut request: Request, store: &SessionStore, project_root: &std::path::Path) {
     let mut body = String::new();
     if std::io::Read::read_to_string(request.as_reader(), &mut body).is_err() {
         respond_json(request, 400, r#"{"error":"bad body"}"#);
@@ -181,7 +181,15 @@ fn handle_event(mut request: Request, store: &SessionStore) {
     // Persist event to disk for debugging and cache
     persist_event(&update);
 
+    // If pinned state changed, persist immediately
+    let has_pinned = update.pinned.is_some();
+
     store.push_event(update);
+
+    if has_pinned {
+        crate::persist_pinned(store, &project_root.to_path_buf());
+    }
+
     respond_json(request, 200, r#"{"ok":true}"#);
 }
 

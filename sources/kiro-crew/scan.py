@@ -64,7 +64,7 @@ def discover() -> list[dict]:
             "file": None,
             "tokens": used,
             "maxTokens": window,
-            "mtime": time.time(),
+            "mtime": 0,  # Don't update mtime from scanner — hooks manage it via push_event
             "character": None,
             "attention_since": None,
             "on_overlay": False,

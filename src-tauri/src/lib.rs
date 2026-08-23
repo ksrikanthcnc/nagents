@@ -118,6 +118,12 @@ pub fn run() {
             // Clear stale attention for non-idle sessions (fixes #022: missed hook clears during downtime)
             store.clear_stale_attention();
 
+            // Restore pinned state (persisted separately, survives any downtime)
+            let pinned_ids = load_pinned(&project_root);
+            if !pinned_ids.is_empty() {
+                store.restore_pinned(&pinned_ids);
+            }
+
             // Start HTTP server for external hook pushes
             let http_port = config.get().http_port;
             server::start(store.clone(), http_port, project_root.clone());
@@ -328,5 +334,26 @@ fn persist_sessions(store: &state::SessionStore, project_root: &PathBuf) {
         Err(e) => {
             log::warn!("[shutdown] failed to persist sessions: {}", e);
         }
+    }
+    // Also persist pinned state separately (survives any downtime)
+    persist_pinned(store, project_root);
+}
+
+/// Persist pinned session IDs to data/pinned.json (always restored, regardless of downtime).
+pub fn persist_pinned(store: &state::SessionStore, project_root: &PathBuf) {
+    use std::fs;
+    let pinned_ids = store.get_pinned_ids();
+    let path = project_root.join("data/pinned.json");
+    let _ = fs::create_dir_all(project_root.join("data"));
+    let _ = fs::write(&path, serde_json::to_string(&pinned_ids).unwrap_or_default());
+}
+
+/// Load pinned session IDs from data/pinned.json.
+fn load_pinned(project_root: &PathBuf) -> Vec<String> {
+    use std::fs;
+    let path = project_root.join("data/pinned.json");
+    match fs::read_to_string(&path) {
+        Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
+        Err(_) => vec![],
     }
 }

@@ -375,7 +375,11 @@ function startRenderLoop(): void {
     cacheRefreshCounter++;
     if (cacheRefreshCounter >= 60) {
       cacheRefreshCounter = 0;
-      cachedBatterySaver = localStorage.getItem("nagents:battery_saver") === "true";
+      const newBatterySaver = localStorage.getItem("nagents:battery_saver") === "true";
+      if (newBatterySaver !== cachedBatterySaver) {
+        log("overlay", `battery saver changed: ${cachedBatterySaver} → ${newBatterySaver}`);
+      }
+      cachedBatterySaver = newBatterySaver;
       cachedHiddenUntil = Number(localStorage.getItem("nagents:overlay_hidden_until") || "0");
     }
 
@@ -675,7 +679,7 @@ function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
     char.el.classList.toggle("char-working", isWorking);
     char.el.classList.toggle("char-attention", !!char.session.attention);
 
-    applyCharAnim(char, char.mode === "follow" ? "alert" : "walk");
+    applyCharAnim(char, char.mode === "follow" && char.session.attention ? "alert" : char.mode === "follow" ? "idle" : "walk");
     applyFacing(char);
     // Eye tracking only for followers (others too far/small to notice)
     if (char.mode === "follow") trackEyes(char);
@@ -694,7 +698,13 @@ function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
 // ─── Character animation + facing ──────────────────────────────────────────
 
 function applyCharAnim(char: OverlayChar, action: import("../characters/types").CharacterAction): void {
-  const slotForMode = action === "alert" ? "char-slot-alert" : "char-slot-walk";
+  const slotMap: Record<string, string> = {
+    alert: "char-slot-alert",
+    walk: "char-slot-walk",
+    idle: "char-slot-idle",
+    think: "char-slot-active",
+  };
+  const slotForMode = slotMap[action] || "char-slot-idle";
   const svgWrap = char.el.querySelector(".overlay-char-svg") as HTMLElement | null;
   if (svgWrap && !svgWrap.classList.contains(slotForMode)) {
     svgWrap.classList.remove("char-slot-idle", "char-slot-active", "char-slot-alert", "char-slot-walk");
@@ -790,7 +800,9 @@ function getWorkerType(name: string): string {
 /** Satellite elements keyed by "parentId-index" */
 const satellites: Map<string, HTMLElement> = new Map();
 let satelliteAngle = 0;
-const SAT_SIZE = 18; // satellite char size in px
+
+/** Satellite size scales with main char size (≈40% of CHAR_SIZE) */
+function getSatSize(): number { return Math.round(CHAR_SIZE * 0.4); }
 
 function renderSatellites(charArray: OverlayChar[]): void {
   if (!container) return;
@@ -820,26 +832,30 @@ function renderSatellites(charArray: OverlayChar[]): void {
         el.className = "overlay-satellite";
         el.style.position = "absolute";
         el.style.pointerEvents = "none";
-        el.style.width = `${SAT_SIZE}px`;
-        el.style.height = `${SAT_SIZE}px`;
+        el.style.width = `${getSatSize()}px`;
+        el.style.height = `${getSatSize()}px`;
         container.appendChild(el);
         satellites.set(key, el);
       }
 
       // Position: orbit around parent
       const angle = satelliteAngle + (2 * Math.PI * i) / count;
-      const sx = char.x + CHAR_SIZE / 2 + Math.cos(angle) * orbitRadius - SAT_SIZE / 2;
-      const sy = char.y + CHAR_SIZE / 2 + Math.sin(angle) * orbitRadius - SAT_SIZE / 2;
+      const satSize = getSatSize();
+      const sx = char.x + CHAR_SIZE / 2 + Math.cos(angle) * orbitRadius - satSize / 2;
+      const sy = char.y + CHAR_SIZE / 2 + Math.sin(angle) * orbitRadius - satSize / 2;
       el.style.left = `${Math.round(sx)}px`;
       el.style.top = `${Math.round(sy)}px`;
 
-      // Render SVG char (only update if char changed)
-      if (el.dataset.charId !== satCharId) {
+      // Render SVG char + description label
+      const colonIdx = name.indexOf(":");
+      const desc = colonIdx > 0 ? name.slice(colonIdx + 1).trim() : "";
+      const contentKey = `${satCharId}:${desc}`;
+      if (el.dataset.contentKey !== contentKey) {
         const charDef = getCharacter(satCharId);
-        el.innerHTML = charDef.svg;
-        el.dataset.charId = satCharId;
+        const descHtml = desc ? `<span class="sat-label">${desc.length > 14 ? desc.slice(0, 13) + "\u2026" : desc}</span>` : "";
+        el.innerHTML = `${charDef.svg}${descHtml}`;
+        el.dataset.contentKey = contentKey;
         el.classList.add("char-slot-idle");
-        // Apply source color from parent
         el.style.setProperty("--sat-color", getSourceColor(char.session.source));
       }
     }
@@ -861,17 +877,20 @@ let bsbWindowShown = false;
 async function showBsbWindow(): Promise<void> {
   if (bsbWindowShown) return;
   bsbWindowShown = true;
+  log("overlay", "BSB: showing window");
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("show_bsb_window");
   } catch (e) {
     log("overlay", `BSB window show failed: ${e}`);
+    bsbWindowShown = false;
   }
 }
 
 async function hideBsbWindow(): Promise<void> {
   if (!bsbWindowShown) return;
   bsbWindowShown = false;
+  log("overlay", "BSB: hiding window");
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("hide_bsb_window");

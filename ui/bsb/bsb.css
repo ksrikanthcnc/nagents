@@ -1,102 +1,102 @@
-/* BSB — Battery Saver Box (separate window) */
+/* BSB — Battery Saver Box */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
-body {
+html, body {
   background: transparent;
-  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  cursor: grab;
   user-select: none;
-  -webkit-app-region: drag;
+  cursor: grab;
 }
-
-body:active {
-  cursor: grabbing;
-}
+body:active { cursor: grabbing; }
 
 #bsb {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(20, 20, 36, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
-#bsb[data-layout="vertical"] {
-  flex-direction: column;
-  flex-wrap: nowrap;
-}
+#bsb[data-layout="vertical"] { flex-direction: column; flex-wrap: nowrap; align-items: center; }
+#bsb[data-layout="grid"] { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, max-content)); }
 
-#bsb[data-layout="grid"] {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(52px, max-content));
-}
+/* ─── Shared char template styles ────────────────────────────────────────── */
 
-/* ─── Char ───────────────────────────────────────────────────────────────── */
-
-.bsb-char {
+.char-tpl {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  position: relative;
 }
 
-.bsb-group {
-  color: rgba(167, 139, 250, 0.8);
+.char-tpl-group {
+  color: rgba(167, 139, 250, 0.9);
+  background: rgba(167, 139, 250, 0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
-  width: 100%;
+  max-width: 100%;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  font-weight: 500;
 }
 
-.bsb-svg svg {
-  width: 100%;
-  height: 100%;
-}
-
-.bsb-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  position: absolute;
-  top: 12px;
-  right: 2px;
-}
-
-.bsb-dot.dot-amber { background: #f59e0b; box-shadow: 0 0 4px rgba(245, 158, 11, 0.6); }
-.bsb-dot.dot-green { background: #4ade80; box-shadow: 0 0 4px rgba(74, 222, 128, 0.4); }
-.bsb-dot.dot-gray { background: rgba(255, 255, 255, 0.3); }
-
-.bsb-title {
-  color: rgba(232, 232, 240, 0.9);
+.char-tpl-title {
+  color: #e8e8f0;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
   width: 100%;
+}
+
+.char-tpl-svg { position: relative; }
+.char-tpl-svg svg { width: 100%; height: 100%; }
+
+.char-tpl-action {
+  color: rgba(232, 232, 240, 0.7);
+  background: rgba(26, 26, 46, 0.85);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  max-width: 100%;
+}
+
+/* ─── BSB-specific ───────────────────────────────────────────────────────── */
+
+.bsb-divider {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(167, 139, 250, 0.3);
+  min-height: 30px;
+}
+
+#bsb[data-layout="vertical"] .bsb-divider {
+  width: 80%; height: 1px; min-height: unset; align-self: center;
 }
 
 .bsb-overflow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 500;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600;
   color: rgba(167, 139, 250, 0.8);
-  min-width: 30px;
-  align-self: center;
+  background: rgba(167, 139, 250, 0.08);
+  padding: 4px 8px; border-radius: 6px; align-self: center;
 }
 
-/* Source hue tinting */
-.bsb-src-kirocrew .bsb-group { color: rgba(167, 139, 250, 0.9); }
-.bsb-src-kirocliv2 .bsb-group,
-.bsb-src-kirocliv3 .bsb-group { color: rgba(168, 230, 207, 0.9); }
-.bsb-src-kiroide .bsb-group { color: rgba(96, 165, 250, 0.9); }
+/* Source hue on group badge */
+.bsb-src-kirocrew .char-tpl-group { color: rgba(167, 139, 250, 0.95); background: rgba(167, 139, 250, 0.15); }
+.bsb-src-kirocliv2 .char-tpl-group,
+.bsb-src-kirocliv3 .char-tpl-group { color: rgba(168, 230, 207, 0.95); background: rgba(168, 230, 207, 0.12); }
+.bsb-src-kiroide .char-tpl-group { color: rgba(96, 165, 250, 0.95); background: rgba(96, 165, 250, 0.12); }

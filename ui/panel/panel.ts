@@ -61,7 +61,7 @@ function saveCharOverrides(): void {
 
 /** Hash a session's visible state (to detect what actually changed). */
 function hashSession(session: Session): string {
-  return `${session.character}|${session.event}|${session.attention}|${session.active}|${session.tool}|${session.tokens}|${session.on_overlay}`;
+  return `${session.character}|${session.event}|${session.attention}|${session.active}|${session.tool}|${session.tokens}|${session.on_overlay}|${session.pinned}`;
 }
 
 /**
@@ -71,8 +71,8 @@ function hashSession(session: Session): string {
 function updatePanel(): void {
   if (!container || !currentState || !config) return;
 
-  // Compute current session ID set (order matters)
-  const currentIds = currentState.sessions.map((s) => s.id).sort().join(",");
+  // Compute current structural key (IDs + pinned states — pinned changes grouping)
+  const currentIds = currentState.sessions.map((s) => `${s.id}:${s.pinned ? "P" : ""}`).sort().join(",");
 
   // If structure changed OR first render, do full render
   if (currentIds !== lastSessionIds || !container.querySelector(".panel-header")) {
@@ -357,7 +357,15 @@ function attachEventHandlers(): void {
         body: JSON.stringify({ session_id: sessionId, pinned: !isPinned }),
       }).catch(() => {});
       log("panel", `pin toggle: ${sessionId} → ${!isPinned}`);
-      (el as HTMLElement).classList.toggle("session-pinned");
+      // Optimistic update: immediately update state and re-render
+      if (currentState) {
+        const session = currentState.sessions.find(s => s.id === sessionId);
+        if (session) {
+          session.pinned = !isPinned;
+          lastSessionIds = ""; // force structural re-render
+          updatePanel();
+        }
+      }
     });
   });
 

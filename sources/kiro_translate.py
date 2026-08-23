@@ -26,13 +26,24 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
 
     if trigger == "PreToolUse":
         file_path = extract_file(tool_name, tool_input)
-        return {
+        update = {
             "session_id": session_id,
             "event": "tool",
             "tool": tool_name or "unknown",
             "file": shorten_path(file_path),
             "mtime": time.time(),
         }
+        # Worker spawn
+        if tool_name == "invoke_sub_agent":
+            name = tool_input.get("name", "worker")
+            short = shorten_agent_name(name)
+            # Prompt first line is the actual task — best for display
+            prompt = tool_input.get("prompt", "")
+            desc = prompt.split("\n")[0][:50] if prompt else ""
+            if not desc:
+                desc = (tool_input.get("explanation", "") or "").split(".")[0][:50]
+            update["worker"] = f"+{short}:{desc}" if desc else f"+{short}"
+        return update
 
     elif trigger == "PostToolUse":
         update: dict = {
@@ -43,8 +54,15 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
             "mtime": time.time(),
         }
 
+        # Sub-agent completed: signal worker done with name
+        if tool_name == "invoke_sub_agent":
+            name = tool_input.get("name", "worker")
+            short = shorten_agent_name(name)
+            update["worker"] = f"-{short}"  # minus prefix = done
+            update["file"] = ""
+
         # Extract exit status for execute_bash
-        if tool_name == "execute_bash":
+        elif tool_name == "execute_bash":
             update["tool_ok"] = parse_exit_code(tool_response)
 
         # Extract task progress from todo_list
@@ -76,12 +94,12 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
         return {
             "session_id": session_id,
             "event": "idle",
-            "attention": True,
+            "attention": False,
             "priority": "low",
             "tool": "",        # clear
             "file": "",        # clear
             "tool_result": "", # clear
-            "action_text": "", # clear (app will derive from description/status)
+            "action_text": "", # clear
             "mtime": time.time(),
         }
 
@@ -98,7 +116,7 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
             "description": "",  # clear stale
             "status": "",       # clear stale
             "priority": "",     # clear
-            "action_text": "",  # clear (agent working now)
+            "action_text": "",  # clear
             "mtime": time.time(),
         }
 
@@ -136,6 +154,15 @@ def extract_file(tool_name: str, tool_input: dict) -> str | None:
 
     elif tool_name == "update_session_information":
         return tool_input.get("title") or tool_input.get("status")
+
+    elif tool_name == "invoke_sub_agent":
+        name = tool_input.get("name", "worker")
+        short = shorten_agent_name(name)
+        prompt = tool_input.get("prompt", "")
+        desc = prompt.split("\n")[0][:50] if prompt else ""
+        if not desc:
+            desc = (tool_input.get("explanation", "") or "").split(".")[0][:50]
+        return f"{short}: {desc}" if desc else f"→ {short}"
 
     else:
         return tool_input.get("path") or tool_input.get("query")
@@ -191,7 +218,50 @@ def shorten_path(path: str | None) -> str | None:
     return path
 
 
+# Short names for known sub-agents
+_AGENT_SHORT = {
+    "context-gatherer": "cg",
+    "general-task-execution": "task",
+    "custom-agent-creator": "creator",
+    "semantic_reviewer": "reviewer",
+    "kirocrew-heartbeat": "heartbeat",
+    "kirocrew-knowledge": "knowledge",
+    "kirocrew-lite": "lite",
+    "introspect": "introspect",
+    "my-default": "default",
+}
+
+
+def shorten_agent_name(name: str) -> str:
+    """Shorten known agent names for display."""
+    return _AGENT_SHORT.get(name, name)
+
+
 def clean_description(desc: str, status: str | None) -> str:
+    """
+    Strip common prefixes from description, preserve punctuation (? ! etc).
+    """
+    if not desc:
+        return ""
+
+    prefixes = [
+        "Waiting on user decision: ",
+        "Waiting on user: ",
+        "Blocked on user: ",
+        "Waiting for user: ",
+        "Need user input: ",
+        "Question: ",
+    ]
+
+    for prefix in prefixes:
+        if desc.startswith(prefix):
+            desc = desc[len(prefix):]
+            break
+        if desc.lower().startswith(prefix.lower()):
+            desc = desc[len(prefix):]
+            break
+
+    return desc
     """
     Strip common prefixes from description, preserve punctuation (? ! etc).
 

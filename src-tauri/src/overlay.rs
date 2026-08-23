@@ -90,17 +90,13 @@ pub fn show_bsb_window(app: AppHandle) -> Result<(), String> {
     let url = WebviewUrl::App("bsb.html".into());
 
     let bsb = WebviewWindowBuilder::new(&app, "bsb", url)
-        .title("nagents")
+        .title("")
         .transparent(true)
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(true)
-        .inner_size(320.0, 120.0)
-        .position(
-            (app.get_webview_window("main").map(|w| w.outer_size().unwrap_or_default().width).unwrap_or(0) as f64) + 20.0,
-            40.0,
-        )
+        .inner_size(400.0, 140.0)
         .visible_on_all_workspaces(true)
         .build()
         .map_err(|e| e.to_string())?;

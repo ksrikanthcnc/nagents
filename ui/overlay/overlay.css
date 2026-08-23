@@ -1,10 +1,6 @@
-/* Overlay — transparent fullscreen */
+/* Overlay — transparent fullscreen with animated characters */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
   width: 100vw;
@@ -16,14 +12,13 @@ html, body {
 
 #overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   pointer-events: none;
 }
 
-/* ─── Character Container ────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Character Container                                                       */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 .overlay-char {
   position: absolute;
@@ -31,47 +26,36 @@ html, body {
   flex-direction: column;
   align-items: center;
   pointer-events: none;
-  transition: filter 0.3s;
+  transition: opacity 0.3s ease;
 }
 
-/* ─── Source label (above char) ──────────────────────────────────────────── */
+/* ─── Layout: group / title / svg / action ───────────────────────────────── */
 
-.overlay-char-source {
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 8px;
-  font-weight: 600;
+.overlay-char-group {
+  font: 700 9px/1 system-ui, -apple-system, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  color: #fff;
   text-align: center;
-  pointer-events: none;
-  margin-bottom: 2px;
-  padding: 1px 4px;
+  padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(26, 26, 46, 0.6);
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  pointer-events: none;
 }
 
-/* Per-source color theming for labels */
-.overlay-char[data-source="kiro-crew"] .overlay-char-source {
-  color: rgba(167, 139, 250, 0.95);
-  border: 1px solid rgba(167, 139, 250, 0.25);
+.overlay-char-title {
+  font: 500 10px/1.2 system-ui, -apple-system, sans-serif;
+  color: #fff;
+  text-align: center;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 1px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
 }
-
-.overlay-char[data-source="kiro-cli"] .overlay-char-source {
-  color: rgba(168, 230, 207, 0.95);
-  border: 1px solid rgba(168, 230, 207, 0.25);
-}
-
-.overlay-char[data-source="kiro-ide"] .overlay-char-source {
-  color: rgba(96, 165, 250, 0.95);
-  border: 1px solid rgba(96, 165, 250, 0.25);
-}
-
-/* Fallback for unknown sources */
-.overlay-char-source {
-  color: rgba(232, 232, 240, 0.8);
-}
-
-/* ─── SVG area ───────────────────────────────────────────────────────────── */
 
 .overlay-char-svg {
   width: 100%;
@@ -84,144 +68,81 @@ html, body {
   height: 100%;
 }
 
-/* ─── Name label (below char) ────────────────────────────────────────────── */
-
-.overlay-char-label {
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 9px;
-  color: #e8e8f0;
-  background: rgba(26, 26, 46, 0.85);
-  padding: 2px 6px;
-  border-radius: 4px;
+.overlay-char-action {
+  font: 500 8px/1.2 system-ui, -apple-system, sans-serif;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  border-radius: 3px;
   white-space: nowrap;
-  margin-top: 2px;
-  pointer-events: none;
-  max-width: 140px;
+  max-width: 110px;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
+  pointer-events: none;
 }
 
-/* ─── Following cursor — needs attention ─────────────────────────────────── */
+.overlay-char-action:empty { display: none; }
+.action-icon { margin-right: 3px; font-size: 11px; }
+
+/* Anti-flip for text in transparent windows */
+.overlay-char-group,
+.overlay-char-title,
+.overlay-char-action {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Mode Styles                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Following cursor ───────────────────────────────────────────────────── */
 
 .char-following {
-  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
+  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.4));
 }
 
-.char-following .overlay-char-svg {
-  /* Character-specific animation via [data-char].char-slot-* svg */
-}
+/* Per-source glow for followers */
+.char-following[data-source="kiro-crew"] { filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.5)); }
+.char-following[data-source="kiro-cli"] { filter: drop-shadow(0 0 6px rgba(168, 230, 207, 0.5)); }
+.char-following[data-source="kiro-ide"] { filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.5)); }
 
-.char-following .overlay-char-label {
-  background: rgba(245, 158, 11, 0.2);
-  border: 1px solid rgba(245, 158, 11, 0.5);
-}
-
-/* Per-source glow ring for following chars */
-.char-following[data-source="kiro-crew"] {
-  filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.7));
-}
-
-.char-following[data-source="kiro-cli"] {
-  filter: drop-shadow(0 0 8px rgba(168, 230, 207, 0.7));
-}
-
-.char-following[data-source="kiro-ide"] {
-  filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.7));
-}
-
-/* ─── Roaming — working independently ────────────────────────────────────── */
+/* ─── Roaming (working independently) ────────────────────────────────────── */
 
 .char-roaming {
-  opacity: 0.75;
-  filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.4));
+  opacity: 0.7;
 }
 
-.char-roaming .overlay-char-svg {
-  /* Character-specific animation via [data-char].char-slot-* svg */
-}
-
-/* ─── Working — actively processing ──────────────────────────────────────── */
+/* ─── Working (running/tool — dimmer) ────────────────────────────────────── */
 
 .char-working {
   opacity: 0.55;
-  transition: opacity 0.3s ease;
 }
 
-/* ─── Transitions: dot mode ──────────────────────────────────────────────── */
-
-.overlay-char {
-  /* Only transition scale/opacity — NOT left/top (JS controls those per-frame) */
-  transition: transform 0.4s ease, opacity 0.3s ease;
-}
+/* ─── Dot (orbit mode — scaled down, labels hidden) ──────────────────────── */
 
 .char-dot {
   opacity: 0.8;
   filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.5));
-  transition: transform 0.3s, opacity 0.3s;
 }
 
-/* Clustered chars (group_as_one: cluster mode) */
+.char-dot .overlay-char-group,
+.char-dot .overlay-char-title,
+.char-dot .overlay-char-action {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* ─── Clustered (group_as_one) ───────────────────────────────────────────── */
+
 .char-clustered {
   opacity: 0.75;
-  transition: transform 0.3s, opacity 0.3s;
 }
 
-/* Sub-agent satellites — SVG char icons orbiting parent */
-.overlay-satellite {
-  pointer-events: none;
-  z-index: 5;
-  filter: drop-shadow(0 0 3px var(--sat-color, rgba(167, 139, 250, 0.5)));
-}
-
-.overlay-satellite svg {
-  width: 100%;
-  height: 100%;
-}
-/* ─── Transitions: appear / disappear ────────────────────────────────────── */
-
-@keyframes char-appear {
-  0% { opacity: 0; transform: scale(0.3); }
-  60% { opacity: 1; transform: scale(1.1); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes char-disappear {
-  0% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.4) translateY(10px); }
-}
-
-.char-appearing {
-  animation: char-appear 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-.char-hiding {
-  animation: char-disappear 0.3s ease-out forwards;
-  pointer-events: none;
-}
-
-/* ─── Zzz particles for idle roaming chars ───────────────────────────────── */
-
-@keyframes zzz-float {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
-  30% { transform: translateY(-6px) translateX(2px); opacity: 0.7; }
-  60% { transform: translateY(-12px) translateX(-1px); opacity: 0.5; }
-  100% { transform: translateY(-16px) translateX(3px); opacity: 0; }
-}
-
-.char-roaming .overlay-char-svg::after {
-  content: 'z z';
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  font: bold 7px/1 system-ui;
-  color: rgba(167, 139, 250, 0.6);
-  letter-spacing: 2px;
-  animation: zzz-float 3s ease-in-out infinite;
-  pointer-events: none;
-}
-
-/* ─── Alert pulse ring (any char with attention, any mode) ───────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Attention Pulse Ring                                                       */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes alert-pulse-ring {
   0% { transform: scale(1); opacity: 0.6; }
@@ -238,276 +159,15 @@ html, body {
   pointer-events: none;
 }
 
-/* Subtler ring for dots with attention */
 .char-dot.char-attention .overlay-char-svg::before {
   inset: -2px;
   border-width: 1.5px;
   animation: alert-pulse-ring 2.5s ease-out infinite;
 }
 
-/* ─── Sub-agent satellites ────────────────────────────────────────────────── */
-/* Two modes: orbit (circling parent) and pet (walking behind parent)       */
-
-@keyframes satellite-orbit {
-  0% { transform: rotate(0deg) translateX(var(--orbit-radius, 22px)) rotate(0deg); }
-  100% { transform: rotate(360deg) translateX(var(--orbit-radius, 22px)) rotate(-360deg); }
-}
-
-@keyframes satellite-pulse {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 1; }
-}
-
-@keyframes satellite-appear {
-  0% { opacity: 0; transform: rotate(0deg) translateX(0) rotate(0deg) scale(0.3); }
-  100% { opacity: 0.8; transform: rotate(0deg) translateX(var(--orbit-radius, 22px)) rotate(0deg) scale(1); }
-}
-
-@keyframes pet-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
-}
-
-@keyframes pet-appear {
-  0% { opacity: 0; transform: scale(0.2); }
-  60% { opacity: 1; transform: scale(1.15); }
-  100% { opacity: 0.85; transform: scale(1); }
-}
-
-/* ─── Container ──────────────────────────────────────────────────────────── */
-
-.char-satellites {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-}
-
-/* ─── Mode 1: Orbit — dots circling parent ───────────────────────────────── */
-
-.char-satellite {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  margin: -4px 0 0 -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sat-color, #a78bfa);
-  opacity: 0.8;
-  animation:
-    satellite-orbit var(--orbit-speed, 4s) linear infinite,
-    satellite-pulse 2s ease-in-out infinite;
-  pointer-events: none;
-  box-shadow: 0 0 5px var(--sat-color, rgba(167, 139, 250, 0.6));
-}
-
-/* Stagger for multiple — equidistant */
-.char-satellite:nth-child(1) { animation-delay: 0s; }
-.char-satellite:nth-child(2) { animation-delay: calc(var(--orbit-speed, 4s) * -0.33); }
-.char-satellite:nth-child(3) { animation-delay: calc(var(--orbit-speed, 4s) * -0.66); }
-.char-satellite:nth-child(4) { animation-delay: calc(var(--orbit-speed, 4s) * -0.25); --orbit-radius: 26px; }
-
-/* ─── Mode 2: Pet — mini char SVG following parent ───────────────────────── */
-
-.char-pet {
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  pointer-events: none;
-  opacity: 0.85;
-  animation: pet-appear 0.4s ease-out forwards, pet-bob 2s ease-in-out infinite 0.4s;
-  filter: drop-shadow(0 0 2px var(--sat-color, rgba(167, 139, 250, 0.4)));
-}
-
-.char-pet svg {
-  width: 100%;
-  height: 100%;
-}
-
-/* Pet positioning — offset from parent center (JS sets --pet-x, --pet-y) */
-.char-pet {
-  top: calc(50% + var(--pet-y, 20px));
-  left: calc(50% + var(--pet-x, -10px));
-}
-
-/* Pets stagger positions */
-.char-pet:nth-child(1) { --pet-x: -14px; --pet-y: 18px; }
-.char-pet:nth-child(2) { --pet-x: 14px; --pet-y: 20px; }
-.char-pet:nth-child(3) { --pet-x: 0px; --pet-y: 24px; }
-
-/* Pet walk animation (reuses char-specific walk if data-char is set) */
-.char-pet[data-char] svg {
-  animation: pet-bob 1.5s ease-in-out infinite;
-}
-
-/* ─── Source-colored variants ────────────────────────────────────────────── */
-
-.char-satellite[data-source="kiro-crew"],
-.char-pet[data-source="kiro-crew"] { --sat-color: #a78bfa; }
-
-.char-satellite[data-source="kiro-cli"],
-.char-pet[data-source="kiro-cli"] { --sat-color: #4ade80; }
-
-.char-satellite[data-source="kiro-ide"],
-.char-pet[data-source="kiro-ide"] { --sat-color: #60a5fa; }
-
-/* ─── Sub-agent count badge ──────────────────────────────────────────────── */
-
-.sub-agent-badge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  font-size: 7px;
-  font-weight: 700;
-  color: #fff;
-  background: var(--sat-color, #a78bfa);
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  box-shadow: 0 0 4px rgba(167, 139, 250, 0.5);
-  z-index: 3;
-}
-
-/* ─── Connection Lines (SVG overlay) ─────────────────────────────────────── */
-/* Lines are rendered in JS (drawConnections) but styled here */
-
-/* Default connection line style — subtle dashed */
-.connection-line {
-  stroke: rgba(167, 139, 250, 0.25);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
-  stroke-linecap: round;
-}
-
-/* Per-source connection colors */
-.connection-line[data-source="kiro-crew"] {
-  stroke: rgba(167, 139, 250, 0.3);
-}
-
-.connection-line[data-source="kiro-cli"] {
-  stroke: rgba(168, 230, 207, 0.3);
-}
-
-.connection-line[data-source="kiro-ide"] {
-  stroke: rgba(96, 165, 250, 0.3);
-}
-
-/* ─── Keyframes ──────────────────────────────────────────────────────────── */
-
-@keyframes char-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-@keyframes char-float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-2px) rotate(-1deg); }
-  75% { transform: translateY(-2px) rotate(1deg); }
-}
-
-/* ─── Debug dot ──────────────────────────────────────────────────────────── */
-
-#debug-dot {
-  position: fixed;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 0, 0, 0.5);
-  pointer-events: none;
-  z-index: 9999;
-  transition: left 0.05s linear, top 0.05s linear;
-}
-
-
-/* ─── New layout: group / title / char / action ──────────────────────────── */
-.overlay-char-group {
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #fff;
-  text-align: center;
-  pointer-events: none;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(167, 139, 250, 0.4);
-}
-
-.overlay-char-title {
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 10px;
-  font-weight: 500;
-  color: #fff;
-  text-align: center;
-  pointer-events: none;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-bottom: 1px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-}
-
-.overlay-char-action {
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 8px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(0, 0, 0, 0.6);
-  padding: 1px 4px;
-  border-radius: 3px;
-  white-space: nowrap;
-  margin-top: 0px;
-  pointer-events: none;
-  max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: center;
-  line-height: 1.2;
-}
-
-.overlay-char-action:empty {
-  display: none;
-}
-
-.action-icon {
-  margin-right: 3px;
-  font-size: 11px;
-}
-
-
-/* ─── Anti-flip fix for text in transparent windows ──────────────────────── */
-.overlay-char-group,
-.overlay-char-title,
-.overlay-char-action {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform: translateZ(0);
-}
-
-/* ─── Hidden count badge ─────────────────────────────────────────────────── */
-
-.overlay-hidden-badge {
-  position: fixed;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(0, 0, 0, 0.5);
-  padding: 2px 6px;
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-/* ─── Poof animations (pin/unpin, mode transitions) ──────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Transitions: Appear / Disappear                                           */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes poof-in {
   0% { opacity: 0; transform: scale(0.2); filter: blur(4px); }
@@ -528,4 +188,166 @@ html, body {
 .char-poof-out {
   animation: poof-out 0.3s ease-out forwards;
   pointer-events: none;
+}
+
+/* Legacy aliases (app-agent may still use these) */
+.char-appearing { animation: poof-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.char-hiding { animation: poof-out 0.3s ease-out forwards; pointer-events: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Sub-agent Satellites                                                       */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes satellite-orbit {
+  0% { transform: rotate(0deg) translateX(var(--orbit-radius, 22px)) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(var(--orbit-radius, 22px)) rotate(-360deg); }
+}
+
+@keyframes satellite-pulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+@keyframes pet-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes pet-appear {
+  0% { opacity: 0; transform: scale(0.2); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0.85; transform: scale(1); }
+}
+
+/* Container */
+.char-satellites {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Orbit mode: dots circling parent */
+.char-satellite {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -4px 0 0 -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sat-color, #a78bfa);
+  opacity: 0.8;
+  animation: satellite-orbit var(--orbit-speed, 4s) linear infinite, satellite-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+  box-shadow: 0 0 5px var(--sat-color, rgba(167, 139, 250, 0.6));
+}
+
+.char-satellite:nth-child(1) { animation-delay: 0s; }
+.char-satellite:nth-child(2) { animation-delay: calc(var(--orbit-speed, 4s) * -0.33); }
+.char-satellite:nth-child(3) { animation-delay: calc(var(--orbit-speed, 4s) * -0.66); }
+.char-satellite:nth-child(4) { animation-delay: calc(var(--orbit-speed, 4s) * -0.25); --orbit-radius: 26px; }
+
+/* Pet mode: mini SVG chars trailing parent */
+.char-pet {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  opacity: 0.85;
+  animation: pet-appear 0.4s ease-out forwards, pet-bob 2s ease-in-out infinite 0.4s;
+  filter: drop-shadow(0 0 2px var(--sat-color, rgba(167, 139, 250, 0.4)));
+  top: calc(50% + var(--pet-y, 20px));
+  left: calc(50% + var(--pet-x, -10px));
+}
+
+.char-pet svg { width: 100%; height: 100%; }
+.char-pet:nth-child(1) { --pet-x: -14px; --pet-y: 18px; }
+.char-pet:nth-child(2) { --pet-x: 14px; --pet-y: 20px; }
+.char-pet:nth-child(3) { --pet-x: 0px; --pet-y: 24px; }
+
+/* App-agent rendered satellites (absolute positioned by JS) */
+.overlay-satellite {
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 0 3px var(--sat-color, rgba(167, 139, 250, 0.5)));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.overlay-satellite svg { width: 100%; height: 100%; }
+.sat-label {
+  font: 500 7px/1 system-ui, -apple-system, sans-serif;
+  color: rgba(232, 232, 240, 0.8);
+  white-space: nowrap;
+  text-align: center;
+  margin-top: 1px;
+}
+
+/* Source coloring */
+.char-satellite[data-source="kiro-crew"], .char-pet[data-source="kiro-crew"], .overlay-satellite[data-source="kiro-crew"] { --sat-color: #a78bfa; }
+.char-satellite[data-source="kiro-cli"], .char-pet[data-source="kiro-cli"], .overlay-satellite[data-source="kiro-cli"] { --sat-color: #4ade80; }
+.char-satellite[data-source="kiro-ide"], .char-pet[data-source="kiro-ide"], .overlay-satellite[data-source="kiro-ide"] { --sat-color: #60a5fa; }
+
+/* Badge */
+.sub-agent-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font: 700 7px/1 system-ui;
+  color: #fff;
+  background: var(--sat-color, #a78bfa);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 4px rgba(167, 139, 250, 0.5);
+  z-index: 3;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Connection Lines (SVG overlay between same-group chars)                    */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.connection-line {
+  stroke: rgba(167, 139, 250, 0.25);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  stroke-linecap: round;
+}
+
+.connection-line[data-source="kiro-crew"] { stroke: rgba(167, 139, 250, 0.3); }
+.connection-line[data-source="kiro-cli"] { stroke: rgba(168, 230, 207, 0.3); }
+.connection-line[data-source="kiro-ide"] { stroke: rgba(96, 165, 250, 0.3); }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Hidden count badge                                                        */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.overlay-hidden-badge {
+  position: fixed;
+  font: 600 9px/1 system-ui, -apple-system, sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Debug                                                                      */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+#debug-dot {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 9999;
 }

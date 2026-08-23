@@ -165,7 +165,7 @@ def make_session(nagents_id: str, title: str, cwd: str) -> dict:
         "file": None,
         "tokens": 0,
         "maxTokens": 1000000,
-        "mtime": time.time(),
+        "mtime": 0,  # Don't update mtime from scanner — hooks manage it via push_event
         "character": None,
         "attention_since": None,
         "on_overlay": False,

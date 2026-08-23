@@ -19,6 +19,7 @@ from pathlib import Path
 
 HOME = Path.home()
 APP_SUPPORT = HOME / "Library/Application Support/Kiro"
+KIRO_SESSIONS_DIR = HOME / ".kiro/sessions"
 GLOBAL_STORAGE = APP_SUPPORT / "User/globalStorage/storage.json"
 WORKSPACE_STORAGE = APP_SUPPORT / "User/workspaceStorage"
 
@@ -150,11 +151,39 @@ def read_workspace_path(ws_dir: Path) -> str:
         return ""
 
 
+def find_session_created_at(session_id: str) -> float:
+    """Find session.json and read createdAt. Returns epoch seconds or 0."""
+    from datetime import datetime
+    # Search for session folder (could be sess_<uuid> or bare <uuid>)
+    for pattern in [f"*/sess_{session_id}", f"*/{session_id}"]:
+        matches = list(KIRO_SESSIONS_DIR.glob(f"{pattern}/session.json"))
+        if matches:
+            try:
+                data = json.loads(matches[0].read_text())
+                ts = data.get("createdAt", "")
+                if ts:
+                    return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+            except Exception:
+                pass
+    # Fallback: try directory birth time (macOS)
+    for pattern in [f"*/sess_{session_id}", f"*/{session_id}"]:
+        dirs = list(KIRO_SESSIONS_DIR.glob(pattern))
+        if dirs:
+            try:
+                return dirs[0].stat().st_birthtime
+            except (AttributeError, OSError):
+                pass
+    return 0
+
+
 def make_session(session_id: str, title: str, ws_path: str) -> dict:
     """Create a session dict matching the nagents contract."""
     ws_display = ws_path.replace(str(HOME), "~") if ws_path else ""
     group = path_to_group(ws_path)
     short_id = session_id.replace("sess_", "")[:8]
+
+    # Try to read createdAt from session.json
+    created_at = find_session_created_at(session_id)
 
     return {
         "id": f"ide-{short_id}",
@@ -171,7 +200,7 @@ def make_session(session_id: str, title: str, ws_path: str) -> dict:
         "file": None,
         "tokens": 0,
         "maxTokens": 200000,
-        "mtime": time.time(),
+        "mtime": created_at,  # Session creation time (stable, doesn't change on scan)
         "character": None,
         "attention_since": None,
         "on_overlay": False,

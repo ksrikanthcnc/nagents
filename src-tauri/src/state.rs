@@ -271,13 +271,17 @@ impl SessionStore {
                 entry.active = session.active;
                 entry.tokens = session.tokens;
                 entry.max_tokens = session.max_tokens;
-                if session.mtime > entry.mtime {
+                if session.mtime > 0.0 && session.mtime > entry.mtime {
                     entry.mtime = session.mtime;
                 }
                 debug!("[state] updated meta: {} ({})", entry.name, entry.id);
             } else {
                 // New session — hook fields start empty
                 let mut new_session = session.clone();
+                // If scanner sends mtime=0, set to now (session first-seen time)
+                if new_session.mtime <= 0.0 {
+                    new_session.mtime = now_epoch();
+                }
                 new_session.event = None;
                 new_session.attention_source = None;
                 new_session.attention = false;
@@ -556,5 +560,22 @@ impl SessionStore {
     pub fn get_all(&self) -> Vec<Session> {
         let store = self.inner.lock().unwrap();
         store.values().cloned().collect()
+    }
+
+    /// Get all pinned session IDs (for persistence).
+    pub fn get_pinned_ids(&self) -> Vec<String> {
+        let store = self.inner.lock().unwrap();
+        store.values().filter(|s| s.pinned).map(|s| s.id.clone()).collect()
+    }
+
+    /// Restore pinned state from a list of session IDs.
+    pub fn restore_pinned(&self, ids: &[String]) {
+        let mut store = self.inner.lock().unwrap();
+        for id in ids {
+            if let Some(session) = store.get_mut(id) {
+                session.pinned = true;
+            }
+        }
+        info!("[state] restored {} pinned sessions", ids.len());
     }
 }
