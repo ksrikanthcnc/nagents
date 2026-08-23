@@ -86,6 +86,15 @@ pub struct Session {
     /// Pre-formatted action display text. Rendered as-is by overlay. "" = clear.
     #[serde(default)]
     pub action_text: Option<String>,
+    /// Number of live sub-agents spawned by this session.
+    #[serde(default)]
+    pub sub_agents: u32,
+    /// Names of active workers/sub-agents.
+    #[serde(default)]
+    pub workers: Vec<String>,
+    /// Epoch when attention was last toggled (for hysteresis — don't re-toggle within 30s).
+    #[serde(default)]
+    pub attention_toggled_at: Option<f64>,
 }
 
 /// Event update from hooks (partial update).
@@ -117,6 +126,11 @@ pub struct EventUpdate {
     pub priority: Option<String>,
     #[serde(default)]
     pub action_text: Option<String>,
+    /// Worker lifecycle: "+name" = spawn worker, "-name" = worker done
+    #[serde(default)]
+    pub worker: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
 }
 
 /// Full state snapshot (sent to frontend).
@@ -183,13 +197,54 @@ fn random_character() -> String {
 #[derive(Clone)]
 pub struct SessionStore {
     inner: Arc<Mutex<HashMap<String, Session>>>,
+    /// Per-source character pools (set from config at startup).
+    char_pools: Arc<Mutex<HashMap<String, Vec<String>>>>,
 }
 
 impl SessionStore {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
+            char_pools: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// Set character pools from config (source → list of char IDs).
+    pub fn set_char_pools(&self, pools: HashMap<String, Vec<String>>) {
+        *self.char_pools.lock().unwrap() = pools;
+    }
+
+    /// Clear stale attention on startup: sessions with event != "idle" shouldn't have attention.
+    pub fn clear_stale_attention(&self) {
+        let mut store = self.inner.lock().unwrap();
+        for session in store.values_mut() {
+            if session.attention && session.event.as_deref() != Some("idle") {
+                session.attention = false;
+                session.attention_source = None;
+            }
+        }
+    }
+
+    /// Pick a random character from the source's pool (falls back to global pool).
+    fn pick_character(&self, source: &str) -> String {
+        let pools = self.char_pools.lock().unwrap();
+        let pool = pools.get(source).filter(|p| !p.is_empty());
+        let chars: &[String] = match pool {
+            Some(p) => p,
+            None => return random_character(),
+        };
+        // Simple pseudo-random
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        use std::time::SystemTime;
+        let seed = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .subsec_nanos();
+        let mut hasher = DefaultHasher::new();
+        seed.hash(&mut hasher);
+        let idx = (hasher.finish() as usize) % chars.len();
+        chars[idx].clone()
     }
 
     /// Scanner pushes a batch of sessions for one source.
@@ -238,9 +293,11 @@ impl SessionStore {
                 new_session.status = None;
                 new_session.priority = None;
                 new_session.action_text = None;
-                // Assign random character if none set
+                new_session.sub_agents = 0;
+                new_session.workers = Vec::new();
+                // Assign random character from source pool if none set
                 if new_session.character.is_none() {
-                    new_session.character = Some(random_character());
+                    new_session.character = Some(self.pick_character(&new_session.source));
                 }
                 store.insert(session.id.clone(), new_session);
                 info!("[state] new session: {} ({})", session.name, session.id);
@@ -315,8 +372,11 @@ impl SessionStore {
                 status: None,
                 priority: None,
                 action_text: None,
+                sub_agents: 0,
+                workers: Vec::new(),
                 last_user_ts: None,
                 interaction_count: 0,
+                attention_toggled_at: None,
             };
             info!(
                 "[state] hook created minimal session: {} (source={})",
@@ -380,6 +440,26 @@ impl SessionStore {
         }
         if let Some(ref action_text) = update.action_text {
             session.action_text = if action_text.is_empty() { None } else { Some(action_text.clone()) };
+        }
+        // Worker lifecycle: "+name" = spawn, "-name" = done (matched by short name)
+        if let Some(ref worker) = update.worker {
+            if let Some(name) = worker.strip_prefix('-') {
+                // Worker done: remove by short name prefix match
+                let short_name = name.split(':').next().unwrap_or(name).trim();
+                if let Some(pos) = session.workers.iter().position(|w| {
+                    w.split(':').next().unwrap_or(w).trim() == short_name
+                }) {
+                    session.workers.remove(pos);
+                }
+                session.sub_agents = session.sub_agents.saturating_sub(1);
+            } else if let Some(name) = worker.strip_prefix('+') {
+                // Worker spawn: push (includes explanation)
+                session.workers.push(name.to_string());
+                session.sub_agents += 1;
+            }
+        }
+        if let Some(pinned) = update.pinned {
+            session.pinned = pinned;
         }
         if let Some(mtime) = update.mtime {
             session.mtime = mtime;

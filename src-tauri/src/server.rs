@@ -24,7 +24,7 @@ const EVENTS_DIR: &str = "data/events";
 const TITLES_FILE: &str = "data/titles.json";
 
 /// Start the HTTP server on the given port (background thread).
-pub fn start(store: SessionStore, port: u16) {
+pub fn start(store: SessionStore, port: u16, project_root: std::path::PathBuf) {
     let addr = format!("127.0.0.1:{}", port);
 
     thread::spawn(move || {
@@ -69,6 +69,9 @@ pub fn start(store: SessionStore, port: u16) {
                 ("POST", "/character") => {
                     handle_character(request, &store);
                 }
+                ("POST", "/config") => {
+                    handle_config_patch(request, &project_root);
+                }
                 ("GET", "/test/start") => {
                     let test = Session {
                         id: "test-001".into(),
@@ -97,8 +100,11 @@ pub fn start(store: SessionStore, port: u16) {
                         status: None,
                         priority: None,
                         action_text: None,
+                        sub_agents: 0,
+                        workers: Vec::new(),
                         last_user_ts: None,
                         interaction_count: 0,
+                        attention_toggled_at: None,
                     };
                     store.insert_test(test);
                     info!("[server] TEST: created test session");
@@ -340,4 +346,57 @@ fn cors_headers() -> Header {
     "Access-Control-Allow-Headers: Content-Type"
         .parse()
         .unwrap()
+}
+
+/// POST /config — patch config.local.yaml with provided JSON keys.
+/// Body: JSON object with overlay/attention_rules keys to merge.
+/// Writes to config.local.yaml (deep merges with existing local if present).
+fn handle_config_patch(mut request: Request, project_root: &std::path::Path) {
+    let mut body = String::new();
+    if std::io::Read::read_to_string(request.as_reader(), &mut body).is_err() {
+        respond_json(request, 400, r#"{"error":"read failed"}"#);
+        return;
+    }
+
+    // Parse incoming patch as YAML value
+    let patch: serde_yaml::Value = match serde_json::from_str::<serde_json::Value>(&body) {
+        Ok(json_val) => {
+            // Convert JSON to YAML value
+            let yaml_str = serde_json::to_string(&json_val).unwrap_or_default();
+            serde_yaml::from_str(&yaml_str).unwrap_or(serde_yaml::Value::Null)
+        }
+        Err(e) => {
+            error!("[server] POST /config: invalid JSON: {}", e);
+            respond_json(request, 400, r#"{"error":"invalid json"}"#);
+            return;
+        }
+    };
+
+    let local_path = project_root.join("config.local.yaml");
+
+    // Read existing local config (if any)
+    let existing: serde_yaml::Value = match std::fs::read_to_string(&local_path) {
+        Ok(content) => serde_yaml::from_str(&content).unwrap_or(serde_yaml::Value::Mapping(Default::default())),
+        Err(_) => serde_yaml::Value::Mapping(Default::default()),
+    };
+
+    // Deep merge patch into existing
+    let merged = crate::config::deep_merge_yaml_pub(existing, patch);
+
+    // Write back
+    match serde_yaml::to_string(&merged) {
+        Ok(yaml_str) => {
+            if let Err(e) = std::fs::write(&local_path, yaml_str) {
+                error!("[server] POST /config: write error: {}", e);
+                respond_json(request, 500, r#"{"error":"write failed"}"#);
+                return;
+            }
+            info!("[server] POST /config: config.local.yaml updated");
+            respond_json(request, 200, r#"{"ok":true}"#);
+        }
+        Err(e) => {
+            error!("[server] POST /config: serialize error: {}", e);
+            respond_json(request, 500, r#"{"error":"serialize failed"}"#);
+        }
+    }
 }

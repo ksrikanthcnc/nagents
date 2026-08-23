@@ -33,13 +33,16 @@ fn compute(store: &SessionStore, config: &ConfigHandle) {
         for session in sessions.values_mut() {
             let prev_attention = session.attention;
 
+            // Compute desired attention state
+            let mut desired_attention = false;
+            let mut desired_reason: Option<String> = None;
+            let mut desired_event_override: Option<String> = None;
+
             // Priority 1: source explicitly set it
             if let Some(source_attention) = session.attention_source {
-                session.attention = source_attention;
+                desired_attention = source_attention;
                 if source_attention {
-                    session.attention_reason = Some("source".into());
-                } else {
-                    session.attention_reason = None;
+                    desired_reason = Some("source".into());
                 }
             } else {
                 // Priority 2: core rules
@@ -47,74 +50,64 @@ fn compute(store: &SessionStore, config: &ConfigHandle) {
 
                 if session.event.as_deref() == Some("tool") && age_sec > rules.tool_stuck_sec as f64
                 {
-                    // Tool event is old — probably waiting for approval
-                    // But only if it's recent enough to actually be stuck (not hours-old stale data)
                     if age_sec < 3600.0 {
-                        session.attention = true;
-                        session.attention_reason = Some(format!(
+                        desired_attention = true;
+                        desired_reason = Some(format!(
                             "tool waiting {}s (threshold: {}s)",
                             age_sec as u32, rules.tool_stuck_sec
                         ));
-                        // Promote event to "approval" for frontend to show
-                        session.event = Some("approval".into());
-                        debug!(
-                            "[attention] {} → approval (tool {}s)",
-                            session.name, age_sec as u32
-                        );
-                    } else {
-                        // Stale event from hours ago — not stuck, just abandoned
-                        session.attention = false;
-                        session.attention_reason = None;
+                        desired_event_override = Some("approval".into());
                     }
                 } else if session.event.as_deref() == Some("running")
                     && age_sec > rules.running_stuck_sec as f64
                 {
-                    // Running too long — probably stuck (but only if recent)
                     if age_sec < 3600.0 {
-                        session.attention = true;
-                        session.attention_reason = Some(format!(
+                        desired_attention = true;
+                        desired_reason = Some(format!(
                             "running {}s (threshold: {}s)",
                             age_sec as u32, rules.running_stuck_sec
                         ));
-                        session.event = Some("stuck".into());
-                        debug!(
-                            "[attention] {} → stuck (running {}s)",
-                            session.name, age_sec as u32
-                        );
-                    } else {
-                        session.attention = false;
-                        session.attention_reason = None;
+                        desired_event_override = Some("stuck".into());
                     }
-                } else if session.active
-                    && age_sec > rules.idle_threshold_sec as f64
-                    && session.event.is_none()
-                {
-                    // Active but idle — might need attention
-                    // BUT only if session has had at least one hook event before
-                    // (otherwise every scanner-discovered session triggers idle immediately)
-                    // Sessions with event=None have never received a hook → skip
-                    session.attention = false;
-                    session.attention_reason = None;
                 } else if let Some(ref event) = session.event {
-                    if rules.waiting_statuses.contains(event) {
-                        // Waiting/idle status — attention only if mtime is recent
-                        // (stale idles from hours ago shouldn't trigger)
-                        if age_sec < 3600.0 {
-                            session.attention = true;
-                            session.attention_reason = Some(format!(
-                                "status: {} ({}s ago)", event, age_sec as u32
-                            ));
-                        } else {
-                            session.attention = false;
-                            session.attention_reason = None;
-                        }
-                    } else {
-                        session.attention = false;
-                        session.attention_reason = None;
+                    if rules.waiting_statuses.contains(event) && age_sec < 3600.0 {
+                        desired_attention = true;
+                        desired_reason = Some(format!(
+                            "status: {} ({}s ago)", event, age_sec as u32
+                        ));
+                    }
+                }
+            }
+
+            // Hysteresis: don't toggle attention if last toggle was < 15s ago
+            // (prevents wasteful recomputation churn — mtime sort handles ordering stability)
+            if desired_attention != prev_attention {
+                let cooldown = 15.0; // seconds
+                let can_toggle = match session.attention_toggled_at {
+                    Some(toggled_at) => (now - toggled_at) >= cooldown,
+                    None => true, // first time — always allow
+                };
+
+                if can_toggle {
+                    session.attention = desired_attention;
+                    session.attention_reason = desired_reason;
+                    session.attention_toggled_at = Some(now);
+                    if let Some(event_override) = desired_event_override {
+                        session.event = Some(event_override);
                     }
                 } else {
-                    session.attention = false;
-                    session.attention_reason = None;
+                    // Hysteresis active — keep previous state, don't toggle
+                    debug!(
+                        "[attention] {} hysteresis: suppressing toggle (last toggle {:.0}s ago)",
+                        session.name,
+                        now - session.attention_toggled_at.unwrap_or(0.0)
+                    );
+                }
+            } else {
+                // No change in attention — still update reason/event for clarity
+                session.attention_reason = desired_reason;
+                if let Some(event_override) = desired_event_override {
+                    session.event = Some(event_override);
                 }
             }
 

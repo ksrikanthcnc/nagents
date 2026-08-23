@@ -13,6 +13,8 @@ use std::thread;
 use std::time::Duration;
 
 /// Start cursor position broadcasting (background thread, ~30fps).
+/// DEPRECATED: cursor is now polled by overlay frontend via HTTP /cursor endpoint.
+#[allow(dead_code)]
 pub fn start_cursor_broadcast(app: AppHandle) {
     thread::spawn(move || {
         info!("[overlay] cursor broadcast started (30fps)");
@@ -77,57 +79,47 @@ pub fn set_overlay_clickthrough(app: AppHandle, ignore: bool) -> Result<(), Stri
     Ok(())
 }
 
+/// Create (or show) the battery saver box window (small, always-on-top, interactive).
+#[tauri::command]
+pub fn show_bsb_window(app: AppHandle) -> Result<(), String> {
+    if let Some(bsb) = app.get_webview_window("bsb") {
+        bsb.show().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let url = WebviewUrl::App("bsb.html".into());
+
+    let bsb = WebviewWindowBuilder::new(&app, "bsb", url)
+        .title("nagents")
+        .transparent(true)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(true)
+        .inner_size(320.0, 120.0)
+        .position(
+            (app.get_webview_window("main").map(|w| w.outer_size().unwrap_or_default().width).unwrap_or(0) as f64) + 20.0,
+            40.0,
+        )
+        .visible_on_all_workspaces(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    bsb.show().map_err(|e| e.to_string())?;
+    info!("[bsb] window created");
+    Ok(())
+}
+
+/// Hide the battery saver box window.
+#[tauri::command]
+pub fn hide_bsb_window(app: AppHandle) -> Result<(), String> {
+    if let Some(bsb) = app.get_webview_window("bsb") {
+        bsb.hide().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Get global cursor position (platform-specific).
-#[cfg(target_os = "macos")]
 pub fn get_cursor_position() -> (f64, f64) {
-    use std::ffi::c_void;
-    #[link(name = "CoreGraphics", kind = "framework")]
-    extern "C" {
-        fn CGEventCreate(source: *const c_void) -> *const c_void;
-        fn CGEventGetLocation(event: *const c_void) -> CGPoint;
-        fn CFRelease(cf: *const c_void);
-    }
-    #[repr(C)]
-    #[derive(Copy, Clone)]
-    struct CGPoint {
-        x: f64,
-        y: f64,
-    }
-    unsafe {
-        let event = CGEventCreate(std::ptr::null());
-        if event.is_null() {
-            return (0.0, 0.0);
-        }
-        let point = CGEventGetLocation(event);
-        CFRelease(event);
-        (point.x, point.y)
-    }
-}
-
-#[cfg(target_os = "windows")]
-pub fn get_cursor_position() -> (f64, f64) {
-    use std::mem::MaybeUninit;
-    #[repr(C)]
-    struct POINT {
-        x: i32,
-        y: i32,
-    }
-    extern "system" {
-        fn GetCursorPos(point: *mut POINT) -> i32;
-    }
-    unsafe {
-        let mut point = MaybeUninit::<POINT>::uninit();
-        if GetCursorPos(point.as_mut_ptr()) != 0 {
-            let p = point.assume_init();
-            (p.x as f64, p.y as f64)
-        } else {
-            (0.0, 0.0)
-        }
-    }
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub fn get_cursor_position() -> (f64, f64) {
-    // Linux: would need X11/Wayland — placeholder for now
-    (0.0, 0.0)
+    crate::cursor::get_cursor_position()
 }

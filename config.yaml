@@ -59,7 +59,7 @@ panel_order:
 # Speed and behavior controls for overlay characters.
 
 overlay:
-  follow_strength: 0.04        # How strongly chars follow cursor (0.01-0.1)
+  follow_strength: 0.008        # How strongly chars follow cursor (0.01-0.1)
   roam_strength: 0.008         # How strongly chars move to roam targets
   roam_max_speed: 3            # Max roam speed (pixels/frame)
   follow_max_speed: 6          # Max follow speed (pixels/frame)
@@ -79,23 +79,29 @@ overlay:
   max_followers: 2             # Max chars following cursor
   max_roamers: 3              # Max free-roaming chars
   max_dots: 5                  # Max dots orbiting cursor
-  pin_counts_toward_max: false # If true, pinned chars consume max_followers slots
+  pin_counts_toward_max: false # Pinned chars are extra (critical tasks), don't consume follower slots
   group_as_one: false          # Merge same-group sessions into one visual unit
   # group_display: cluster (all visible, close), single (one rep), carousel (rotate)
   group_display: cluster
   # Panel display mode: compact (32px chars, tight) or comfortable (48px, spacious)
   panel_mode: compact
+  # Base character size in pixels (all scaling is proportional to this)
+  char_size: 44
   # Follower ordering (based on last_user_ts, not agent mtime)
   # Options: fifo, lifo, lru, priority, round_robin (comma-separated chain)
   follower_mode: "lifo"
-  round_robin_sec: 10          # Rotation interval for round_robin mode
+  round_robin_sec: 3          # Rotation interval for cluster center (seconds)
+  # Battery saver box settings
+  bsb_max_chars: 5            # Max chars shown in battery saver box
+  bsb_opacity: 0              # Background opacity (0.0 = fully transparent, 1.0 = opaque)
+  bsb_layout: horizontal      # Layout: horizontal, vertical, grid
 # Map source → default character ID for new sessions from that source.
 # ─── Characters ──────────────────────────────────────────────────────────────
 # Default char per source (flat). Pool assignment done in frontend.
 # Per-session override via right-click in panel (persisted to localStorage).
 
 characters:
-  kiro-crew: ghost
-  kiro-cli-v2: cat
-  kiro-cli-v3: cat
-  kiro-ide: ghost
+  kiro-crew: ghost,flame,crystal
+  kiro-cli-v2: cat,skeleton,owl
+  kiro-cli-v3: cat,skeleton,owl
+  kiro-ide: ghost,robot,mushroom,cloud

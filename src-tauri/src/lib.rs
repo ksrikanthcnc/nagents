@@ -5,6 +5,7 @@
 
 mod attention;
 mod config;
+mod cursor;
 mod overlay;
 mod scanner;
 mod server;
@@ -100,22 +101,32 @@ pub fn run() {
             // Create session store
             let store = SessionStore::new();
 
+            // Set character pools from config (source → pool of char IDs)
+            // Config format: "ghost" (single) or will be extended to lists later
+            let char_pools: std::collections::HashMap<String, Vec<String>> = config.get().characters.iter()
+                .map(|(source, chars_str)| {
+                    let pool: Vec<String> = chars_str.split(',').map(|s| s.trim().to_string()).collect();
+                    (source.clone(), pool)
+                })
+                .collect();
+            store.set_char_pools(char_pools);
+
             // Reload cached events from data/events/ (restore state from last run)
             let project_root = config_path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
             reload_event_cache(&store, &project_root);
 
+            // Clear stale attention for non-idle sessions (fixes #022: missed hook clears during downtime)
+            store.clear_stale_attention();
+
             // Start HTTP server for external hook pushes
             let http_port = config.get().http_port;
-            server::start(store.clone(), http_port);
+            server::start(store.clone(), http_port, project_root.clone());
 
             // Start scanner orchestrator (spawns source executables)
             scanner::start(store.clone(), config.clone(), project_root);
 
             // Start attention computation loop
             attention::start(store.clone(), config.clone());
-
-            // Start cursor broadcast for overlay
-            overlay::start_cursor_broadcast(app.handle().clone());
 
             // Create overlay window at startup (always exists, shows chars when attention)
             let app_handle = app.handle().clone();
@@ -143,6 +154,8 @@ pub fn run() {
             overlay::create_overlay,
             overlay::hide_overlay,
             overlay::set_overlay_clickthrough,
+            overlay::show_bsb_window,
+            overlay::hide_bsb_window,
         ])
         .run(tauri::generate_context!())
         .expect("error running nagents");

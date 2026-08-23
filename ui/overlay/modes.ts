@@ -28,6 +28,10 @@ export type CharMode = "follow" | "roam" | "revolve" | "hidden";
 export interface ModeAssignment {
   sessionId: string;
   mode: CharMode;
+  /** If set, this char is clustered around the given session (targets its position, scales down) */
+  clusteredTo?: string;
+  /** Hidden due to group_as_one (don't count in +N badge) */
+  groupHidden?: boolean;
 }
 
 export interface CharState {
@@ -119,25 +123,28 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
       for (const [, members] of groupMembers) {
         ungrouped.push(members[0]); // representative
         for (let i = 1; i < members.length; i++) {
-          result.set(members[i].sessionId, { sessionId: members[i].sessionId, mode: "hidden" });
-        }
-      }
-    } else if (cfg.group_display === "carousel") {
-      // Rotate which member is shown (every round_robin_sec)
-      const now = Date.now();
-      for (const [group, members] of groupMembers) {
-        const idx = Math.floor(now / (cfg.round_robin_sec * 1000)) % members.length;
-        ungrouped.push(members[idx]); // currently shown
-        for (let i = 0; i < members.length; i++) {
-          if (i !== idx) {
-            result.set(members[i].sessionId, { sessionId: members[i].sessionId, mode: "hidden" });
-          }
+          result.set(members[i].sessionId, { sessionId: members[i].sessionId, mode: "hidden", groupHidden: true });
         }
       }
     } else {
-      // "cluster" (default) — all visible, grouped together (physics handles attraction)
+      // "cluster" or "carousel" (merged): one center char, others orbit it.
+      // Center rotates every round_robin_sec.
+      const now = Date.now();
       for (const [, members] of groupMembers) {
-        ungrouped.push(...members);
+        // Determine who is center (rotates by time)
+        const centerIdx = Math.floor(now / (cfg.round_robin_sec * 1000)) % members.length;
+        const centerChar = members[centerIdx];
+        // Center goes into waterfall (gets a mode slot)
+        ungrouped.push(centerChar);
+        // Others cluster around center
+        for (let i = 0; i < members.length; i++) {
+          if (i === centerIdx) continue;
+          result.set(members[i].sessionId, {
+            sessionId: members[i].sessionId,
+            mode: "follow", // placeholder, overridden to center's mode after waterfall
+            clusteredTo: centerChar.sessionId,
+          });
+        }
       }
     }
 
@@ -181,6 +188,16 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
     result.set(c.sessionId, { sessionId: c.sessionId, mode });
   }
 
+  // Update clustered chars to match their representative's mode
+  for (const [id, assignment] of result) {
+    if (assignment.clusteredTo) {
+      const repAssignment = result.get(assignment.clusteredTo);
+      if (repAssignment) {
+        assignment.mode = repAssignment.mode;
+      }
+    }
+  }
+
   return result;
 }
 
@@ -220,17 +237,13 @@ function sortByPriority(list: CharState[], modeStr: string, rrSec: number): void
     const diff = getPriorityLevel(b) - getPriorityLevel(a);
     if (diff !== 0) return diff;
 
-    // Stability bonus: prefer chars already in follow mode to stay (avoids flapping)
-    const aFollow = a.currentMode === "follow" ? 1 : 0;
-    const bFollow = b.currentMode === "follow" ? 1 : 0;
-    if (aFollow !== bFollow) return bFollow - aFollow;
-
     // Tie-break by configured mode
     for (const mode of tieBreakers) {
       const d = compareTieBreak(a, b, mode);
       if (d !== 0) return d;
     }
-    // Final deterministic tie-break: sessionId (prevents unstable sort flapping)
+
+    // Final deterministic tie-break: sessionId
     return a.sessionId.localeCompare(b.sessionId);
   });
 }
@@ -259,8 +272,12 @@ function compareTieBreak(a: CharState, b: CharState, mode: string): number {
       // Oldest waiting gets priority (fairness)
       return (a.lastUserTs || a.spawnedAt) - (b.lastUserTs || b.spawnedAt);
     case "lifo":
-      // Newest gets priority (latest task most relevant) — like alt-tab
-      return (b.lastUserTs || b.spawnedAt) - (a.lastUserTs || a.spawnedAt);
+      // Newest gets priority (latest activity most relevant) — like alt-tab
+      // Use mtime (always unique, ms-precision) as primary LIFO signal,
+      // with lastUserTs as boost (user interaction > automatic activity)
+      const aLifo = a.session.last_user_ts || a.session.mtime || a.spawnedAt;
+      const bLifo = b.session.last_user_ts || b.session.mtime || b.spawnedAt;
+      return bLifo - aLifo;
     case "lru":
       // Least recently used by user gets priority (neglected → surface it)
       return (a.lastUserTs || 0) - (b.lastUserTs || 0);

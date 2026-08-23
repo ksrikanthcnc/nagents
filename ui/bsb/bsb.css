@@ -1,0 +1,102 @@
+/* BSB — Battery Saver Box (separate window) */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: transparent;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: grab;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+body:active {
+  cursor: grabbing;
+}
+
+#bsb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+}
+
+#bsb[data-layout="vertical"] {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+#bsb[data-layout="grid"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, max-content));
+}
+
+/* ─── Char ───────────────────────────────────────────────────────────────── */
+
+.bsb-char {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+
+.bsb-group {
+  color: rgba(167, 139, 250, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  width: 100%;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.bsb-svg svg {
+  width: 100%;
+  height: 100%;
+}
+
+.bsb-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  position: absolute;
+  top: 12px;
+  right: 2px;
+}
+
+.bsb-dot.dot-amber { background: #f59e0b; box-shadow: 0 0 4px rgba(245, 158, 11, 0.6); }
+.bsb-dot.dot-green { background: #4ade80; box-shadow: 0 0 4px rgba(74, 222, 128, 0.4); }
+.bsb-dot.dot-gray { background: rgba(255, 255, 255, 0.3); }
+
+.bsb-title {
+  color: rgba(232, 232, 240, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  width: 100%;
+}
+
+.bsb-overflow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(167, 139, 250, 0.8);
+  min-width: 30px;
+  align-self: center;
+}
+
+/* Source hue tinting */
+.bsb-src-kirocrew .bsb-group { color: rgba(167, 139, 250, 0.9); }
+.bsb-src-kirocliv2 .bsb-group,
+.bsb-src-kirocliv3 .bsb-group { color: rgba(168, 230, 207, 0.9); }
+.bsb-src-kiroide .bsb-group { color: rgba(96, 165, 250, 0.9); }

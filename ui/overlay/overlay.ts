@@ -9,7 +9,7 @@
  */
 
 import type { Session, CursorPosition, OverlayConfig } from "../shared/types";
-import { pollState, getConfig, log } from "../shared/bridge";
+import { pollState, getConfig, setOverlayClickthrough, log } from "../shared/bridge";
 import { getCharacter } from "../characters/registry";
 import { computeModes, type CharMode, type CharState, type ModeConfig, MODE_DEFAULTS } from "./modes";
 
@@ -42,6 +42,8 @@ let globalRevolveAngle = 0;
 let cursorReady = false;
 let lastSummaryLog = 0;
 let hiddenBadgeEl: HTMLElement | null = null;
+/** True when all chars have mode=hidden (skip cursor poll) */
+let allCharsHidden = false;
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -98,8 +100,8 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   const cursorInterval = Math.round(1000 / cfg.cursor_fps);
   (async () => {
     while (true) {
-      // Pause cursor poll when no chars on screen AND cursor already initialized
-      if (cursorReady && chars.size === 0) {
+      // Pause cursor poll when no chars on screen or all chars hidden
+      if (cursorReady && (chars.size === 0 || allCharsHidden)) {
         await new Promise(r => setTimeout(r, 2000));
         continue;
       }
@@ -242,14 +244,16 @@ function applyModes(): void {
     session: c.session,
     currentMode: c.mode,
     spawnedAt: c.spawnedAt,
-    lastUserTs: c.session.last_user_ts ?? c.spawnedAt,
+    lastUserTs: c.session.last_user_ts ?? (c.session.mtime * 1000),
     interactionCount: c.session.interaction_count ?? 0,
   }));
 
+  const batterySaverOn = localStorage.getItem("nagents:battery_saver") === "true";
+
   const modeCfg: ModeConfig = {
-    max_followers: cfg.max_followers ?? MODE_DEFAULTS.max_followers,
-    max_roamers: cfg.max_roamers ?? MODE_DEFAULTS.max_roamers,
-    max_dots: cfg.max_dots ?? MODE_DEFAULTS.max_dots,
+    max_followers: batterySaverOn ? 1 : (cfg.max_followers ?? MODE_DEFAULTS.max_followers),
+    max_roamers: batterySaverOn ? 0 : (cfg.max_roamers ?? MODE_DEFAULTS.max_roamers),
+    max_dots: batterySaverOn ? 0 : (cfg.max_dots ?? MODE_DEFAULTS.max_dots),
     follower_mode: cfg.follower_mode ?? MODE_DEFAULTS.follower_mode,
     round_robin_sec: cfg.round_robin_sec ?? MODE_DEFAULTS.round_robin_sec,
     pin_counts_toward_max: cfg.pin_counts_toward_max ?? MODE_DEFAULTS.pin_counts_toward_max,
@@ -268,8 +272,8 @@ function applyModes(): void {
     const level = (!p.attention) ? 0 :
       (p.event === "approval" || p.event === "stuck") ? 4 :
       (p.event === "idle") ? 3 : 1;
-    return `${s.sessionId}:${level}:${p.pinned ? "P" : ""}`;
-  }).sort().join("|") + `|${modeCfg.max_followers}:${modeCfg.max_roamers}:${modeCfg.max_dots}:${modeCfg.group_as_one}:${modeCfg.group_display}`;
+    return `${s.sessionId}:${level}:${p.pinned ? "P" : ""}:${p.last_user_ts || 0}`;
+  }).sort().join("|") + `|${modeCfg.max_followers}:${modeCfg.max_roamers}:${modeCfg.max_dots}:${modeCfg.group_as_one}:${modeCfg.group_display}:${batterySaverOn}`;
 
   let assignments: Map<string, import("./modes").ModeAssignment>;
   if (currentPriorityHash === prevPriorityHash && prevAssignments.size > 0) {
@@ -279,6 +283,13 @@ function applyModes(): void {
     assignments = computeModes(states, modeCfg);
     prevAssignments = assignments;
     prevPriorityHash = currentPriorityHash;
+
+    // Publish assignments to localStorage so panel (separate webview) can read them
+    const assignmentData: Record<string, string> = {};
+    for (const [id, a] of assignments) {
+      assignmentData[id] = a.mode;
+    }
+    localStorage.setItem("nagents:mode_assignments", JSON.stringify(assignmentData));
   }
 
   let hiddenCount = 0;
@@ -320,15 +331,24 @@ function applyModes(): void {
     char.clusteredTo = assignment.clusteredTo || null;
     char.el.style.opacity = "";
 
-    if (newMode === "hidden") {
+    if (newMode === "hidden" || batterySaverOn) {
       char.el.style.display = "none";
-      if (!assignment.groupHidden) hiddenCount++;
+      if (newMode === "hidden" && !assignment.groupHidden) hiddenCount++;
     } else {
       char.el.style.display = "";
     }
   }
 
-  updateHiddenBadge(hiddenCount);
+  // In battery saver, hide the +N badge and satellites too
+  if (batterySaverOn) {
+    if (hiddenBadgeEl) hiddenBadgeEl.style.display = "none";
+  } else {
+    updateHiddenBadge(hiddenCount);
+  }
+
+  // Track whether all chars are hidden (for cursor poll optimization)
+  // In battery saver mode, all chars are visually hidden (no cursor poll needed)
+  allCharsHidden = batterySaverOn || hiddenCount === charArray.length;
 }
 
 // ─── Render Loop ────────────────────────────────────────────────────────────
@@ -339,32 +359,52 @@ function startRenderLoop(): void {
   svg.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;";
   container!.appendChild(svg);
 
-  const frameInterval = 1000 / cfg.physics_fps;
+  let frameInterval = 1000 / cfg.physics_fps;
   let lastFrame = 0;
   let frameCount = 0;
+
+  // Cache localStorage reads (refresh every 60 frames ≈ 1s at 60fps)
+  let cachedBatterySaver = localStorage.getItem("nagents:battery_saver") === "true";
+  let cachedHiddenUntil = Number(localStorage.getItem("nagents:overlay_hidden_until") || "0");
+  let cacheRefreshCounter = 0;
+
   function tick(now: number) {
     animFrameId = requestAnimationFrame(tick);
-    if (now - lastFrame < frameInterval) return;
+
+    // Refresh localStorage cache every 60 frames (~1s)
+    cacheRefreshCounter++;
+    if (cacheRefreshCounter >= 60) {
+      cacheRefreshCounter = 0;
+      cachedBatterySaver = localStorage.getItem("nagents:battery_saver") === "true";
+      cachedHiddenUntil = Number(localStorage.getItem("nagents:overlay_hidden_until") || "0");
+    }
+
+    const effectiveInterval = cachedBatterySaver ? 66 : frameInterval; // 15fps vs configured
+    if (now - lastFrame < effectiveInterval) return;
     lastFrame = now;
     frameCount++;
-    updatePhysics();
-    // Draw connections every 3rd frame (perf: SVG rebuild is expensive)
-    if (frameCount % 3 === 0) drawConnections(svg);
+    updatePhysics(cachedBatterySaver, cachedHiddenUntil);
+    // Draw connections (skip in battery saver mode)
+    if (!cachedBatterySaver && frameCount % 3 === 0) {
+      drawConnections(svg);
+    } else if (cachedBatterySaver && svg.innerHTML) {
+      svg.innerHTML = ""; // Clear existing lines when entering battery saver
+    }
   }
   animFrameId = requestAnimationFrame(tick);
 }
 
-function updatePhysics(): void {
+function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
   const charArray = Array.from(chars.values());
   const now = Date.now();
 
   // Check overlay hide flag (set by panel)
-  const hiddenUntil = Number(localStorage.getItem("nagents:overlay_hidden_until") || "0");
   if (hiddenUntil === Infinity || (hiddenUntil > 0 && now < hiddenUntil)) {
     // Hide all chars
     for (const c of charArray) c.el.style.display = "none";
     if (hiddenBadgeEl) hiddenBadgeEl.style.display = "none";
     if (container) container.style.opacity = "0";
+    hideBsbWindow();
     return;
   } else if (container && container.style.opacity === "0") {
     container.style.opacity = "";
@@ -372,7 +412,23 @@ function updatePhysics(): void {
   }
 
   // Skip physics entirely if no visible chars (power saving)
-  if (charArray.length === 0) return;
+  if (charArray.length === 0) { hideBsbWindow(); return; }
+
+  // Battery saver v2: show separate BSB window (no physics in overlay)
+  if (batterySaver) {
+    // Hide animated chars, satellites, and +N badge
+    for (const c of charArray) c.el.style.display = "none";
+    for (const [, el] of satellites) el.style.display = "none";
+    if (hiddenBadgeEl) hiddenBadgeEl.style.display = "none";
+    // Show BSB window (separate interactive window)
+    showBsbWindow();
+    return;
+  } else {
+    hideBsbWindow();
+    // Restore satellite visibility when exiting battery saver
+    for (const [, el] of satellites) el.style.display = "";
+  }
+
   const visibleChars = charArray.filter(c => c.el.style.display !== "none");
   if (visibleChars.length === 0) return;
 
@@ -563,8 +619,8 @@ function updatePhysics(): void {
     // followers ↔ roamers: yes
     // followers ↔ followers: yes
     // roamers ↔ roamers: yes
-    // dots ↔ dots: no (orbit handles spacing)
-    if ((char.mode as string) !== "revolve") {
+    // Collision (skip in battery saver — use cached value from render loop)
+    if ((char.mode as string) !== "revolve" && !batterySaver) {
       for (const other of charArray) {
         if (other === char || other.el.style.display === "none") continue;
         // Skip dot-roamer collisions
@@ -624,6 +680,9 @@ function updatePhysics(): void {
     // Eye tracking only for followers (others too far/small to notice)
     if (char.mode === "follow") trackEyes(char);
   }
+
+  // ─── Sub-agent satellites: orbit parent chars ──────────────────────
+  renderSatellites(charArray);
 
   // Hidden badge follows cursor — positioned above cursor so bottom edge touches it
   if (hiddenBadgeEl && hiddenBadgeEl.style.display !== "none") {
@@ -691,6 +750,133 @@ function trackEyes(char: OverlayChar): void {
   const flip = char.el.dataset.flip === "-1" ? -1 : 1;
   for (const eye of eyes) {
     (eye as SVGElement).style.translate = `${ox * flip}px ${oy}px`;
+  }
+}
+
+// ─── Sub-agent Satellites ────────────────────────────────────────────────────
+
+/** Source → glow color for satellites */
+function getSourceColor(source: string): string {
+  if (source.includes("crew")) return "rgba(167, 139, 250, 0.7)";
+  if (source.includes("cli")) return "rgba(168, 230, 207, 0.7)";
+  if (source.includes("ide")) return "rgba(96, 165, 250, 0.7)";
+  return "rgba(167, 139, 250, 0.5)";
+}
+
+/** Worker type → character ID mapping (from anim-agent spec 032) */
+const WORKER_CHAR_MAP: Record<string, string> = {
+  "cg": "wisp",
+  "context-gatherer": "wisp",
+  "task": "spark",
+  "general-task-execution": "spark",
+  "creator": "flame",
+  "custom-agent-creator": "flame",
+  "reviewer": "orb",
+  "semantic_reviewer": "orb",
+  "knowledge": "owl",
+  "kirocrew-knowledge": "owl",
+  "lite": "blob",
+  "kirocrew-lite": "blob",
+  "introspect": "crystal",
+};
+
+/** Extract worker type from name (e.g. "cg: Exploring auth" → "cg") */
+function getWorkerType(name: string): string {
+  const colonIdx = name.indexOf(":");
+  if (colonIdx > 0) return name.slice(0, colonIdx).trim();
+  return name.trim();
+}
+
+/** Satellite elements keyed by "parentId-index" */
+const satellites: Map<string, HTMLElement> = new Map();
+let satelliteAngle = 0;
+const SAT_SIZE = 18; // satellite char size in px
+
+function renderSatellites(charArray: OverlayChar[]): void {
+  if (!container) return;
+  satelliteAngle += 0.02; // slow orbit
+
+  const activeSatelliteKeys = new Set<string>();
+
+  for (const char of charArray) {
+    if (char.el.style.display === "none") continue;
+    if (char.mode === "hidden") continue;
+    const count = (char.session as any).sub_agents || 0;
+    const names: string[] = (char.session as any).workers || [];
+    if (count === 0) continue;
+
+    const orbitRadius = CHAR_SIZE * 0.6;
+    for (let i = 0; i < count; i++) {
+      const key = `${char.session.id}-sat-${i}`;
+      activeSatelliteKeys.add(key);
+
+      let el = satellites.get(key);
+      const name = names[i] || `sub-${i + 1}`;
+      const workerType = getWorkerType(name);
+      const satCharId = WORKER_CHAR_MAP[workerType] || "ghost";
+
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "overlay-satellite";
+        el.style.position = "absolute";
+        el.style.pointerEvents = "none";
+        el.style.width = `${SAT_SIZE}px`;
+        el.style.height = `${SAT_SIZE}px`;
+        container.appendChild(el);
+        satellites.set(key, el);
+      }
+
+      // Position: orbit around parent
+      const angle = satelliteAngle + (2 * Math.PI * i) / count;
+      const sx = char.x + CHAR_SIZE / 2 + Math.cos(angle) * orbitRadius - SAT_SIZE / 2;
+      const sy = char.y + CHAR_SIZE / 2 + Math.sin(angle) * orbitRadius - SAT_SIZE / 2;
+      el.style.left = `${Math.round(sx)}px`;
+      el.style.top = `${Math.round(sy)}px`;
+
+      // Render SVG char (only update if char changed)
+      if (el.dataset.charId !== satCharId) {
+        const charDef = getCharacter(satCharId);
+        el.innerHTML = charDef.svg;
+        el.dataset.charId = satCharId;
+        el.classList.add("char-slot-idle");
+        // Apply source color from parent
+        el.style.setProperty("--sat-color", getSourceColor(char.session.source));
+      }
+    }
+  }
+
+  // Remove satellites for sessions that no longer have sub-agents
+  for (const [key, el] of satellites) {
+    if (!activeSatelliteKeys.has(key)) {
+      el.remove();
+      satellites.delete(key);
+    }
+  }
+}
+
+// ─── Battery Saver Window (separate Tauri window) ───────────────────────────
+
+let bsbWindowShown = false;
+
+async function showBsbWindow(): Promise<void> {
+  if (bsbWindowShown) return;
+  bsbWindowShown = true;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("show_bsb_window");
+  } catch (e) {
+    log("overlay", `BSB window show failed: ${e}`);
+  }
+}
+
+async function hideBsbWindow(): Promise<void> {
+  if (!bsbWindowShown) return;
+  bsbWindowShown = false;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("hide_bsb_window");
+  } catch (e) {
+    log("overlay", `BSB window hide failed: ${e}`);
   }
 }
 
