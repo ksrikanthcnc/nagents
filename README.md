@@ -534,7 +534,6 @@ See [docs/CHARACTER_CONTRACT.md](docs/CHARACTER_CONTRACT.md) for full SVG conven
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design deep-dive |
 | [docs/SOURCE_CONTRACT.md](docs/SOURCE_CONTRACT.md) | Scanner/hook interface spec |
 | [docs/CHARACTER_CONTRACT.md](docs/CHARACTER_CONTRACT.md) | Character plugin guide |
-| [docs/OVERLAY_BEHAVIOR.md](docs/OVERLAY_BEHAVIOR.md) | Zone system + physics design |
 | [BUGS.md](BUGS.md) | Known issues + dead code + test gaps |
 
 ---
@@ -551,7 +550,7 @@ See [BUGS.md](BUGS.md) for the full list. Key notes:
 
 ## License
 
-Private project.
+MIT
 
 ---
 
