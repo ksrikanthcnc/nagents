@@ -1,6 +1,7 @@
 /* Panel — Control Center */
 
-:root {
+/* ─── Theme: Dark (default) ──────────────────────────────────────────────── */
+:root, [data-theme="dark"] {
   --bg-primary: #1a1a2e;
   --bg-secondary: #16213e;
   --bg-group: #0f3460;
@@ -16,6 +17,64 @@
   --attention-glow: rgba(245, 158, 11, 0.15);
   --success: #4ade80;
   --danger: #ef4444;
+}
+
+/* ─── Theme: Midnight ────────────────────────────────────────────────────── */
+[data-theme="midnight"] {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-group: #21262d;
+  --bg-group-crew: rgba(136, 132, 216, 0.06);
+  --bg-group-cli: rgba(72, 199, 142, 0.06);
+  --bg-group-ide: rgba(88, 166, 255, 0.06);
+  --text-primary: #f0f6fc;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --accent: #8884d8;
+  --accent-glow: rgba(136, 132, 216, 0.3);
+  --attention: #d29922;
+  --attention-glow: rgba(210, 153, 34, 0.15);
+  --success: #3fb950;
+  --danger: #f85149;
+}
+
+/* ─── Theme: Light ───────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-group: #eaeef2;
+  --bg-group-crew: rgba(139, 92, 246, 0.08);
+  --bg-group-cli: rgba(16, 185, 129, 0.08);
+  --bg-group-ide: rgba(59, 130, 246, 0.08);
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --text-muted: #8c959f;
+  --accent: #8b5cf6;
+  --accent-glow: rgba(139, 92, 246, 0.2);
+  --attention: #d97706;
+  --attention-glow: rgba(217, 119, 6, 0.1);
+  --success: #16a34a;
+  --danger: #dc2626;
+}
+
+/* ─── Theme: High Contrast ───────────────────────────────────────────────── */
+[data-theme="contrast"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-group: #1a1a1a;
+  --bg-group-crew: rgba(167, 139, 250, 0.12);
+  --bg-group-cli: rgba(168, 230, 207, 0.12);
+  --bg-group-ide: rgba(96, 165, 250, 0.12);
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-muted: #888888;
+  --accent: #c4b5fd;
+  --accent-glow: rgba(196, 181, 253, 0.4);
+  --attention: #fbbf24;
+  --attention-glow: rgba(251, 191, 36, 0.2);
+  --success: #86efac;
+  --danger: #fca5a5;
+}
   --border: #2a2a4a;
   --radius: 8px;
 }

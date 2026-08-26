@@ -36,6 +36,9 @@ export async function initPanel(el: HTMLElement): Promise<void> {
   container = el;
   log("panel", "initializing");
 
+  // Apply saved theme immediately
+  document.documentElement.dataset.theme = localStorage.getItem("nagents:theme") || "dark";
+
   config = await getConfig();
   log("panel", "config loaded", config);
 
@@ -155,11 +158,11 @@ function updateSessionElement(session: Session): void {
 
 /** Recursively render sub-groups. depth controls indentation CSS class. */
 function renderSubGroups(groups: SessionGroup[], depth: number): string {
-  // Sort sub-groups: configurable via panel_group_sort (localStorage)
+  // Sort sub-groups: configurable. Skip internal groups (zone/pinned/muted/state — they have intentional order)
   const sortMode = localStorage.getItem("nagents:panel_group_sort") || (config as any)?.overlay?.panel_group_sort || "recency";
-  const sorted = [...groups].sort((a, b) => {
+  const isInternal = groups.length > 0 && groups[0].id.startsWith("on-");
+  const sorted = isInternal ? groups : [...groups].sort((a, b) => {
     if (sortMode === "recency") {
-      // Use earliest session mtime (stable — based on group creation, not activity)
       const aEarliest = Math.min(...(a.sessions.length ? a.sessions.map(s => s.mtime || Infinity) : [Infinity]));
       const bEarliest = Math.min(...(b.sessions.length ? b.sessions.map(s => s.mtime || Infinity) : [Infinity]));
       return aEarliest - bEarliest;
@@ -224,6 +227,12 @@ function render(): void {
 
   let html = `<header class="panel-header">
     <span class="session-count">${currentState.count} sessions</span>
+    <select class="toolbar-select" id="theme-select" title="Theme">
+      <option value="dark">Dark</option>
+      <option value="midnight">Midnight</option>
+      <option value="light">Light</option>
+      <option value="contrast">High Contrast</option>
+    </select>
     <select class="toolbar-select" id="hide-overlay-select" title="Hide overlay">
       <option value="">👁</option>
       <option value="5">Hide 5min</option>
@@ -380,6 +389,18 @@ function attachEventHandlers(): void {
         // Fallback: open in browser
         window.open("http://localhost:5180/settings.html", "_blank");
       }
+    });
+  }
+
+  // Theme selector
+  const themeSelect = container.querySelector("#theme-select") as HTMLSelectElement | null;
+  if (themeSelect) {
+    const saved = localStorage.getItem("nagents:theme") || "dark";
+    themeSelect.value = saved;
+    document.documentElement.dataset.theme = saved;
+    themeSelect.addEventListener("change", () => {
+      document.documentElement.dataset.theme = themeSelect.value;
+      localStorage.setItem("nagents:theme", themeSelect.value);
     });
   }
 
