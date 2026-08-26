@@ -23,16 +23,16 @@ describe("group_as_one + single display", () => {
       group_display: "single",
     });
 
-    const g1a = makeAttentionChar("approval"); // level 4
+    const g1a = makeAttentionChar("idle", { status: "waiting_on_user" }); // level 6 (highest)
     g1a.session.group = "project-A";
-    const g1b = makeAttentionChar("idle", { status: "waiting_on_user" }); // level 3
+    const g1b = makeAttentionChar("approval"); // level 5
     g1b.session.group = "project-A";
-    const g1c = makeAttentionChar("idle", { priority: "low" }); // level 2
+    const g1c = makeAttentionChar("stuck"); // level 4
     g1c.session.group = "project-A";
 
     const result = computeModes([g1a, g1b, g1c], cfg);
 
-    // g1a (highest priority) is the representative → gets a zone mode
+    // g1a (highest priority, level 6) is the representative → gets a zone mode
     const repMode = result.get(g1a.sessionId)?.mode;
     expect(repMode).toBe("follow");
 

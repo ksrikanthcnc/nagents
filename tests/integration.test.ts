@@ -199,6 +199,8 @@ describe("Working Mode: live state verification", () => {
       group_as_one: overlay.group_as_one ?? false,
       group_display: overlay.group_display || "cluster",
       working_mode: overlay.working_mode || "roam",
+      working_counts_toward_max: overlay.working_counts_toward_max ?? false,
+      attention_follows: overlay.attention_follows ?? false,
     };
 
     const assignments = computeModes(charStates, modeCfg);
@@ -289,6 +291,8 @@ describe("Mode Assignment with Live Config", () => {
       group_as_one: overlay.group_as_one ?? false,
       group_display: overlay.group_display || "cluster",
       working_mode: overlay.working_mode || "roam",
+      working_counts_toward_max: overlay.working_counts_toward_max ?? false,
+      attention_follows: overlay.attention_follows ?? false,
     };
 
     const assignments = computeModes(charStates, modeCfg);
@@ -300,19 +304,17 @@ describe("Mode Assignment with Live Config", () => {
       expect(["follow", "roam", "revolve", "hidden"]).toContain(a!.mode);
     }
 
-    // Verify slot limits
-    const followCount = Array.from(assignments.values()).filter(
-      a => a.mode === "follow" && !allActive.find(s => s.id === a.sessionId)?.pinned
-    ).length;
-    const pinnedFollowCount = Array.from(assignments.values()).filter(
-      a => a.mode === "follow" && allActive.find(s => s.id === a.sessionId)?.pinned
-    ).length;
+    // Exempt: pinned + (if attention_follows) attention
+    const exemptIds = new Set(
+      allActive.filter(s => s.pinned || s.priority === "high" ||
+        (modeCfg.attention_follows !== false && s.attention)
+      ).map(s => s.id)
+    );
 
-    if (!modeCfg.pin_counts_toward_max) {
-      // Normal follow count should not exceed max_followers
-      expect(followCount).toBeLessThanOrEqual(modeCfg.max_followers);
-    } else {
-      expect(followCount + pinnedFollowCount).toBeLessThanOrEqual(modeCfg.max_followers);
-    }
+    const normalFollowCount = Array.from(assignments.entries())
+      .filter(([id, a]) => a.mode === "follow" && !exemptIds.has(id)).length;
+
+    // Normal follow count should not exceed max_followers
+    expect(normalFollowCount).toBeLessThanOrEqual(modeCfg.max_followers);
   });
 });

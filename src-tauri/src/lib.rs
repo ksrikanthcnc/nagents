@@ -160,35 +160,37 @@ pub fn run() {
                 .collect();
             store.set_char_pools(char_pools);
 
-            // Reload cached events from data/events/ (restore state from last run)
+            // Don't preload sessions — scanners are sole source of truth for what exists.
+            // Only load user metadata (pinned/muted/title) to apply after scanners discover sessions.
             let project_root = resolve_project_root(app);
-            reload_event_cache(&store, &project_root);
-
-            // Clear stale attention for non-idle sessions (fixes #022: missed hook clears during downtime)
-            store.clear_stale_attention();
 
             // Restore pinned/muted/title state from data/sessions.json
+            // Applied after a delay (scanners need time to discover sessions first)
             let meta = load_session_meta(&project_root);
-            if !meta.is_empty() {
-                // Enforce exclusivity: muted wins over pinned (can't be both)
-                let pinned_ids: Vec<String> = meta.iter()
-                    .filter(|(_, m)| m.pinned && !m.muted)
-                    .map(|(id, _)| id.clone()).collect();
-                let muted_ids: Vec<String> = meta.iter()
-                    .filter(|(_, m)| m.muted)
-                    .map(|(id, _)| id.clone()).collect();
-                if !pinned_ids.is_empty() { store.restore_pinned(&pinned_ids); }
-                if !muted_ids.is_empty() { store.restore_muted(&muted_ids); }
-                // Titles restored via store method
-                for (id, m) in &meta {
-                    if let Some(title) = &m.title {
-                        store.set_title(id, title);
+            let store_for_meta = store.clone();
+            let meta_project_root = project_root.clone();
+            std::thread::spawn(move || {
+                // Wait for scanners to complete first run
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                if !meta.is_empty() {
+                    let pinned_ids: Vec<String> = meta.iter()
+                        .filter(|(_, m)| m.pinned && !m.muted)
+                        .map(|(id, _)| id.clone()).collect();
+                    let muted_ids: Vec<String> = meta.iter()
+                        .filter(|(_, m)| m.muted)
+                        .map(|(id, _)| id.clone()).collect();
+                    if !pinned_ids.is_empty() { store_for_meta.restore_pinned(&pinned_ids); }
+                    if !muted_ids.is_empty() { store_for_meta.restore_muted(&muted_ids); }
+                    for (id, m) in &meta {
+                        if let Some(title) = &m.title {
+                            store_for_meta.set_title(id, title);
+                        }
                     }
+                    info!("[nagents] restored session meta: {} pinned, {} muted, {} titles",
+                        pinned_ids.len(), muted_ids.len(),
+                        meta.values().filter(|m| m.title.is_some()).count());
                 }
-                info!("[nagents] restored session meta: {} pinned, {} muted, {} titles",
-                    pinned_ids.len(), muted_ids.len(),
-                    meta.values().filter(|m| m.title.is_some()).count());
-            }
+            });
 
             // Start HTTP server for external hook pushes
             let http_port = config.get().http_port;

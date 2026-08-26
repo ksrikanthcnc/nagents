@@ -1,15 +1,16 @@
 /**
- * Waterfall Placement Tests
+ * Waterfall Placement Tests — New Priority Model
  *
- * Verifies sessions are placed into zones in order:
- *   follow (max_followers) → roam (max_roamers) → dot/revolve (max_dots) → hidden
+ * Verifies sessions are placed into zones:
+ *   follow (max_followers) → roam (max_roamers) → revolve (max_dots) → hidden
  *
- * When a zone fills up, remaining sessions spill to the next zone.
+ * With attention_follows=false (default), attention sessions compete normally.
+ * With working_mode=roam + working_counts_toward_max=false, working get free roam.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { computeModes } from "../ui/overlay/modes";
-import { makeAttentionChar, makeConfig, resetIds } from "./helpers";
+import { makeChar, makeConfig, resetIds } from "./helpers";
 
 beforeEach(() => resetIds());
 
@@ -17,51 +18,50 @@ describe("Waterfall Zone Filling", () => {
   it("sessions fill follow first, then roam, then dot, then hidden", () => {
     const cfg = makeConfig({ max_followers: 2, max_roamers: 2, max_dots: 2 });
 
-    // 7 sessions — all same priority (level 3, idle waiting)
+    // 7 idle sessions (level 2) — all go through waterfall
     const chars = Array.from({ length: 7 }, (_, i) =>
-      makeAttentionChar("idle", { status: "waiting_on_user", mtime: 1000 + i })
+      makeChar({ event: "idle", attention: false, mtime: 1000 + i })
     );
 
     const result = computeModes(chars, cfg);
-    const modes = chars.map((c) => result.get(c.sessionId)?.mode);
+    const modes = chars.map(c => result.get(c.sessionId)?.mode);
 
-    // First 2 → follow, next 2 → roam, next 2 → revolve, last → hidden
-    expect(modes.filter((m) => m === "follow")).toHaveLength(2);
-    expect(modes.filter((m) => m === "roam")).toHaveLength(2);
-    expect(modes.filter((m) => m === "revolve")).toHaveLength(2);
-    expect(modes.filter((m) => m === "hidden")).toHaveLength(1);
+    expect(modes.filter(m => m === "follow")).toHaveLength(2);
+    expect(modes.filter(m => m === "roam")).toHaveLength(2);
+    expect(modes.filter(m => m === "revolve")).toHaveLength(2);
+    expect(modes.filter(m => m === "hidden")).toHaveLength(1);
   });
 
   it("with max_followers=0, all go to roam/dot/hidden", () => {
     const cfg = makeConfig({ max_followers: 0, max_roamers: 3, max_dots: 2 });
 
     const chars = Array.from({ length: 6 }, () =>
-      makeAttentionChar("idle", { status: "waiting_on_user" })
+      makeChar({ event: "idle", attention: false })
     );
 
     const result = computeModes(chars, cfg);
-    const modes = chars.map((c) => result.get(c.sessionId)?.mode);
+    const modes = chars.map(c => result.get(c.sessionId)?.mode);
 
-    expect(modes.filter((m) => m === "follow")).toHaveLength(0);
-    expect(modes.filter((m) => m === "roam")).toHaveLength(3);
-    expect(modes.filter((m) => m === "revolve")).toHaveLength(2);
-    expect(modes.filter((m) => m === "hidden")).toHaveLength(1);
+    expect(modes.filter(m => m === "follow")).toHaveLength(0);
+    expect(modes.filter(m => m === "roam")).toHaveLength(3);
+    expect(modes.filter(m => m === "revolve")).toHaveLength(2);
+    expect(modes.filter(m => m === "hidden")).toHaveLength(1);
   });
 
-  it("with all slots=1, only 3 visible (1 follow + 1 roam + 1 dot)", () => {
+  it("with all slots=1, only 3 visible", () => {
     const cfg = makeConfig({ max_followers: 1, max_roamers: 1, max_dots: 1 });
 
     const chars = Array.from({ length: 5 }, () =>
-      makeAttentionChar("idle", { status: "waiting_on_user" })
+      makeChar({ event: "idle", attention: false })
     );
 
     const result = computeModes(chars, cfg);
-    const modes = chars.map((c) => result.get(c.sessionId)?.mode);
+    const modes = chars.map(c => result.get(c.sessionId)?.mode);
 
-    expect(modes.filter((m) => m === "follow")).toHaveLength(1);
-    expect(modes.filter((m) => m === "roam")).toHaveLength(1);
-    expect(modes.filter((m) => m === "revolve")).toHaveLength(1);
-    expect(modes.filter((m) => m === "hidden")).toHaveLength(2);
+    expect(modes.filter(m => m === "follow")).toHaveLength(1);
+    expect(modes.filter(m => m === "roam")).toHaveLength(1);
+    expect(modes.filter(m => m === "revolve")).toHaveLength(1);
+    expect(modes.filter(m => m === "hidden")).toHaveLength(2);
   });
 
   it("zero sessions returns empty map", () => {
@@ -72,7 +72,7 @@ describe("Waterfall Zone Filling", () => {
 
   it("single session gets follow", () => {
     const cfg = makeConfig({ max_followers: 2 });
-    const char = makeAttentionChar("approval");
+    const char = makeChar({ event: "approval", attention: true });
 
     const result = computeModes([char], cfg);
     expect(result.get(char.sessionId)?.mode).toBe("follow");
@@ -81,15 +81,14 @@ describe("Waterfall Zone Filling", () => {
   it("exact fit: sessions equal total slots, none hidden", () => {
     const cfg = makeConfig({ max_followers: 2, max_roamers: 2, max_dots: 2 });
 
-    // Exactly 6 sessions = 2+2+2, none should be hidden
     const chars = Array.from({ length: 6 }, () =>
-      makeAttentionChar("idle", { status: "waiting_on_user" })
+      makeChar({ event: "idle", attention: false })
     );
 
     const result = computeModes(chars, cfg);
-    const modes = chars.map((c) => result.get(c.sessionId)?.mode);
+    const modes = chars.map(c => result.get(c.sessionId)?.mode);
 
-    expect(modes.filter((m) => m === "hidden")).toHaveLength(0);
+    expect(modes.filter(m => m === "hidden")).toHaveLength(0);
   });
 });
 
@@ -97,59 +96,87 @@ describe("Overflow Scenarios", () => {
   it("overflow follow→roam when max_followers exceeded", () => {
     const cfg = makeConfig({ max_followers: 2, max_roamers: 5, max_dots: 5 });
 
-    // 3 attention sessions, only 2 follow slots
     const chars = Array.from({ length: 3 }, () =>
-      makeAttentionChar("approval")
+      makeChar({ event: "approval", attention: true }) // all level 5
     );
 
     const result = computeModes(chars, cfg);
-    const modes = chars.map((c) => result.get(c.sessionId)?.mode);
+    const modes = chars.map(c => result.get(c.sessionId)?.mode);
 
-    expect(modes.filter((m) => m === "follow")).toHaveLength(2);
-    expect(modes.filter((m) => m === "roam")).toHaveLength(1);
+    expect(modes.filter(m => m === "follow")).toHaveLength(2);
+    expect(modes.filter(m => m === "roam")).toHaveLength(1);
   });
 
   it("overflow roam→dot when max_roamers exceeded", () => {
     const cfg = makeConfig({ max_followers: 0, max_roamers: 2, max_dots: 5 });
 
     const chars = Array.from({ length: 4 }, () =>
-      makeAttentionChar("idle", { priority: "low" })
+      makeChar({ event: "idle", attention: false })
     );
 
     const result = computeModes(chars, cfg);
-    const modes = chars.map((c) => result.get(c.sessionId)?.mode);
+    const modes = chars.map(c => result.get(c.sessionId)?.mode);
 
-    expect(modes.filter((m) => m === "roam")).toHaveLength(2);
-    expect(modes.filter((m) => m === "revolve")).toHaveLength(2);
+    expect(modes.filter(m => m === "roam")).toHaveLength(2);
+    expect(modes.filter(m => m === "revolve")).toHaveLength(2);
   });
 
   it("overflow dot→hidden when max_dots exceeded", () => {
     const cfg = makeConfig({ max_followers: 0, max_roamers: 0, max_dots: 2 });
 
     const chars = Array.from({ length: 4 }, () =>
-      makeAttentionChar("idle", { priority: "low" })
+      makeChar({ event: "idle", attention: false })
     );
 
     const result = computeModes(chars, cfg);
-    const modes = chars.map((c) => result.get(c.sessionId)?.mode);
+    const modes = chars.map(c => result.get(c.sessionId)?.mode);
 
-    expect(modes.filter((m) => m === "revolve")).toHaveLength(2);
-    expect(modes.filter((m) => m === "hidden")).toHaveLength(2);
+    expect(modes.filter(m => m === "revolve")).toHaveLength(2);
+    expect(modes.filter(m => m === "hidden")).toHaveLength(2);
   });
 
   it("large session count: 20 sessions with limited slots", () => {
     const cfg = makeConfig({ max_followers: 2, max_roamers: 3, max_dots: 5 });
 
     const chars = Array.from({ length: 20 }, () =>
-      makeAttentionChar("idle", { status: "waiting_on_user" })
+      makeChar({ event: "idle", attention: false })
     );
 
     const result = computeModes(chars, cfg);
-    const modes = chars.map((c) => result.get(c.sessionId)?.mode);
+    const modes = chars.map(c => result.get(c.sessionId)?.mode);
 
-    expect(modes.filter((m) => m === "follow")).toHaveLength(2);
-    expect(modes.filter((m) => m === "roam")).toHaveLength(3);
-    expect(modes.filter((m) => m === "revolve")).toHaveLength(5);
-    expect(modes.filter((m) => m === "hidden")).toHaveLength(10);
+    expect(modes.filter(m => m === "follow")).toHaveLength(2);
+    expect(modes.filter(m => m === "roam")).toHaveLength(3);
+    expect(modes.filter(m => m === "revolve")).toHaveLength(5);
+    expect(modes.filter(m => m === "hidden")).toHaveLength(10);
+  });
+});
+
+describe("Working Sessions + Free Roam", () => {
+  it("working sessions get free roam (dont affect non-working slot counts)", () => {
+    const cfg = makeConfig({
+      max_followers: 2, max_roamers: 2, max_dots: 2,
+      working_mode: "roam", working_counts_toward_max: false,
+    });
+
+    // 3 working (free roam) + 6 idle (waterfall: 2 follow + 2 roam + 2 dot)
+    const workers = Array.from({ length: 3 }, () =>
+      makeChar({ event: "running", attention: false })
+    );
+    const idles = Array.from({ length: 6 }, () =>
+      makeChar({ event: "idle", attention: false })
+    );
+
+    const result = computeModes([...workers, ...idles], cfg);
+
+    // Workers: all free roam
+    for (const w of workers) {
+      expect(result.get(w.sessionId)?.mode).toBe("roam");
+    }
+    // Idles: waterfall 2+2+2
+    const idleModes = idles.map(c => result.get(c.sessionId)?.mode);
+    expect(idleModes.filter(m => m === "follow")).toHaveLength(2);
+    expect(idleModes.filter(m => m === "roam")).toHaveLength(2);
+    expect(idleModes.filter(m => m === "revolve")).toHaveLength(2);
   });
 });

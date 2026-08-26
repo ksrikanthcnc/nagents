@@ -1,12 +1,15 @@
 /**
- * Queue Priority Tests
+ * Queue Priority Tests — New Priority Model
  *
- * Verifies that computeModes correctly ranks sessions by priority level:
- *   Level 4: attention + event=approval/stuck (agent blocked)
- *   Level 3: attention + event=idle + normal/null priority or status=waiting_on_user
- *   Level 2: attention + event=idle + priority=low (task done)
- *   Level 1: attention + event=running/tool (working with attention)
- *   Level 0: no attention (shouldn't normally appear)
+ * Priority levels (highest first):
+ *   6: status === "waiting_on_user" (agent explicitly asked, needs you)
+ *   5: event === "approval" (tool stuck >30s, probably needs approval)
+ *   4: event === "stuck" (running >120s, might be stuck)
+ *   3: attention && event === "idle" (idle with attention)
+ *   2: event === "idle" (idle, no attention — done/normal)
+ *   1: default (null event, inactive)
+ *   0: event === "running" or "tool" (actively working, doesn't need you)
+ *  -1: muted (always last)
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -15,144 +18,149 @@ import { makeChar, makeAttentionChar, makeConfig, resetIds } from "./helpers";
 
 beforeEach(() => resetIds());
 
-describe("Priority Scoring", () => {
-  const cfg = makeConfig({ max_followers: 1, max_roamers: 1, max_dots: 1 });
+describe("Priority Level Assignment", () => {
+  const cfg = makeConfig({ max_followers: 1, max_roamers: 5, max_dots: 5 });
 
-  it("approval (level 4) beats idle-waiting (level 3)", () => {
-    const approval = makeAttentionChar("approval");
-    const waiting = makeAttentionChar("idle", { status: "waiting_on_user" });
+  it("level 6: status=waiting_on_user is highest", () => {
+    const waiting = makeChar({ status: "waiting_on_user", event: "idle", attention: true });
+    const approval = makeChar({ event: "approval", attention: true });
 
-    const result = computeModes([waiting, approval], cfg);
-
-    // approval should get the single follow slot
-    expect(result.get(approval.sessionId)?.mode).toBe("follow");
-    expect(result.get(waiting.sessionId)?.mode).toBe("roam");
-  });
-
-  it("stuck (level 4) beats idle-waiting (level 3)", () => {
-    const stuck = makeAttentionChar("stuck");
-    const waiting = makeAttentionChar("idle", { status: "waiting_on_user" });
-
-    const result = computeModes([waiting, stuck], cfg);
-
-    expect(result.get(stuck.sessionId)?.mode).toBe("follow");
-    expect(result.get(waiting.sessionId)?.mode).toBe("roam");
-  });
-
-  it("idle-waiting (level 3) beats idle-low (level 2)", () => {
-    const waiting = makeAttentionChar("idle", { status: "waiting_on_user" });
-    const low = makeAttentionChar("idle", { priority: "low" });
-
-    const result = computeModes([low, waiting], cfg);
-
+    const result = computeModes([approval, waiting], cfg);
     expect(result.get(waiting.sessionId)?.mode).toBe("follow");
-    expect(result.get(low.sessionId)?.mode).toBe("roam");
+    expect(result.get(approval.sessionId)?.mode).toBe("roam");
   });
 
-  it("idle with null priority is level 3 (not level 2)", () => {
-    const nullPriority = makeAttentionChar("idle", { priority: null });
-    const low = makeAttentionChar("idle", { priority: "low" });
+  it("level 5: event=approval beats stuck", () => {
+    const approval = makeChar({ event: "approval", attention: true });
+    const stuck = makeChar({ event: "stuck", attention: true });
 
-    const result = computeModes([low, nullPriority], cfg);
-
-    expect(result.get(nullPriority.sessionId)?.mode).toBe("follow");
-    expect(result.get(low.sessionId)?.mode).toBe("roam");
+    const result = computeModes([stuck, approval], cfg);
+    expect(result.get(approval.sessionId)?.mode).toBe("follow");
+    expect(result.get(stuck.sessionId)?.mode).toBe("roam");
   });
 
-  it("idle with priority=normal is level 3", () => {
-    const normal = makeAttentionChar("idle", { priority: "normal" });
-    const low = makeAttentionChar("idle", { priority: "low" });
+  it("level 4: event=stuck beats idle+attention", () => {
+    const stuck = makeChar({ event: "stuck", attention: true });
+    const idleAttn = makeChar({ event: "idle", attention: true });
 
-    const result = computeModes([low, normal], cfg);
-
-    expect(result.get(normal.sessionId)?.mode).toBe("follow");
-    expect(result.get(low.sessionId)?.mode).toBe("roam");
+    const result = computeModes([idleAttn, stuck], cfg);
+    expect(result.get(stuck.sessionId)?.mode).toBe("follow");
+    expect(result.get(idleAttn.sessionId)?.mode).toBe("roam");
   });
 
-  it("idle-low (level 2) beats working (level 1)", () => {
-    const low = makeAttentionChar("idle", { priority: "low" });
-    const working = makeAttentionChar("running");
+  it("level 3: idle+attention beats idle without attention", () => {
+    const idleAttn = makeChar({ event: "idle", attention: true });
+    const idleNoAttn = makeChar({ event: "idle", attention: false });
 
-    const result = computeModes([working, low], cfg);
-
-    expect(result.get(low.sessionId)?.mode).toBe("follow");
-    expect(result.get(working.sessionId)?.mode).toBe("roam");
+    const result = computeModes([idleNoAttn, idleAttn], cfg);
+    expect(result.get(idleAttn.sessionId)?.mode).toBe("follow");
+    expect(result.get(idleNoAttn.sessionId)?.mode).toBe("roam");
   });
 
-  it("working with attention (level 1) beats no-attention (level 0)", () => {
-    const working = makeAttentionChar("running");
-    const noAttention = makeChar({ attention: false, event: "idle" });
+  it("level 2: event=idle (no attention) beats null event", () => {
+    const idle = makeChar({ event: "idle", attention: false });
+    const nullEvent = makeChar({ event: null, attention: false });
 
-    const result = computeModes([noAttention, working], cfg);
-
-    expect(result.get(working.sessionId)?.mode).toBe("follow");
-    expect(result.get(noAttention.sessionId)?.mode).toBe("roam");
+    const result = computeModes([nullEvent, idle], cfg);
+    expect(result.get(idle.sessionId)?.mode).toBe("follow");
+    expect(result.get(nullEvent.sessionId)?.mode).toBe("roam");
   });
 
-  it("full priority cascade: 4 > 3 > 2 > 1 > 0 in correct order", () => {
-    // Only 1 follow slot — highest priority gets it, rest cascade
-    const cfg5 = makeConfig({ max_followers: 1, max_roamers: 1, max_dots: 1 });
+  it("level 1: null event beats running/tool", () => {
+    // working_mode=queue to prevent working skip
+    const cfgQueue = makeConfig({ max_followers: 1, max_roamers: 5, working_mode: "queue" });
+    const nullEvent = makeChar({ event: null, attention: false });
+    const running = makeChar({ event: "running", attention: false });
 
-    const level4 = makeAttentionChar("approval");
-    const level3 = makeAttentionChar("idle", { status: "waiting_on_user" });
-    const level2 = makeAttentionChar("idle", { priority: "low" });
-    const level1 = makeAttentionChar("running");
-    const level0 = makeChar({ attention: false, event: "idle" });
-
-    // Pass in reverse order to prove sorting works
-    const result = computeModes([level0, level1, level2, level3, level4], cfg5);
-
-    expect(result.get(level4.sessionId)?.mode).toBe("follow");
-    expect(result.get(level3.sessionId)?.mode).toBe("roam");
-    expect(result.get(level2.sessionId)?.mode).toBe("revolve");
-    expect(result.get(level1.sessionId)?.mode).toBe("hidden");
-    expect(result.get(level0.sessionId)?.mode).toBe("hidden");
+    const result = computeModes([running, nullEvent], cfgQueue);
+    expect(result.get(nullEvent.sessionId)?.mode).toBe("follow");
+    expect(result.get(running.sessionId)?.mode).toBe("roam");
   });
 
-  it("multiple level-4 sessions fill follow slots in order", () => {
-    const cfg2 = makeConfig({ max_followers: 2, max_roamers: 2, max_dots: 2 });
+  it("level 0: running/tool is lowest non-muted priority", () => {
+    const cfgQueue = makeConfig({ max_followers: 1, max_roamers: 5, working_mode: "queue" });
+    const running = makeChar({ event: "running", attention: false });
+    const muted = makeChar({ event: "idle", attention: true, muted: true });
 
-    const a = makeAttentionChar("approval");
-    const b = makeAttentionChar("stuck");
-    const c = makeAttentionChar("approval");
+    const result = computeModes([muted, running], cfgQueue);
+    expect(result.get(running.sessionId)?.mode).toBe("follow");
+    expect(result.get(muted.sessionId)?.mode).toBe("roam");
+  });
 
-    const result = computeModes([c, a, b], cfg2);
+  it("level -1: muted is always last regardless of event", () => {
+    const cfgQueue = makeConfig({ max_followers: 1, max_roamers: 5, working_mode: "queue" });
+    const mutedApproval = makeChar({ event: "approval", attention: true, muted: true });
+    const running = makeChar({ event: "running", attention: false });
 
-    // All are level 4 — first 2 get follow, last gets roam
-    const modes = [
-      result.get(a.sessionId)?.mode,
-      result.get(b.sessionId)?.mode,
-      result.get(c.sessionId)?.mode,
-    ];
-    expect(modes.filter((m) => m === "follow")).toHaveLength(2);
-    expect(modes.filter((m) => m === "roam")).toHaveLength(1);
+    const result = computeModes([mutedApproval, running], cfgQueue);
+    // Even though approval would be level 5, muted overrides to -1
+    expect(result.get(running.sessionId)?.mode).toBe("follow");
+    expect(result.get(mutedApproval.sessionId)?.mode).toBe("roam");
   });
 });
 
-describe("Priority Edge Cases", () => {
-  const cfg = makeConfig({ max_followers: 2, max_roamers: 2, max_dots: 2 });
+describe("Full Priority Cascade", () => {
+  it("all levels sort correctly: 6 > 5 > 4 > 3 > 2 > 1 > 0 > -1", () => {
+    const cfgQueue = makeConfig({ max_followers: 1, max_roamers: 1, max_dots: 1, working_mode: "queue" });
 
-  it("session with attention=false is level 0 regardless of event", () => {
-    const noAttn = makeChar({ attention: false, event: "approval" });
-    const attn = makeAttentionChar("idle", { priority: "low" });
+    const level6 = makeChar({ status: "waiting_on_user", event: "idle", attention: true });
+    const level5 = makeChar({ event: "approval", attention: true });
+    const level4 = makeChar({ event: "stuck", attention: true });
+    const level3 = makeChar({ event: "idle", attention: true });
+    const level2 = makeChar({ event: "idle", attention: false });
+    const level1 = makeChar({ event: null, attention: false });
+    const level0 = makeChar({ event: "running", attention: false });
+    const levelNeg = makeChar({ event: "approval", attention: true, muted: true });
 
-    const result = computeModes([noAttn, attn], cfg);
+    // Randomize input order
+    const all = [level0, levelNeg, level4, level2, level6, level1, level3, level5];
+    const result = computeModes(all, cfgQueue);
 
-    // attn (level 2) should rank higher than noAttn (level 0)
-    expect(result.get(attn.sessionId)?.mode).toBe("follow");
+    // level6 gets follow (slot 1), level5 gets roam (slot 1), level4 gets revolve (slot 1), rest hidden
+    expect(result.get(level6.sessionId)?.mode).toBe("follow");
+    expect(result.get(level5.sessionId)?.mode).toBe("roam");
+    expect(result.get(level4.sessionId)?.mode).toBe("revolve");
+    expect(result.get(level3.sessionId)?.mode).toBe("hidden");
+    expect(result.get(level2.sessionId)?.mode).toBe("hidden");
+    expect(result.get(level1.sessionId)?.mode).toBe("hidden");
+    expect(result.get(level0.sessionId)?.mode).toBe("hidden");
+    expect(result.get(levelNeg.sessionId)?.mode).toBe("hidden");
   });
 
-  it("tool event with attention is level 1 (same as running)", () => {
-    const tool = makeAttentionChar("tool");
-    const running = makeAttentionChar("running");
+  it("same priority level uses tiebreaker (LIFO by default)", () => {
+    const cfg = makeConfig({ max_followers: 1, max_roamers: 5, follower_mode: "lifo" });
+    const now = Date.now() / 1000;
 
-    // Both level 1 — should get equivalent treatment
-    const result = computeModes([tool, running], cfg);
-    const toolMode = result.get(tool.sessionId)?.mode;
-    const runMode = result.get(running.sessionId)?.mode;
+    // Both level 5 (approval), different mtime
+    const old = makeChar({ event: "approval", attention: true, mtime: now - 100 });
+    const recent = makeChar({ event: "approval", attention: true, mtime: now - 5 });
 
-    // Both should be in follow (2 slots available)
-    expect(toolMode).toBe("follow");
-    expect(runMode).toBe("follow");
+    const result = computeModes([old, recent], cfg);
+    // LIFO: most recent mtime wins
+    expect(result.get(recent.sessionId)?.mode).toBe("follow");
+    expect(result.get(old.sessionId)?.mode).toBe("roam");
+  });
+});
+
+describe("Status vs Event Priority", () => {
+  it("waiting_on_user (level 6) beats approval even if event differs", () => {
+    const cfg = makeConfig({ max_followers: 1, max_roamers: 5 });
+
+    // waiting_on_user can come with any event
+    const waiting = makeChar({ status: "waiting_on_user", event: "running", attention: true });
+    const approval = makeChar({ event: "approval", attention: true });
+
+    const result = computeModes([approval, waiting], cfg);
+    expect(result.get(waiting.sessionId)?.mode).toBe("follow");
+  });
+
+  it("waiting_on_user without attention still gets level 6", () => {
+    const cfg = makeConfig({ max_followers: 1, max_roamers: 5 });
+
+    const waiting = makeChar({ status: "waiting_on_user", event: "idle", attention: false });
+    const idleAttn = makeChar({ event: "idle", attention: true }); // level 3
+
+    const result = computeModes([idleAttn, waiting], cfg);
+    expect(result.get(waiting.sessionId)?.mode).toBe("follow");
   });
 });

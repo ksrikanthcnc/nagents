@@ -1,75 +1,58 @@
 /**
- * State Transition Tests
+ * State Transition Tests — New Priority Model
  *
- * Tests for issues discovered during testing:
- * 1. Pin→unpin: formerly pinned session should respect max_followers after unpin
- * 2. Muted sessions should not get follow mode (prevents overlay/panel desync)
- *
- * These verify that mode assignments are correct when state changes between calls.
+ * Tests pin/unpin, mute/unmute transitions and verifies computeModes
+ * handles state changes correctly between calls.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { computeModes } from "../ui/overlay/modes";
-import { makeChar, makeAttentionChar, makeConfig, resetIds } from "./helpers";
+import { makeChar, makeConfig, resetIds } from "./helpers";
 
 beforeEach(() => resetIds());
 
 describe("Pin → Unpin Transition", () => {
-  it("unpinning a session respects max_followers on next computation", () => {
-    const cfg = makeConfig({ max_followers: 2, max_roamers: 3, max_dots: 3 });
+  it("unpinning respects max_followers on next computation", () => {
+    const cfg = makeConfig({ max_followers: 2, max_roamers: 3 });
 
-    // State 1: 2 pinned + 2 normal attention sessions = 4 followers total
-    const p1 = makeChar({ pinned: true, attention: true, event: "idle", status: "waiting_on_user" });
-    const p2 = makeChar({ pinned: true, attention: true, event: "idle", status: "waiting_on_user" });
-    const n1 = makeAttentionChar("approval");
-    const n2 = makeAttentionChar("stuck");
+    // State 1: 2 pinned + 2 normal = 4 followers total (pinned exempt)
+    const p1 = makeChar({ pinned: true, event: "idle" });
+    const p2 = makeChar({ pinned: true, event: "idle" });
+    const n1 = makeChar({ event: "approval", attention: true }); // level 5
+    const n2 = makeChar({ event: "stuck", attention: true }); // level 4
 
     const result1 = computeModes([p1, p2, n1, n2], cfg);
-    // Pinned exempt: all 4 should be following
     expect(result1.get(p1.sessionId)?.mode).toBe("follow");
     expect(result1.get(p2.sessionId)?.mode).toBe("follow");
     expect(result1.get(n1.sessionId)?.mode).toBe("follow");
     expect(result1.get(n2.sessionId)?.mode).toBe("follow");
 
-    // State 2: unpin p2 → now only 1 pinned, but p2 becomes normal with attention
+    // State 2: unpin p2 → now normal, competes for 2 follow slots
     p2.session.pinned = false;
     const result2 = computeModes([p1, p2, n1, n2], cfg);
 
     // p1 still pinned → follow (exempt)
     expect(result2.get(p1.sessionId)?.mode).toBe("follow");
-    // Only 2 follow slots for normal (max_followers=2)
-    // 3 normal sessions competing: p2, n1, n2
-    const normalModes = [
-      result2.get(p2.sessionId)?.mode,
-      result2.get(n1.sessionId)?.mode,
-      result2.get(n2.sessionId)?.mode,
-    ];
-    // At most 2 should be "follow", 1 should be "roam"
-    expect(normalModes.filter((m) => m === "follow")).toHaveLength(2);
-    expect(normalModes.filter((m) => m === "roam")).toHaveLength(1);
-    // Total followers: 1 pinned + 2 normal = 3 (not 4!)
+    // 3 normal competing for 2 slots: n1(level5) > n2(level4) > p2(level2 idle)
+    expect(result2.get(n1.sessionId)?.mode).toBe("follow");
+    expect(result2.get(n2.sessionId)?.mode).toBe("follow");
+    expect(result2.get(p2.sessionId)?.mode).toBe("roam");
   });
 
-  it("pin_counts_toward_max: unpin frees a slot for normal sessions", () => {
+  it("pin_counts_toward_max: unpin frees a slot", () => {
     const cfg = makeConfig({ max_followers: 2, max_roamers: 3, pin_counts_toward_max: true });
 
-    // State 1: 2 pinned consume all follow slots, normal session in roam
-    const p1 = makeChar({ pinned: true, attention: true, event: "idle" });
-    const p2 = makeChar({ pinned: true, attention: true, event: "idle" });
-    const n1 = makeAttentionChar("approval");
+    const p1 = makeChar({ pinned: true, event: "idle" });
+    const p2 = makeChar({ pinned: true, event: "idle" });
+    const n1 = makeChar({ event: "approval", attention: true });
 
     const result1 = computeModes([p1, p2, n1], cfg);
-    expect(result1.get(p1.sessionId)?.mode).toBe("follow");
-    expect(result1.get(p2.sessionId)?.mode).toBe("follow");
-    // With pin_counts_toward_max, 2 pinned = 0 follow slots left
-    expect(result1.get(n1.sessionId)?.mode).toBe("roam");
+    expect(result1.get(n1.sessionId)?.mode).toBe("roam"); // no follow slots left
 
-    // State 2: unpin p2 → frees a slot
     p2.session.pinned = false;
     const result2 = computeModes([p1, p2, n1], cfg);
-    expect(result2.get(p1.sessionId)?.mode).toBe("follow"); // still pinned
-    // Now 1 pinned = 1 follow slot available for normal
-    // Both p2 (now normal) and n1 compete — n1 has higher priority (approval > idle)
+    expect(result2.get(p1.sessionId)?.mode).toBe("follow");
+    // Now 1 slot available: n1(level5) beats p2(level2)
     expect(result2.get(n1.sessionId)?.mode).toBe("follow");
     expect(result2.get(p2.sessionId)?.mode).toBe("roam");
   });
@@ -77,74 +60,110 @@ describe("Pin → Unpin Transition", () => {
   it("rapid pin/unpin: final state is authoritative", () => {
     const cfg = makeConfig({ max_followers: 1, max_roamers: 3 });
 
-    const session = makeChar({ pinned: false, attention: true, event: "approval" });
-    const other = makeAttentionChar("idle", { status: "waiting_on_user" });
+    const session = makeChar({ pinned: false, event: "approval", attention: true });
+    const other = makeChar({ event: "idle", attention: false }); // level 2
 
-    // Initially not pinned: session gets follow (higher priority)
+    // Not pinned: session(level5) gets follow over other(level2)
     const r1 = computeModes([session, other], cfg);
     expect(r1.get(session.sessionId)?.mode).toBe("follow");
 
-    // Pin it → still follow (but as pinned, exempt)
+    // Pin it → still follow (exempt)
     session.session.pinned = true;
     const r2 = computeModes([session, other], cfg);
     expect(r2.get(session.sessionId)?.mode).toBe("follow");
-    expect(r2.get(other.sessionId)?.mode).toBe("follow"); // slot freed for other
+    // other gets the normal follow slot now
+    expect(r2.get(other.sessionId)?.mode).toBe("follow");
 
-    // Unpin it → back to normal waterfall
+    // Unpin → back to normal
     session.session.pinned = false;
     const r3 = computeModes([session, other], cfg);
-    // Only 1 follow slot for normal now. session (level 4) beats other (level 3)
+    // session(level5) beats other(level2)
     expect(r3.get(session.sessionId)?.mode).toBe("follow");
     expect(r3.get(other.sessionId)?.mode).toBe("roam");
   });
 });
 
-describe("Muted + Overlay/Panel Sync", () => {
-  it("muted session should NOT get follow when competing with unmuted sessions", () => {
-    const cfg = makeConfig({ max_followers: 2, max_roamers: 3, max_dots: 3 });
-
-    const unmuted1 = makeAttentionChar("approval"); // level 4
-    const unmuted2 = makeAttentionChar("idle", { status: "waiting_on_user" }); // level 3
-    const muted = makeChar({ muted: true, attention: true, event: "approval" }); // priority -1
-
-    const result = computeModes([muted, unmuted1, unmuted2], cfg);
-
-    // Unmuted sessions take the follow slots
-    expect(result.get(unmuted1.sessionId)?.mode).toBe("follow");
-    expect(result.get(unmuted2.sessionId)?.mode).toBe("follow");
-    // Muted goes to roam (not follow!) — sorted last by priority -1
-    expect(result.get(muted.sessionId)?.mode).toBe("roam");
-  });
-
-  it("muted alone gets follow (lowest priority but slots available)", () => {
-    // Muted = lowest priority, but still participates in waterfall.
-    // If follow slots are open, muted can use them.
-    const cfg = makeConfig({ max_followers: 2, max_roamers: 3 });
-    const muted = makeChar({ muted: true, attention: true, event: "idle" });
-
-    const result = computeModes([muted], cfg);
-
-    expect(result.get(muted.sessionId)?.mode).toBe("follow");
-  });
-
-  it("muting a following session should move it out of follow on recomputation", () => {
+describe("Mute/Unmute Transitions", () => {
+  it("muting a session demotes it (unmuted sessions promote)", () => {
     const cfg = makeConfig({ max_followers: 2, max_roamers: 3 });
 
-    const s1 = makeAttentionChar("approval");
-    const s2 = makeAttentionChar("stuck");
-    const s3 = makeAttentionChar("idle", { status: "waiting_on_user" });
+    const s1 = makeChar({ event: "approval", attention: true }); // level 5
+    const s2 = makeChar({ event: "stuck", attention: true }); // level 4
+    const s3 = makeChar({ event: "idle", attention: true }); // level 3
 
-    // State 1: s1 and s2 follow (level 4), s3 roams (level 3)
+    // State 1: s1+s2 follow, s3 roams
     const r1 = computeModes([s1, s2, s3], cfg);
     expect(r1.get(s1.sessionId)?.mode).toBe("follow");
     expect(r1.get(s2.sessionId)?.mode).toBe("follow");
     expect(r1.get(s3.sessionId)?.mode).toBe("roam");
 
-    // State 2: mute s2 → should drop to roam, s3 promotes to follow
+    // State 2: mute s2 → drops to -1, s3 promotes
     s2.session.muted = true;
     const r2 = computeModes([s1, s2, s3], cfg);
-    expect(r2.get(s1.sessionId)?.mode).toBe("follow"); // unchanged
-    expect(r2.get(s3.sessionId)?.mode).toBe("follow"); // promoted!
-    expect(r2.get(s2.sessionId)?.mode).toBe("roam"); // muted → demoted
+    expect(r2.get(s1.sessionId)?.mode).toBe("follow");
+    expect(r2.get(s3.sessionId)?.mode).toBe("follow"); // promoted
+    expect(r2.get(s2.sessionId)?.mode).toBe("roam"); // demoted
+  });
+
+  it("unmuting restores normal priority", () => {
+    const cfg = makeConfig({ max_followers: 1, max_roamers: 5 });
+
+    const s1 = makeChar({ event: "idle", attention: false, muted: true }); // muted: -1
+    const s2 = makeChar({ event: "idle", attention: false }); // level 2
+
+    const r1 = computeModes([s1, s2], cfg);
+    expect(r1.get(s2.sessionId)?.mode).toBe("follow"); // s2 wins
+    expect(r1.get(s1.sessionId)?.mode).toBe("roam"); // muted last
+
+    // Unmute s1 → now both level 2, tiebreak decides
+    s1.session.muted = false;
+    const r2 = computeModes([s1, s2], cfg);
+    // Both level 2, one gets follow, one gets roam (deterministic by tiebreak)
+    const modes = [r2.get(s1.sessionId)?.mode, r2.get(s2.sessionId)?.mode].sort();
+    expect(modes).toEqual(["follow", "roam"]);
+  });
+});
+
+describe("Event Transitions", () => {
+  it("idle → running: session moves from follow to roam (working_mode=roam)", () => {
+    const cfg = makeConfig({ max_followers: 2, max_roamers: 3, working_mode: "roam" });
+
+    const session = makeChar({ event: "idle", attention: false }); // level 2 → follow
+
+    const r1 = computeModes([session], cfg);
+    expect(r1.get(session.sessionId)?.mode).toBe("follow");
+
+    // Starts working → becomes working, skips follow
+    session.session.event = "running";
+    const r2 = computeModes([session], cfg);
+    expect(r2.get(session.sessionId)?.mode).toBe("roam");
+  });
+
+  it("running → approval: session moves from roam to follow", () => {
+    const cfg = makeConfig({ max_followers: 2, max_roamers: 3, working_mode: "roam" });
+
+    const session = makeChar({ event: "running", attention: false }); // working → roam
+
+    const r1 = computeModes([session], cfg);
+    expect(r1.get(session.sessionId)?.mode).toBe("roam");
+
+    // Gets stuck → approval event
+    session.session.event = "approval";
+    session.session.attention = true;
+    const r2 = computeModes([session], cfg);
+    // No longer isWorking (attention=true), level 5 → follow
+    expect(r2.get(session.sessionId)?.mode).toBe("follow");
+  });
+
+  it("waiting_on_user always gets highest priority regardless of event", () => {
+    const cfg = makeConfig({ max_followers: 1, max_roamers: 5 });
+
+    const waiting = makeChar({ status: "waiting_on_user", event: "idle", attention: false });
+    const approval = makeChar({ event: "approval", attention: true }); // level 5
+
+    const result = computeModes([approval, waiting], cfg);
+    // waiting_on_user (level 6) beats approval (level 5)
+    expect(result.get(waiting.sessionId)?.mode).toBe("follow");
+    expect(result.get(approval.sessionId)?.mode).toBe("roam");
   });
 });

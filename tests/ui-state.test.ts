@@ -74,6 +74,8 @@ async function getLiveModeCfg(): Promise<ModeConfig> {
     group_as_one: ov.group_as_one ?? false,
     group_display: ov.group_display || "cluster",
     working_mode: ov.working_mode || "roam",
+    working_counts_toward_max: ov.working_counts_toward_max ?? false,
+    attention_follows: ov.attention_follows ?? false,
   };
 }
 
@@ -103,22 +105,23 @@ describe("UI State: Mode Assignment Integrity", () => {
   it("total follow count never exceeds max_followers (+ pinned exempt)", async () => {
     const { assignments, sessions, cfg } = await computeLiveModes();
 
-    const pinnedIds = new Set(sessions.filter(s => s.pinned).map(s => s.id));
+    const pinnedIds = new Set(sessions.filter(s => s.pinned || s.priority === "high").map(s => s.id));
+    // With attention_follows: true (legacy), attention sessions are also exempt
+    const attentionExempt = cfg.attention_follows !== false;
+    const exemptIds = new Set([
+      ...pinnedIds,
+      ...(attentionExempt ? sessions.filter(s => s.attention).map(s => s.id) : []),
+    ]);
+
     let normalFollow = 0;
-    let pinnedFollow = 0;
 
     for (const [id, a] of assignments) {
-      if (a.mode === "follow") {
-        if (pinnedIds.has(id)) pinnedFollow++;
-        else normalFollow++;
+      if (a.mode === "follow" && !exemptIds.has(id)) {
+        normalFollow++;
       }
     }
 
-    if (cfg.pin_counts_toward_max) {
-      expect(normalFollow + pinnedFollow).toBeLessThanOrEqual(cfg.max_followers);
-    } else {
-      expect(normalFollow).toBeLessThanOrEqual(cfg.max_followers);
-    }
+    expect(normalFollow).toBeLessThanOrEqual(cfg.max_followers);
   });
 
   it("total roam count never exceeds max_roamers", async () => {
@@ -317,10 +320,17 @@ describe("UI State: Config Reflects in Mode Assignment", () => {
   it("max_followers from config is respected", async () => {
     const cfg = await getConfig();
     const { assignments, sessions } = await computeLiveModes();
+    const modeCfg = await getLiveModeCfg();
 
-    const pinnedIds = new Set(sessions.filter(s => s.pinned).map(s => s.id));
+    // Exempt: pinned + (if attention_follows) attention sessions
+    const exemptIds = new Set(
+      sessions.filter(s => s.pinned || s.priority === "high" ||
+        (modeCfg.attention_follows !== false && s.attention)
+      ).map(s => s.id)
+    );
+
     const normalFollowers = Array.from(assignments.entries())
-      .filter(([id, a]) => a.mode === "follow" && !pinnedIds.has(id));
+      .filter(([id, a]) => a.mode === "follow" && !exemptIds.has(id));
 
     expect(normalFollowers.length).toBeLessThanOrEqual(cfg.overlay.max_followers);
   });

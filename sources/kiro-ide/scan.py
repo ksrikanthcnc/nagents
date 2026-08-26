@@ -60,6 +60,23 @@ def discover() -> list[dict]:
     return sessions
 
 
+STALE_THRESHOLD_SEC = 3600 * 24  # 24h
+
+
+def is_session_fresh(session_id: str) -> bool:
+    """Check if a session has recent activity (messages.jsonl modified within threshold)."""
+    # Search all hash dirs for this session's messages.jsonl
+    for hash_dir in (HOME / ".kiro/sessions").iterdir():
+        if not hash_dir.is_dir() or hash_dir.name == "cli":
+            continue
+        msg_file = hash_dir / session_id / "messages.jsonl"
+        if msg_file.exists():
+            age = time.time() - msg_file.stat().st_mtime
+            return age < STALE_THRESHOLD_SEC
+    # No messages file found — might be brand new, allow it
+    return True
+
+
 def get_open_workspace_dirs() -> list[Path]:
     """Read windowsState from global storage to find open workspaces."""
     if not GLOBAL_STORAGE.exists():

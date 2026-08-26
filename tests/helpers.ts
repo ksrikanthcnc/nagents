@@ -67,15 +67,15 @@ export function makeChar(
 }
 
 /**
- * Build a CharState with attention + specific event/priority combo.
+ * Build a CharState with specific event/status/priority combo.
  * Shorthand for common test patterns.
  */
 export function makeAttentionChar(
   event: string,
-  opts: { priority?: string | null; status?: string | null; mtime?: number; last_user_ts?: number | null } = {}
+  opts: { priority?: string | null; status?: string | null; mtime?: number; last_user_ts?: number | null; attention?: boolean } = {}
 ): CharState {
   return makeChar({
-    attention: true,
+    attention: opts.attention ?? true,
     event,
     priority: opts.priority ?? null,
     status: opts.status ?? null,
