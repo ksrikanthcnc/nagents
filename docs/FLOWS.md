@@ -7,10 +7,10 @@ Detailed documentation of all data pipelines in the nagents system.
 The primary path for real-time session updates. Triggered on every Kiro agent action.
 
 ```
-Kiro Agent Action (PreToolUse / PostToolUse / Stop / UserPromptSubmit)
+Kiro Agent Action
+(PreToolUse / PostToolUse / Stop / UserPromptSubmit)
         │
-        │ Kiro fires hook (from ~/.kiro/hooks/nagents.json)
-        │ Payload: {session_id, hook_event_name, tool_name, tool_input, tool_response, prompt}
+        │ Hook fires (stdin JSON)
         ▼
 ┌─────────────────────────────────────────────┐
 │ hook-dispatch.py                              │
