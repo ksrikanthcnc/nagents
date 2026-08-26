@@ -38,3 +38,6 @@ logs/
 
 # Local config override (user-specific, not committed)
 config.local.yaml
+.haive.pid
+.haive.log
+logs/
