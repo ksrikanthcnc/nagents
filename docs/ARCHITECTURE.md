@@ -406,26 +406,26 @@ Main window close
 1. Load config.yaml + config.local.yaml (merged)
 2. Start fs watcher on both config files
 3. Create SessionStore, set character pools from config
-4. If downtime < 1 hour:
-   a. Load data/sessions.json (full session state)
-   b. Overlay recent events from data/events/*.jsonl
-5. Clear stale attention (sessions stuck in non-idle with attention=true)
-6. Restore pinned/muted/title meta from data/sessions.json
-7. Start HTTP server on :3335
-8. Start scanner orchestrator (spawns Python per source interval)
-9. Start attention loop (compute every 5s)
-10. Create overlay window (after 5s delay for Vite dev server)
-11. Register Tauri managed state + invoke handlers
+4. Start HTTP server on :3335
+5. Start scanner orchestrator (spawns Python per source interval)
+   — Scanners are the sole source of truth for session existence
+6. Start attention loop (compute every 5s)
+7. After scanners populate sessions:
+   a. Read data/sessions.json for metadata
+   b. Apply pinned/muted/title to matching sessions
+8. Clear stale attention (sessions stuck in non-idle with attention=true)
+9. Create overlay window (after 5s delay for Vite dev server)
+10. Register Tauri managed state + invoke handlers
 ```
 
-### Event Cache (data/events/)
+### Event Log (data/events/)
 
 ```
 data/events/ide-abc12345.jsonl   ← one file per session
 data/events/cli2-def67890.jsonl  ← append-only, one JSON object per line
 ```
 
-Each line is a full EventUpdate with timestamp. On startup, recent events (within 1 hour of close) are replayed to restore hook-owned fields. Files are append-only during runtime.
+Each line is a full EventUpdate with timestamp. These are debug/audit logs only — NOT used for startup recovery. Scanners re-discover sessions fresh on every restart. Files are append-only during runtime.
 
 ---
 
@@ -512,7 +512,7 @@ Deep-merges into `config.local.yaml`, triggering hot-reload via fs watcher.
 - No framework overhead (vanilla TS, ~zero allocations in render loop).
 - Satellite elements reused (keyed by `parentId-index`).
 - Character SVGs: raw strings, injected once per element creation.
-- Event cache: append-only JSONL files, loaded once on startup.
+- Event log: append-only JSONL files (debug only, not loaded on startup).
 
 ### Network
 - All HTTP is localhost (127.0.0.1:3335) — no network latency.

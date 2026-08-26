@@ -315,7 +315,7 @@ nagents/
 ## Testing
 
 ```bash
-npm test                  # 102 tests (modes, priority, waterfall, groups, freq, transitions)
+npm test                  # 136 tests (modes, priority, waterfall, groups, freq, transitions)
 npm run test:watch        # Watch mode
 
 # Integration (requires running server)
