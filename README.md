@@ -1,8 +1,12 @@
 # Nagents (nagents)
 
-A macOS desktop overlay that visualizes AI agent sessions as animated characters. Characters follow your cursor, roam your screen, orbit as dots, or hide — all based on which agents need your attention and which are happily working away.
+A desktop overlay that visualizes AI agent sessions as animated characters. Characters follow your cursor, roam your screen, orbit as dots, or hide — all based on which agents need your attention and which are happily working away.
 
 Built for monitoring multiple Kiro IDE, CLI, and Crew sessions simultaneously without context-switching to check their status.
+
+**Tested on:** macOS (primary), Kiro IDE v1+. Cross-platform via Tauri 2 (Windows/Linux should work but untested).
+
+**[Live Demo](https://ksrikanthcnc.github.io/nagents/)** — try the overlay in your browser, no install needed.
 
 ---
 
@@ -243,7 +247,7 @@ Zero runtime JS dependencies. Only `@tauri-apps/api`, TypeScript, Vite, and Vite
 
 ### Prerequisites
 
-- macOS (primary platform; Windows/Linux partial)
+- macOS, Windows, or Linux (tested on macOS)
 - Rust toolchain (`rustup`)
 - Node.js 18+ with npm
 - Python 3.10+
@@ -252,11 +256,42 @@ Zero runtime JS dependencies. Only `@tauri-apps/api`, TypeScript, Vite, and Vite
 ### Development
 
 ```bash
-npm install
-./start.sh             # tmux-managed dev session (Vite + Cargo + Tauri)
-./start.sh status      # check if running
-./start.sh stop        # kill everything
-./start.sh logs        # attach to tmux
+npm install                # Install JS deps (first time only)
+./start.sh                 # Start everything in tmux
+./start.sh status          # Check if running
+./start.sh stop            # Kill everything
+./start.sh logs            # Attach to tmux (see Rust + Vite logs)
+```
+
+`start.sh` launches three processes in a tmux session:
+- **Vite** dev server on `:5180` (hot-reload for TypeScript/CSS changes — instant)
+- **Cargo** builds and runs the Rust backend (HTTP server on `:3335`, scanners, attention loop)
+- **Tauri** creates native windows (panel, overlay, BSB) connected to Vite
+
+**Workflow:**
+- Edit `ui/**/*.ts` or `*.css` → Vite hot-reloads the frontend instantly (no restart)
+- Edit `config.yaml` → Rust detects change, emits event, all windows update in <1s
+- Edit `src-tauri/src/*.rs` → Cargo recompiles (~5s), Tauri restarts the app
+- Edit `sources/*.py` → Takes effect on next scanner interval (or trigger a hook manually)
+
+**Useful during development:**
+```bash
+# Force all scanners to run now (don't wait for interval)
+curl http://127.0.0.1:3335/scan
+
+# Push a fake test session
+curl http://127.0.0.1:3335/test/start
+
+# Clear test sessions
+curl http://127.0.0.1:3335/test/clear
+
+# Check current state
+curl http://127.0.0.1:3335/state | python3 -m json.tool
+
+# Push a manual event
+curl -X POST http://127.0.0.1:3335/event \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"test-001","event":"tool","tool":"execute_bash"}'
 ```
 
 ### Build
@@ -265,54 +300,7 @@ npm install
 npm run tauri:build    # .dmg/.app in src-tauri/target/release/bundle/
 ```
 
-### Hook Installation
-
-```bash
-# Place hook config at ~/.kiro/hooks/nagents.json
-# Triggers: PreToolUse, PostToolUse, Stop, UserPromptSubmit
-# Command: python3 /path/to/nagents/sources/hook-dispatch.py
-```
-
----
-
-## Project Structure
-
-```
-nagents/
-├── src-tauri/src/          # Rust backend
-│   ├── lib.rs              # App orchestrator + persistence
-│   ├── server.rs           # HTTP API (12 endpoints)
-│   ├── state.rs            # Session store + event merge
-│   ├── config.rs           # YAML loading + hot-reload
-│   ├── attention.rs        # Time-based attention loop
-│   ├── scanner.rs          # External process orchestrator
-│   ├── overlay.rs          # Window lifecycle
-│   └── cursor.rs           # Platform cursor FFI
-├── ui/                     # TypeScript frontend (4 windows)
-│   ├── overlay/            # Physics, modes, rendering, satellites, connections
-│   ├── panel/              # Control center
-│   ├── bsb/               # Battery Saver Box
-│   ├── settings/           # Auto-generated settings form
-│   ├── shared/             # Bridge, types, config-schema
-│   └── characters/         # Pluggable character system (13 built-in)
-├── sources/                # Python hooks + scanners
-│   ├── hook-dispatch.py    # Session classifier + router
-│   ├── kiro_translate.py   # Event translation (shared)
-│   ├── kiro-ide/           # IDE scanner + hook
-│   ├── kiro-cli-v3/        # CLI v3 scanner + hook
-│   ├── kiro-cli-v2/        # CLI v2 scanner + hook
-│   └── kiro-crew/          # Crew scanner (no hook)
-├── tests/                  # Vitest (modes, priority, waterfall, groups)
-├── data/                   # Runtime state (sessions.json, events/*.jsonl)
-├── docs/                   # ARCHITECTURE, FLOWS, API, SOURCE_CONTRACT, etc.
-├── config.yaml             # Base config (committed)
-├── config.local.yaml       # Local overrides (gitignored)
-└── demo/                   # Static GitHub Pages demo
-```
-
----
-
-## Testing
+### Testing
 
 ```bash
 npm test                  # 136 tests (modes, priority, waterfall, groups, freq, transitions)
@@ -329,26 +317,211 @@ python3 test-lifecycle.py # Full lifecycle demo (7 sessions, all transitions)
 
 Test files cover: priority levels, waterfall placement, working mode, tie-breaking (all 6 strategies), pin/mute behavior, group merging (single + cluster), state transitions, and live server integration.
 
+**Writing new tests:** Tests live in `tests/`. Import `makeChar`, `makeConfig`, `makeSession` from `tests/helpers.ts` for factory functions. The mode system is pure logic (no DOM) so it's straightforward to unit test.
+
 ---
 
 ## Extending
 
-### Adding a Source
+### Configuring Hooks
 
-1. Write `sources/<name>/scan.py` (outputs JSON session array to stdout)
-2. Optionally write `sources/<name>/hook.py` (receives stdin, POSTs to `/event`)
-3. Add to `config.yaml` under `sources:`
+Nagents receives real-time events via Kiro hooks. Place a hook file at `~/.kiro/hooks/nagents.json`:
 
-See [docs/SOURCE_CONTRACT.md](docs/SOURCE_CONTRACT.md) for the schema.
+```json
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "nagents: user prompt",
+      "trigger": "UserPromptSubmit",
+      "action": { "type": "command", "command": "python3 /path/to/nagents/sources/hook-dispatch.py" },
+      "timeout": 5
+    },
+    {
+      "name": "nagents: tool start",
+      "trigger": "PreToolUse",
+      "action": { "type": "command", "command": "python3 /path/to/nagents/sources/hook-dispatch.py" },
+      "timeout": 5
+    },
+    {
+      "name": "nagents: tool done",
+      "trigger": "PostToolUse",
+      "action": { "type": "command", "command": "python3 /path/to/nagents/sources/hook-dispatch.py" },
+      "timeout": 5
+    },
+    {
+      "name": "nagents: agent done",
+      "trigger": "Stop",
+      "action": { "type": "command", "command": "python3 /path/to/nagents/sources/hook-dispatch.py" },
+      "timeout": 5
+    }
+  ]
+}
+```
 
-### Adding a Character
+Replace `/path/to/nagents/` with the actual project path. All four triggers go to the same dispatcher — it classifies the session and routes internally.
 
-1. Create `ui/characters/<id>/` with SVG, `animations.css`, `manifest.ts`
-2. Import + register in `ui/characters/registry.ts`
+### Adding a New Source
 
-No other changes needed — panel picker and overlay renderer auto-discover registered characters.
+A **source** is any executable that discovers agent sessions. Write it in any language.
 
-See [docs/CHARACTER_CONTRACT.md](docs/CHARACTER_CONTRACT.md) for SVG conventions and action interface.
+**Step 1: Create the scanner** — `sources/<name>/scan.py`
+
+The scanner runs periodically and prints a JSON array of sessions to stdout:
+
+```python
+#!/usr/bin/env python3
+import json
+
+sessions = [
+    {
+        "id": "mysrc-abc12345",      # Unique, prefixed by source
+        "source": "my-source",       # Must match config key
+        "name": "My Session",        # Display name (max 50 chars)
+        "workspace": "~/project",    # Workspace path
+        "group": "project",          # Panel grouping
+        "active": True,              # Session exists?
+        "tokens": 50000,             # Context usage
+        "maxTokens": 200000,         # Max context window
+        "mtime": 1723987200.5,       # Last activity (epoch)
+    }
+]
+print(json.dumps(sessions))
+```
+
+**Step 2: Add to config.yaml**
+
+```yaml
+sources:
+  my-source:
+    scanner: "python3 sources/my-source/scan.py"
+    interval_sec: 30        # How often to scan
+    hook: true              # Does this source also push hooks?
+    enabled: true
+```
+
+**Step 3 (optional): Create a hook handler** — `sources/<name>/hook.py`
+
+If your source also pushes real-time events (not just periodic scans):
+
+```python
+#!/usr/bin/env python3
+import json, sys, urllib.request
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from kiro_translate import translate
+
+payload = json.loads(sys.stdin.read())
+trigger = payload.get("hook_event_name", "")
+session_id = f"mysrc-{payload['session_id'][:8]}"
+
+update = translate(trigger, payload, session_id)
+if update:
+    data = json.dumps(update).encode()
+    req = urllib.request.Request(
+        "http://127.0.0.1:3335/event",
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+    urllib.request.urlopen(req, timeout=3)
+```
+
+**Step 4: Assign characters**
+
+```yaml
+characters:
+  my-source: ghost,robot,cat    # Comma-separated pool
+```
+
+New sessions from this source get a random character from its pool.
+
+See [docs/SOURCE_CONTRACT.md](docs/SOURCE_CONTRACT.md) for the full schema (all fields, field ownership, GC behavior).
+
+Also see:
+- [sources/README.md](sources/README.md) — Overview of all source scanners
+- [sources/kiro-ide/README.md](sources/kiro-ide/README.md) — IDE source implementation details
+- [sources/kiro-crew/README.md](sources/kiro-crew/README.md) — Crew source implementation details
+
+### Adding a New Character
+
+Characters are self-contained plugins — no core code changes needed.
+
+**Step 1: Create the folder**
+
+```
+ui/characters/<id>/
+├── <id>.svg          # Artwork (viewBox 64x64)
+├── manifest.ts       # CharacterDef implementation
+└── animations.css    # CSS keyframes per action
+```
+
+**Step 2: Write the SVG**
+
+- ViewBox: `0 0 64 64` (or up to 56x72)
+- Add class names on parts to animate: `.eye`, `.body`, `.tail`, `.mouth`
+- No external deps (`<use>`, linked images, etc.)
+- Keep simple — renders at 28-44px
+
+**Step 3: Create manifest.ts**
+
+```typescript
+import type { CharacterDef } from "../types";
+import svg from "./<id>.svg?raw";
+
+export const <id>: CharacterDef = {
+  id: "<id>",
+  name: "Display Name",
+  description: "Short description for panel tooltip.",
+  svg,
+  actions: {
+    idle:      { cssClass: "<id>-idle" },
+    walk:      { cssClass: "<id>-walk" },
+    alert:     { cssClass: "<id>-alert" },
+    think:     { cssClass: "<id>-think" },
+    sleep:     { cssClass: "<id>-sleep" },
+    celebrate: { cssClass: "<id>-celebrate", loop: false },
+  },
+};
+```
+
+**Step 4: Write animations.css**
+
+```css
+/* idle — subtle breathing */
+.<id>-idle .body {
+  animation: <id>-breathe 3s ease-in-out infinite;
+}
+@keyframes <id>-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.03); }
+}
+
+/* alert — shake */
+.<id>-alert .body {
+  animation: <id>-shake 0.4s ease-in-out infinite;
+}
+@keyframes <id>-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+```
+
+**Step 5: Register**
+
+In `ui/characters/registry.ts`:
+
+```typescript
+import { mychar } from "./mychar/manifest";
+
+const CHARACTERS: CharacterDef[] = [
+  // ... existing chars ...
+  mychar,
+];
+```
+
+That's it. The panel character picker and overlay renderer auto-discover all registered characters.
+
+See [docs/CHARACTER_CONTRACT.md](docs/CHARACTER_CONTRACT.md) for full SVG conventions and all available actions.
 
 ---
 
@@ -370,7 +543,7 @@ See [docs/CHARACTER_CONTRACT.md](docs/CHARACTER_CONTRACT.md) for SVG conventions
 
 See [BUGS.md](BUGS.md) for the full list. Key notes:
 
-- **Platform**: macOS fully functional. Windows cursor works but untested e2e. Linux falls back to xdotool (no Wayland).
+- **Platform**: Tested on macOS. Windows/Linux should work via Tauri 2 but untested. Linux cursor falls back to xdotool (no Wayland yet).
 - **Test gaps**: Mode system well-tested; scanner/hook/attention/physics rely on manual testing.
 - **Dead code**: Minimal — mostly deprecated functions explicitly marked.
 
@@ -379,3 +552,7 @@ See [BUGS.md](BUGS.md) for the full list. Key notes:
 ## License
 
 Private project.
+
+---
+
+Built with [Kiro](https://kiro.dev).
