@@ -93,6 +93,53 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // macOS: Accessory policy — shows over fullscreen apps, removes Dock icon
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            // Tray icon (since Dock icon is hidden)
+            use tauri::tray::TrayIconBuilder;
+            use tauri::menu::{MenuBuilder, MenuItemBuilder};
+            let show = MenuItemBuilder::with_id("show", "Show Panel").build(app)?;
+            let settings = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
+            let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+            let menu = MenuBuilder::new(app).items(&[&show, &settings, &quit]).build()?;
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .tooltip("nagents")
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                        // Double-click tray icon → toggle panel
+                        if let Some(win) = tray.app_handle().get_webview_window("main") {
+                            if win.is_visible().unwrap_or(false) {
+                                let _ = win.hide();
+                            } else {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
+                        }
+                    }
+                })
+                .on_menu_event(|app, event| {
+                    match event.id().as_ref() {
+                        "show" => {
+                            if let Some(win) = app.get_webview_window("main") {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
+                        }
+                        "settings" => {
+                            let _ = crate::overlay::show_settings_window(app.clone());
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .build(app)?;
+
             // Resolve config path (project root / config.yaml)
             let config_path = resolve_config_path(app);
             let config = ConfigHandle::load(&config_path);

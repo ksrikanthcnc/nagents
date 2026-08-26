@@ -92,6 +92,7 @@ overlay:
   group_display: cluster
   # Panel display mode: compact (32px chars, tight) or comfortable (48px, spacious)
   panel_mode: compact
+  panel_group_sort: recency     # Sub-group ordering: alpha (A-Z) or recency (most recent activity first)
   # Base character size in pixels (all scaling is proportional to this)
   char_size: 44
   # Follower ordering (based on last_user_ts, not agent mtime)

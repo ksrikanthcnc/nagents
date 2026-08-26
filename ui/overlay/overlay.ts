@@ -416,7 +416,16 @@ function applyModes(): void {
     char.el.style.opacity = "";
 
     if (newMode === "hidden" || batterySaverOn) {
-      char.el.style.display = "none";
+      // Poof before hiding (only if was previously visible)
+      if (prevMode && prevMode !== "hidden" && !batterySaverOn) {
+        char.el.classList.remove("char-poof");
+        void char.el.offsetWidth;
+        char.el.classList.add("char-poof");
+        // Hide after poof animation (250ms)
+        setTimeout(() => { char.el.style.display = "none"; }, 250);
+      } else {
+        char.el.style.display = "none";
+      }
       if (newMode === "hidden" && !assignment.groupHidden) hiddenCount++;
     } else {
       char.el.style.display = "";

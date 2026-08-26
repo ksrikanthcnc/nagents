@@ -155,15 +155,27 @@ function updateSessionElement(session: Session): void {
 
 /** Recursively render sub-groups. depth controls indentation CSS class. */
 function renderSubGroups(groups: SessionGroup[], depth: number): string {
+  // Sort sub-groups: configurable via panel_group_sort (localStorage)
+  const sortMode = localStorage.getItem("nagents:panel_group_sort") || (config as any)?.overlay?.panel_group_sort || "recency";
+  const sorted = [...groups].sort((a, b) => {
+    if (sortMode === "recency") {
+      // Use earliest session mtime (stable — based on group creation, not activity)
+      const aEarliest = Math.min(...(a.sessions.length ? a.sessions.map(s => s.mtime || Infinity) : [Infinity]));
+      const bEarliest = Math.min(...(b.sessions.length ? b.sessions.map(s => s.mtime || Infinity) : [Infinity]));
+      return aEarliest - bEarliest;
+    }
+    return a.label.localeCompare(b.label);
+  });
   let html = "";
-  for (const sub of groups) {
+  let gi = 0;
+  for (const sub of sorted) {
     const isSubCollapsed = collapsed.has(sub.id);
     const subArrow = isSubCollapsed ? "▸" : "▾";
     const sessionCount = countSessions(sub);
     const attentionCount = sub.sessions.filter(s => s.attention).length;
     const attentionBadge = attentionCount > 0 ? `<span class="attention-badge">${attentionCount}!</span>` : "";
 
-    html += `<div class="group group-depth-${depth} ${isSubCollapsed ? "group-collapsed" : ""}" data-group="${sub.id}">
+    html += `<div class="group group-depth-${depth} group-hue-${gi % 4} ${isSubCollapsed ? "group-collapsed" : ""}" data-group="${sub.id}">
       <div class="group-header" data-toggle="${sub.id}">
         <span class="group-arrow">${subArrow}</span>
         <span class="group-label">${sub.label}</span>
@@ -192,6 +204,7 @@ function renderSubGroups(groups: SessionGroup[], depth: number): string {
       }
     }
     html += `</div>`;
+    gi++;
   }
   return html;
 }
@@ -524,8 +537,18 @@ function renderSession(session: Session): string {
   const actionDef = char.actions[action];
   const animClass = actionDef?.cssClass ?? "";
 
-  // Display name: if "group:title" format, show just title part
-  const name = session.name.includes(":") ? session.name.split(":").slice(1).join(":") : session.name;
+  // Display name: title > prompt > session ID
+  const isRawId = session.name === session.id || session.name.startsWith("pid:") || /^[0-9a-f-]{8,}$/.test(session.name);
+  let name: string;
+  if (isRawId && session.prompt) {
+    name = session.prompt.split("\n")[0].slice(0, 40);
+  } else if (isRawId) {
+    name = session.id; // show full session ID when no better name available
+  } else {
+    name = session.name.includes(":") ? session.name.split(":").slice(1).join(":") : session.name;
+  }
+  // Show session ID for CLI (for nagents:sess:group:title usage)
+  const shortId = session.source.startsWith("kiro-cli") ? session.id : "";
   const indicator = getIndicator(session);
 
   // Health bar
@@ -578,6 +601,7 @@ function renderSession(session: Session): string {
   // Tooltip
   const tooltipParts: string[] = [];
   tooltipParts.push(`<div class="tooltip-title">${session.name}</div>`);
+  tooltipParts.push(`<div class="tooltip-row" style="opacity:0.4;font-size:9px">${session.id}</div>`);
   if (session.workspace) tooltipParts.push(`<div class="tooltip-row">${session.workspace}</div>`);
   if (session.event) tooltipParts.push(`<div class="tooltip-row">event: <span>${session.event}</span></div>`);
   if (session.tool) tooltipParts.push(`<div class="tooltip-row">tool: <span>${session.tool}</span></div>`);
@@ -593,7 +617,7 @@ function renderSession(session: Session): string {
 
   return `<div class="session ${attentionClass} ${pinnedClass} ${mutedClass}" data-id="${session.id}">
     <div class="session-group-label">${groupLabel}</div>
-    <div class="session-name-short">${name}${dotBadge}${pinBadge}${muteBadge}</div>
+    <div class="session-name-short">${name}${dotBadge}${pinBadge}${muteBadge}${shortId ? `<span class="session-short-id">${shortId}</span>` : ""}</div>
     <div class="session-char ${animClass}" data-char="${charId}">
       ${char.svg}
     </div>
@@ -640,9 +664,9 @@ function panelSessionSort(a: Session, b: Session): number {
   if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
   // Muted last
   if (a.muted !== b.muted) return a.muted ? 1 : -1;
-  // Then by last_user_ts (LIFO: newest first — default mode)
-  const aTs = a.last_user_ts || 0;
-  const bTs = b.last_user_ts || 0;
+  // Then by recency (last_user_ts → mtime fallback, newest first)
+  const aTs = a.last_user_ts || a.mtime || 0;
+  const bTs = b.last_user_ts || b.mtime || 0;
   if (aTs !== bTs) return bTs - aTs;
   return a.id.localeCompare(b.id);
 }

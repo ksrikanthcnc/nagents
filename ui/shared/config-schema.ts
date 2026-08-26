@@ -201,6 +201,12 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     options: [{ value: "compact", label: "Compact" }, { value: "comfortable", label: "Comfortable" }],
   },
   {
+    key: "panel_group_sort", label: "Group Sort", type: "select", section: "display",
+    description: "Sub-group ordering. Alpha: A-Z. Recency: most recently active group first.",
+    default: "recency",
+    options: [{ value: "alpha", label: "Alphabetical" }, { value: "recency", label: "Recency" }],
+  },
+  {
     key: "font_size_group", label: "Group Font", type: "number", section: "display",
     description: "Font size for group/source labels (px).",
     default: 9, min: 6, max: 16,
