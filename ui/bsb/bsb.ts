@@ -19,7 +19,7 @@ export async function initBsb(el: HTMLElement): Promise<void> {
   container = el;
 
   cfg = (await getConfig()).overlay;
-  log("bsb", `config: max=${(cfg as any).bsb_max_chars} layout=${(cfg as any).bsb_layout} charSize=${(cfg as any).char_size}`);
+  log("bsb", `config: max=${cfg.bsb_max_chars} layout=${cfg.bsb_layout} charSize=${cfg.char_size}`);
 
   // Drag
   try {

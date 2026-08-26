@@ -61,6 +61,8 @@ export interface Session {
   sub_agent_names: string[];
   /** Worker names from backend (alias for sub_agent_names). */
   workers?: string[];
+  /** Pre-formatted action display text. */
+  action_text?: string;
 }
 
 // ─── State Snapshot ─────────────────────────────────────────────────────────
@@ -114,6 +116,23 @@ export interface OverlayConfig {
   source_as_group: boolean;
   follower_mode: string;
   round_robin_sec: number;
+  // Extended (from config.yaml extra fields via serde flatten)
+  char_size?: number;
+  panel_mode?: string;
+  panel_group_sort?: string;
+  freq_half_life_min?: number;
+  overlay_mode?: string;
+  working_mode?: string;
+  working_counts_toward_max?: boolean;
+  attention_follows?: boolean;
+  connectors?: boolean;
+  bsb_max_chars?: number;
+  bsb_layout?: string;
+  bsb_opacity?: number;
+  show_over_fullscreen?: boolean;
+  hide_from_capture?: boolean;
+  startup_delay_sec?: number;
+  group_display?: string;
 }
 
 export interface Config {

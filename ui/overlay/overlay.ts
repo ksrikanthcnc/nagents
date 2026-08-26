@@ -86,16 +86,16 @@ let CHAR_SIZE = 44; // base char size, configurable via cfg.char_size
  * "off": handled externally (overlay hidden, BSB shown).
  */
 function applyOverlayMode(): void {
-  const mode = (cfg as any).overlay_mode || "full";
+  const mode = cfg.overlay_mode || "full";
   if (mode === "lite") {
     cfg.max_followers = 1;
     cfg.max_roamers = 0;
     cfg.max_dots = 0;
     cfg.cursor_fps = 1;
-    (cfg as any).cursor_smoothing = 0.04;
+    cfg.cursor_smoothing = 0.04;
     cfg.follow_strength = 0.003;
-    (cfg as any).connectors = false;
-    (cfg as any).collision_distance = 0;
+    cfg.connectors = false;
+    cfg.collision_distance = 0;
     cfg.physics_fps = 30; // 30fps is smooth enough for 1 slow char
   }
   // "full" = no overrides, use config as-is
@@ -117,8 +117,8 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
     const appConfig = await getConfig();
     if (appConfig.overlay) cfg = appConfig.overlay;
     applyOverlayMode();
-    if ((cfg as any).char_size) CHAR_SIZE = (cfg as any).char_size;
-    log("overlay", `config loaded: mode=${(cfg as any).overlay_mode || "full"} followers=${cfg.max_followers} roamers=${cfg.max_roamers} dots=${cfg.max_dots} charSize=${CHAR_SIZE}`);
+    if (cfg.char_size) CHAR_SIZE = cfg.char_size;
+    log("overlay", `config loaded: mode=${cfg.overlay_mode || "full"} followers=${cfg.max_followers} roamers=${cfg.max_roamers} dots=${cfg.max_dots} charSize=${CHAR_SIZE}`);
   } catch {
     log("overlay", "config load failed, using defaults");
   }
@@ -147,14 +147,14 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   // Listen for config changes (fs watch events from Rust, instant)
   onConfigChanged((fresh) => {
     if (fresh.overlay) {
-      const prevWorkingMode = (cfg as any).working_mode;
+      const prevWorkingMode = cfg.working_mode;
       cfg = fresh.overlay;
       applyOverlayMode();
-      if ((cfg as any).char_size) CHAR_SIZE = (cfg as any).char_size;
+      if (cfg.char_size) CHAR_SIZE = cfg.char_size;
       cursorInterval = Math.round(1000 / cfg.cursor_fps);
       frameInterval = 1000 / cfg.physics_fps;
       // Poof all working chars when working_mode changes (visual cue)
-      if (prevWorkingMode && prevWorkingMode !== (cfg as any).working_mode) {
+      if (prevWorkingMode && prevWorkingMode !== cfg.working_mode) {
         for (const char of chars.values()) {
           if (char.session.event === "running" || char.session.event === "tool") {
             char.el.classList.remove("char-poof");
@@ -163,7 +163,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
           }
         }
       }
-      log("overlay", `config updated: mode=${(cfg as any).overlay_mode || "full"} fps=${cfg.physics_fps} cursor=${cfg.cursor_fps}`);
+      log("overlay", `config updated: mode=${cfg.overlay_mode || "full"} fps=${cfg.physics_fps} cursor=${cfg.cursor_fps}`);
     }
   });
 
@@ -174,7 +174,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
       if (fresh.overlay) {
         cfg = fresh.overlay;
         applyOverlayMode();
-        if ((cfg as any).char_size) CHAR_SIZE = (cfg as any).char_size;
+        if (cfg.char_size) CHAR_SIZE = cfg.char_size;
         cursorInterval = Math.round(1000 / cfg.cursor_fps);
         frameInterval = 1000 / cfg.physics_fps;
       }
@@ -198,7 +198,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
     lastTimestamp = now;
     // If >10s gap between checks (interval is 2s), system was sleeping
     if (gap > 10000) {
-      const delay = ((cfg as any).startup_delay_sec ?? 5) * 1000;
+      const delay = (cfg.startup_delay_sec ?? 5) * 1000;
       log("overlay", `wake detected (gap=${Math.round(gap/1000)}s), pausing for ${delay/1000}s`);
       allCharsHidden = true; // pause physics
       setTimeout(() => {
@@ -330,7 +330,7 @@ function applyModes(): void {
     interactionCount: c.session.interaction_count ?? 0,
   }));
 
-  const batterySaverOn = localStorage.getItem("nagents:battery_saver") === "true" || (cfg as any).overlay_mode === "off";
+  const batterySaverOn = localStorage.getItem("nagents:battery_saver") === "true" || cfg.overlay_mode === "off";
 
   const modeCfg: ModeConfig = {
     max_followers: batterySaverOn ? 1 : (cfg.max_followers ?? MODE_DEFAULTS.max_followers),
@@ -340,11 +340,11 @@ function applyModes(): void {
     round_robin_sec: cfg.round_robin_sec ?? MODE_DEFAULTS.round_robin_sec,
     pin_counts_toward_max: cfg.pin_counts_toward_max ?? MODE_DEFAULTS.pin_counts_toward_max,
     group_as_one: localStorage.getItem("nagents:group_as_one") === "true" || (cfg.group_as_one ?? MODE_DEFAULTS.group_as_one),
-    group_display: localStorage.getItem("nagents:group_display") || (cfg as any).group_display || "cluster",
-    working_mode: (cfg as any).working_mode || "roam",
-    working_counts_toward_max: (cfg as any).working_counts_toward_max ?? false,
-    attention_follows: (cfg as any).attention_follows ?? true,
-    freq_half_life_min: (cfg as any).freq_half_life_min ?? 60,
+    group_display: localStorage.getItem("nagents:group_display") || cfg.group_display || "cluster",
+    working_mode: cfg.working_mode || "roam",
+    working_counts_toward_max: cfg.working_counts_toward_max ?? false,
+    attention_follows: cfg.attention_follows ?? true,
+    freq_half_life_min: cfg.freq_half_life_min ?? 60,
   };
   // Compute modes only when state has meaningfully changed
   const stateFingerprint = states.map(s =>
@@ -482,7 +482,7 @@ function startRenderLoop(): void {
     frameCount++;
     updatePhysics(cachedBatterySaver, cachedHiddenUntil);
     // Draw connections (skip in battery saver or when disabled)
-    const connectorsEnabled = (cfg as any).connectors !== false;
+    const connectorsEnabled = cfg.connectors !== false;
     if (!cachedBatterySaver && connectorsEnabled && frameCount % 3 === 0) {
       drawConnections(svg);
     } else if ((cachedBatterySaver || !connectorsEnabled) && svg.innerHTML) {
@@ -494,7 +494,7 @@ function startRenderLoop(): void {
 
 function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
   // Lerp cursor toward target (smooths jumps from slow poll rate)
-  const smoothing = (cfg as any).cursor_smoothing || 0.12;
+  const smoothing = cfg.cursor_smoothing || 0.12;
   cursor.x += (cursorTarget.x - cursor.x) * smoothing;
   cursor.y += (cursorTarget.y - cursor.y) * smoothing;
 
@@ -990,7 +990,7 @@ function renderBsbBox(charArray: OverlayChar[]): void {
   }
   bsbBoxEl.style.display = "";
 
-  const maxChars = (cfg as any).bsb_max_chars ?? 5;
+  const maxChars = cfg.bsb_max_chars ?? 5;
   const fGroup = cfg.font_size_group ?? 9;
   const fTitle = cfg.font_size_title ?? 10;
   const fAction = cfg.font_size_action ?? 10;

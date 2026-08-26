@@ -243,7 +243,7 @@ function render(): void {
     <button class="toolbar-btn" id="settings-btn" title="Settings">⚙</button>
   </header>`;
 
-  const panelMode = (config as any).overlay?.panel_mode || "comfortable";
+  const panelMode = config.overlay?.panel_mode || "comfortable";
   html += `<div class="panel-groups panel-${panelMode}">`;
 
   for (const meta of groups) {
@@ -600,8 +600,8 @@ function renderSession(session: Session): string {
     const fileHint = session.file ? ` ${session.file.split("/").pop()}` : "";
     status = `\uD83D\uDD27 ${toolText}${fileHint}`;
   } else if (session.event === "idle") {
-    if ((session as any).action_text) {
-      status = (session as any).action_text;
+    if (session.action_text) {
+      status = session.action_text;
     } else if (session.description) {
       const desc = session.description.trimEnd();
       const icon = desc.endsWith("?") ? "?" : "\u2713";
@@ -645,7 +645,7 @@ function renderSession(session: Session): string {
     ${indicator}
     ${healthBar}
     ${status ? `<div class="session-status">${status}</div>` : ""}
-    ${(session.sub_agents || 0) > 0 ? `<div class="session-sub-agents">⑂${session.sub_agents}${(session as any).workers?.length ? `<div class="sub-agent-list">${(session as any).workers.map((n: string) => `<span class="sub-agent-name">${n}</span>`).join("")}</div>` : ""}</div>` : ""}
+    ${(session.sub_agents || 0) > 0 ? `<div class="session-sub-agents">⑂${session.sub_agents}${session.workers?.length ? `<div class="sub-agent-list">${session.workers.map((n: string) => `<span class="sub-agent-name">${n}</span>`).join("")}</div>` : ""}</div>` : ""}
     <div class="session-tooltip">${tooltipParts.join("")}</div>
   </div>`;
 }

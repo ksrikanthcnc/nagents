@@ -284,7 +284,7 @@ function getPriorityLevel(c: CharState): number {
   const { event, attention, priority, status } = c.session;
 
   // Muted: always last
-  if ((c.session as any).muted) return -1;
+  if (c.session.muted) return -1;
 
   // ─── Attention sessions (needs you) ────────────────────────────────
   // waiting_on_user: agent explicitly asked, we KNOW it needs you
