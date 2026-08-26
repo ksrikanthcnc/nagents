@@ -73,11 +73,11 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" {
                     // Persist session state + close timestamp for restart recovery
-                    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-                    let project_root = PathBuf::from(manifest_dir)
-                        .parent()
-                        .unwrap_or_else(|| std::path::Path::new("."))
-                        .to_path_buf();
+                    let project_root = window.app_handle().path().app_data_dir()
+                        .unwrap_or_else(|_| {
+                            let manifest_dir = env!("CARGO_MANIFEST_DIR");
+                            PathBuf::from(manifest_dir).parent().unwrap_or(std::path::Path::new(".")).to_path_buf()
+                        });
                     // Save full session state
                     if let Some(store) = window.app_handle().try_state::<state::SessionStore>() {
                         persist_sessions(&store, &project_root);
@@ -160,7 +160,7 @@ pub fn run() {
             store.set_char_pools(char_pools);
 
             // Reload cached events from data/events/ (restore state from last run)
-            let project_root = config_path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+            let project_root = resolve_project_root(app);
             reload_event_cache(&store, &project_root);
 
             // Clear stale attention for non-idle sessions (fixes #022: missed hook clears during downtime)
@@ -245,11 +245,66 @@ fn resolve_config_path(app: &tauri::App) -> PathBuf {
         return project_root.join("config.yaml");
     }
 
-    // In production, look next to the app
-    app.path()
-        .app_config_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("config.yaml")
+    // In production: use bundled config from Resources, user data in app_data_dir
+    // First-launch: copy bundled config to user data dir
+    let data_dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let user_config = data_dir.join("config.yaml");
+    if !user_config.exists() {
+        let _ = std::fs::create_dir_all(&data_dir);
+        // Copy from bundle resources (Tauri puts ../ paths under _up_/)
+        if let Ok(resource_dir) = app.path().resource_dir() {
+            let bundled = resource_dir.join("_up_").join("config.yaml");
+            if bundled.exists() {
+                let _ = std::fs::copy(&bundled, &user_config);
+                info!("[config] first launch: copied bundled config to {:?}", user_config);
+            }
+        }
+    }
+    user_config
+}
+
+/// Resolve the project root (where scanners/data live).
+/// Dev: project dir. Prod: app data dir (with scanners from bundle resources).
+fn resolve_project_root(app: &tauri::App) -> PathBuf {
+    if cfg!(debug_assertions) {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        return PathBuf::from(manifest_dir)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .to_path_buf();
+    }
+
+    // Production: scanners are in bundle resources, data in app_data_dir
+    let data_dir = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let _ = std::fs::create_dir_all(&data_dir);
+
+    // Copy scanners from bundle to data dir (if not already there)
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let bundled_sources = resource_dir.join("_up_").join("sources");
+        let user_sources = data_dir.join("sources");
+        if bundled_sources.exists() && !user_sources.exists() {
+            copy_dir_recursive(&bundled_sources, &user_sources);
+            info!("[config] first launch: copied scanners to {:?}", user_sources);
+        }
+    }
+
+    data_dir
+}
+
+/// Recursively copy a directory.
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) {
+    let _ = std::fs::create_dir_all(dst);
+    if let Ok(entries) = std::fs::read_dir(src) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let dest = dst.join(entry.file_name());
+            if path.is_dir() {
+                copy_dir_recursive(&path, &dest);
+            } else {
+                let _ = std::fs::copy(&path, &dest);
+            }
+        }
+    }
 }
 
 /// Reload session state from persisted snapshot + event cache.

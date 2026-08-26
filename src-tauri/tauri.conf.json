@@ -28,6 +28,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.icns", "icons/icon.png"]
+    "icon": ["icons/icon.icns", "icons/icon.png"],
+    "resources": [
+      "../config.yaml",
+      "../sources/**/*"
+    ]
   }
 }

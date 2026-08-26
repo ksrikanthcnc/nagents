@@ -49,6 +49,7 @@ let container: HTMLElement | null = null;
 let globalRevolveAngle = 0;
 let hiddenBadgeEl: HTMLElement | null = null;
 let nextId = 1;
+let connectorsEnabled = false;
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -320,6 +321,8 @@ function applyModes(): void {
     group_as_one: cfg.group_as_one,
     group_display: "cluster",
     working_mode: "roam",
+    working_counts_toward_max: false,
+    attention_follows: true,
   };
 
   const assignments = computeModes(states, modeCfg);
@@ -586,6 +589,7 @@ function trackEyes(char: OverlayChar): void {
 
 function drawConnections(svg: SVGSVGElement): void {
   svg.innerHTML = "";
+  if (!connectorsEnabled) return;
   const charArray = Array.from(chars.values());
   const groups = new Map<string, OverlayChar[]>();
 
@@ -885,6 +889,12 @@ document.addEventListener("DOMContentLoaded", () => {
     cfg.follower_mode = modeSelect.value;
     applyModes();
     logEvent("mode", `follower mode → ${modeSelect.value}`);
+  });
+
+  // Connectors toggle
+  const connCheck = document.getElementById("cfg-connectors") as HTMLInputElement;
+  connCheck.addEventListener("change", () => {
+    connectorsEnabled = connCheck.checked;
   });
 
   // Burst button

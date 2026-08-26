@@ -427,6 +427,14 @@ body::before {
   background: rgba(167, 139, 250, 0.35);
 }
 
+.config-row input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  accent-color: #a78bfa;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
 /* ─── Character styles (imported from overlay) ─────────────────────────────── */
 /* These duplicate overlay.css since we import character SVGs directly */
 
