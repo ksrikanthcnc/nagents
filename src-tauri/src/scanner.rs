@@ -81,7 +81,7 @@ pub fn start(store: SessionStore, config: ConfigHandle, project_root: PathBuf) {
 }
 
 /// Run a scanner command and parse JSON output.
-fn run_scanner(cmd: &str, source_id: &str, cwd: &PathBuf) -> Result<Vec<Session>, String> {
+pub fn run_scanner(cmd: &str, source_id: &str, cwd: &PathBuf) -> Result<Vec<Session>, String> {
     let output = Command::new("sh")
         .args(["-c", cmd])
         .current_dir(cwd)

@@ -55,6 +55,12 @@ export interface ModeConfig {
   group_display: string;
   /** Working sessions behavior: "roam" (skip follow, always roam) | "queue" (normal waterfall) */
   working_mode?: string;
+  /** Whether working-roaming sessions count toward max_roamers or are extra (like pinned) */
+  working_counts_toward_max?: boolean;
+  /** Whether attention sessions always follow (exempt from max_followers). Default true. */
+  attention_follows?: boolean;
+  /** Half-life for freq dampening in minutes. Default 60. */
+  freq_half_life_min?: number;
 }
 
 export const MODE_DEFAULTS: ModeConfig = {
@@ -67,12 +73,15 @@ export const MODE_DEFAULTS: ModeConfig = {
   group_as_one: false,
   group_display: "cluster",
   working_mode: "roam",
+  working_counts_toward_max: false,
+  attention_follows: false,
 };
 
 // ─── Round-robin state ──────────────────────────────────────────────────────
 
 let rrLastRotate = 0;
 let rrOffset = 0;
+let currentFreqHalfLifeSec = 3600; // set before each sort
 
 // ─── Persistent queue order (survives across calls, for LRU/FIFO/LIFO) ─────
 // Maintains insertion order so switching modes doesn't reset positions.
@@ -90,12 +99,15 @@ let queueOrder: string[] = []; // session IDs in their last-computed order
 export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, ModeAssignment> {
   const result = new Map<string, ModeAssignment>();
 
-  // ─── Pinned: always follow ────────────────────────────────────────
+  // ─── Pinned + Attention: always follow (exempt from max_followers) ──
   const pinned: CharState[] = [];
   let normal: CharState[] = [];
 
   for (const c of chars) {
     if (c.session.pinned || c.session.priority === "high") {
+      pinned.push(c);
+      result.set(c.sessionId, { sessionId: c.sessionId, mode: "follow" });
+    } else if (c.session.attention && cfg.attention_follows !== false) {
       pinned.push(c);
       result.set(c.sessionId, { sessionId: c.sessionId, mode: "follow" });
     } else {
@@ -154,7 +166,7 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
     normal = ungrouped;
   }
 
-  sortByPriority(normal, cfg.follower_mode, cfg.round_robin_sec);
+  sortByPriority(normal, cfg.follower_mode, cfg.round_robin_sec, cfg.freq_half_life_min ?? 60);
 
   // Update persistent queue (add new IDs, remove gone ones)
   const normalIds = new Set(normal.map(c => c.sessionId));
@@ -180,8 +192,10 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
 
     // Working sessions: skip follow, go to roam (if working_mode = "roam")
     if (isWorking && cfg.working_mode !== "queue") {
-      // Always roam (or dot/hidden if roam is full)
-      if (roamUsed < cfg.max_roamers) {
+      // working_counts_toward_max: false = extra roam (doesn't consume slot), true = counts toward max_roamers
+      if (cfg.working_counts_toward_max === false) {
+        mode = "roam"; // always roam, doesn't count
+      } else if (roamUsed < cfg.max_roamers) {
         mode = "roam";
         roamUsed++;
       } else if (dotUsed < cfg.max_dots) {
@@ -230,7 +244,8 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
  *   1 = working (running/tool)
  *   0 = no attention (shouldn't be on overlay but handle gracefully)
  */
-function sortByPriority(list: CharState[], modeStr: string, rrSec: number): void {
+function sortByPriority(list: CharState[], modeStr: string, rrSec: number, freqHalfLifeMin: number = 60): void {
+  currentFreqHalfLifeSec = freqHalfLifeMin * 60;
   const now = Date.now();
 
   // Round-robin: special case
@@ -268,18 +283,27 @@ function sortByPriority(list: CharState[], modeStr: string, rrSec: number): void
 function getPriorityLevel(c: CharState): number {
   const { event, attention, priority, status } = c.session;
 
-  if (!attention) return 0;
+  // Muted: always last
+  if ((c.session as any).muted) return -1;
 
-  if (event === "approval" || event === "stuck") return 4;
+  // ─── Attention sessions (needs you) ────────────────────────────────
+  // waiting_on_user: agent explicitly asked, we KNOW it needs you
+  if (status === "waiting_on_user") return 6;
+  // approval: tool stuck >30s, probably needs approval
+  if (event === "approval") return 5;
+  // stuck: running >120s, might be stuck
+  if (event === "stuck") return 4;
+  // idle with attention (e.g. ending with '?', waiting for input)
+  if (attention && event === "idle") return 3;
 
-  if (event === "idle") {
-    if (status === "waiting_on_user" || priority === "normal" || priority === null || priority === undefined) {
-      return 3; // ? — agent asked something or normal idle
-    }
-    if (priority === "low") return 2; // done, no urgency
-  }
+  // ─── Non-attention (normal waterfall) ──────────────────────────────
+  // Idle (done/normal) — not working, might look at it
+  if (event === "idle") return 2;
+  // Default (null event, inactive, etc.)
+  if (!event || event === "none") return 1;
+  // Running/tool = actively working, doesn't need you → last non-muted
+  if (event === "running" || event === "tool") return 0;
 
-  // running/tool with attention = working
   return 1;
 }
 
@@ -299,15 +323,20 @@ function compareTieBreak(a: CharState, b: CharState, mode: string): number {
       // Least recently used by user gets priority (neglected → surface it)
       return (a.lastUserTs || 0) - (b.lastUserTs || 0);
     case "freq": {
-      // Frequency with session-active-time decay.
-      // Uses time since char appeared on overlay (spawnedAt), not wall-clock time.
-      // This ignores sleep/shutdown — only counts active session time.
+      // Exponential decay: each interaction's contribution halves every 2 hours.
+      // Recent interaction = weight ~1.0, 2h ago = 0.5, 4h ago = 0.25, 8h ago ≈ 0.
+      // This means: 5 prompts in last hour beats 100 prompts from 5 hours ago.
       const now = Date.now() / 1000;
-      const aActiveHours = Math.max(1, (now - a.spawnedAt / 1000) / 3600);
-      const bActiveHours = Math.max(1, (now - b.spawnedAt / 1000) / 3600);
-      const aScore = a.interactionCount / aActiveHours;
-      const bScore = b.interactionCount / bActiveHours;
-      return bScore - aScore; // highest score first
+      const halfLife = currentFreqHalfLifeSec;
+      const decay = Math.LN2 / halfLife;
+      // Score = sum of decayed interactions. We approximate using count * decay(lastUserTs).
+      // True per-interaction decay would need timestamps array — this approximation
+      // uses lastUserTs as "when the cluster of interactions happened".
+      const aAge = now - (a.lastUserTs / 1000 || a.spawnedAt / 1000);
+      const bAge = now - (b.lastUserTs / 1000 || b.spawnedAt / 1000);
+      const aScore = a.interactionCount * Math.exp(-decay * aAge);
+      const bScore = b.interactionCount * Math.exp(-decay * bAge);
+      return bScore - aScore;
     }
     case "priority":
       // Already handled as primary sort, skip in tie-break

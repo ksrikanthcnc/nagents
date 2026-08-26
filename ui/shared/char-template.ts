@@ -69,7 +69,7 @@ export function renderCharHtml(s: Session, opts?: Partial<CharRenderOptions>): s
   const action = getActionText(s);
   const cellWidth = o.charWidth || o.charSize;
 
-  return `<div class="char-tpl ${srcClass}" style="width:${cellWidth}px">
+  return `<div class="char-tpl ${srcClass}" data-session-id="${s.id}" style="width:${cellWidth}px">
     <div class="char-tpl-group" style="font-size:${o.fontGroup}px">${group}</div>
     <div class="char-tpl-title" style="font-size:${o.fontTitle}px">${s.name}</div>
     <div class="char-tpl-svg" style="width:${o.charSize}px;height:${o.charSize}px">${charDef.svg}</div>

@@ -62,6 +62,9 @@ case "${1:-start}" in
     lsof -ti :$HTTP_PORT 2>/dev/null | xargs kill -9 2>/dev/null || true
     lsof -ti :$VITE_PORT 2>/dev/null | xargs kill -9 2>/dev/null || true
 
+    # Clear WebKit cache (prevents stale JS modules after code changes)
+    rm -rf ~/Library/WebKit/nagents ~/Library/Caches/nagents 2>/dev/null || true
+
     # Start: cargo tauri dev runs Vite + Rust + native windows
     tmux new-session -d -s "$SESSION" -c "$DIR" \
       "RUST_LOG=info cargo tauri dev 2>&1"

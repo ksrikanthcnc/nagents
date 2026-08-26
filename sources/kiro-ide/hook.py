@@ -47,8 +47,33 @@ def main():
     if not update:
         sys.exit(0)
 
+    # Handle nagents: command
+    if update.get("_nagents_cmd"):
+        handle_nagents_cmd(update)
+        sys.exit(0)
+
     post_event(update, trigger)
     sys.exit(0)
+
+
+def handle_nagents_cmd(cmd: dict) -> None:
+    """Handle nagents: command — set title on a session by UUID prefix."""
+    prefix = cmd.get("sess_id_prefix", "")
+    title = cmd.get("title", "")
+    if not prefix or not title:
+        return
+    for id_prefix in [f"cli3-{prefix}", f"cli2-{prefix}", f"ide-{prefix}"]:
+        try:
+            data = json.dumps({"session_id": id_prefix, "title": title}).encode()
+            req = urllib.request.Request(
+                f"{NAGENTS_URL}/title",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=2)
+        except Exception:
+            pass
 
 
 def make_session_id(raw_id: str) -> str:

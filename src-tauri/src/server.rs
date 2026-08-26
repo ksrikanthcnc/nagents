@@ -20,8 +20,6 @@ use tiny_http::{Header, Request, Response, Server};
 
 /// Directory for persisted hook events (debug + cache)
 const EVENTS_DIR: &str = "data/events";
-/// File for user-assigned session titles
-const TITLES_FILE: &str = "data/titles.json";
 
 /// Start the HTTP server on the given port (background thread).
 pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16, project_root: std::path::PathBuf) {
@@ -69,13 +67,33 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                     handle_event(request, &store, &project_root);
                 }
                 ("POST", "/title") => {
-                    handle_title(request, &store);
+                    handle_title(request, &store, &project_root);
                 }
                 ("POST", "/character") => {
                     handle_character(request, &store);
                 }
                 ("POST", "/config") => {
                     handle_config_patch(request, &project_root);
+                }
+                ("GET", "/scan") => {
+                    // Force all scanners to run immediately
+                    let cfg = config.get();
+                    let mut scanned = 0;
+                    for (source_id, source_cfg) in &cfg.sources {
+                        if !source_cfg.enabled { continue; }
+                        if let Some(ref cmd) = source_cfg.scanner {
+                            match crate::scanner::run_scanner(cmd, source_id, &project_root) {
+                                Ok(sessions) => {
+                                    let count = sessions.len();
+                                    store.push_sessions(sessions);
+                                    scanned += count;
+                                }
+                                Err(_) => {}
+                            }
+                        }
+                    }
+                    let json = format!(r#"{{"ok":true,"scanned":{}}}"#, scanned);
+                    respond_json(request, 200, &json);
                 }
                 ("GET", "/test/start") => {
                     let test = Session {
@@ -86,7 +104,7 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                         group: "test".into(),
                         active: true,
                         event: Some("running".into()),
-                        attention_source: None,
+                        
                         attention: false,
                         attention_reason: None,
                         tool: None,
@@ -98,6 +116,7 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                         attention_since: None,
                         on_overlay: false,
                         pinned: false,
+                        muted: false,
                         tool_ok: None,
                         tool_result: None,
                         prompt: None,
@@ -185,20 +204,20 @@ fn handle_event(mut request: Request, store: &SessionStore, project_root: &std::
     // Persist event to disk for debugging and cache
     persist_event(&update);
 
-    // If pinned state changed, persist immediately
-    let has_pinned = update.pinned.is_some();
+    // If pinned or muted state changed, persist immediately
+    let needs_meta_persist = update.pinned.is_some() || update.muted.is_some();
 
     store.push_event(update);
 
-    if has_pinned {
-        crate::persist_pinned(store, &project_root.to_path_buf());
+    if needs_meta_persist {
+        crate::persist_session_meta(store, &project_root.to_path_buf());
     }
 
     respond_json(request, 200, r#"{"ok":true}"#);
 }
 
 /// Write event to data/events/<session_id>.jsonl for persistence/debugging.
-fn handle_title(mut request: Request, store: &SessionStore) {
+fn handle_title(mut request: Request, store: &SessionStore, project_root: &std::path::Path) {
     let mut body = String::new();
     if std::io::Read::read_to_string(request.as_reader(), &mut body).is_err() {
         respond_json(request, 400, r#"{"error":"bad body"}"#);
@@ -223,8 +242,8 @@ fn handle_title(mut request: Request, store: &SessionStore) {
     // Update in-memory session name
     store.set_title(&update.session_id, &update.title);
 
-    // Persist to data/titles.json
-    persist_title(&update.session_id, &update.title);
+    // Persist to data/sessions.json
+    crate::persist_title_to_meta(&update.session_id, &update.title, &project_root.to_path_buf());
 
     info!(
         "[server] POST /title: {} → {:?}",
@@ -258,48 +277,6 @@ fn handle_character(mut request: Request, store: &SessionStore) {
     store.set_character(&update.session_id, &update.character);
     info!("[server] POST /character: {} → {:?}", update.session_id, update.character);
     respond_json(request, 200, r#"{"ok":true}"#);
-}
-
-/// Persist a title override to data/titles.json.
-fn persist_title(session_id: &str, title: &str) {
-    use std::collections::HashMap;
-    use std::fs;
-    use std::path::Path;
-
-    let project_root = if cfg!(debug_assertions) {
-        let manifest = env!("CARGO_MANIFEST_DIR");
-        Path::new(manifest)
-            .parent()
-            .unwrap_or(Path::new("."))
-            .to_path_buf()
-    } else {
-        std::env::current_dir().unwrap_or_default()
-    };
-
-    let titles_path = project_root.join(TITLES_FILE);
-
-    // Ensure data/ dir exists
-    if let Some(parent) = titles_path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-
-    // Read existing titles
-    let mut titles: HashMap<String, String> = if titles_path.exists() {
-        fs::read_to_string(&titles_path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
-    } else {
-        HashMap::new()
-    };
-
-    // Update
-    titles.insert(session_id.to_string(), title.to_string());
-
-    // Write back
-    if let Ok(json) = serde_json::to_string_pretty(&titles) {
-        let _ = fs::write(&titles_path, json + "\n");
-    }
 }
 
 /// Write event to data/events/<session_id>.jsonl for persistence/debugging.

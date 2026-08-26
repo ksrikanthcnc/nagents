@@ -94,7 +94,6 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
         return {
             "session_id": session_id,
             "event": "idle",
-            "attention": False,
             "priority": "low",
             "tool": "",        # clear
             "file": "",        # clear
@@ -105,10 +104,15 @@ def translate(trigger: str, payload: dict, session_id: str) -> dict | None:
 
     elif trigger == "UserPromptSubmit":
         prompt = payload.get("prompt", "")
+
+        # Check for nagents: command — user setting title/group
+        nagents_cmd = parse_nagents_command(prompt)
+        if nagents_cmd:
+            return nagents_cmd  # returns a special update dict
+
         return {
             "session_id": session_id,
             "event": "running",
-            "attention": False,
             "prompt": prompt or "",
             "tool": "",         # clear stale
             "file": "",         # clear stale
@@ -203,6 +207,54 @@ def parse_todo_result(tool_response: str) -> str:
         return f"{done}/{total}"
     except (json.JSONDecodeError, TypeError):
         return ""
+
+
+def parse_nagents_command(prompt: str) -> dict | None:
+    """
+    Parse nagents: command from anywhere in user prompt.
+
+    Format: nagents:<session_id>:<group>:<title>
+    Examples:
+      "nagents:sess_ca95a60c:k8s:deploy-monitor"  → group=k8s, title=deploy-monitor
+      "nagents:sess_ca95a60c::"                   → reset (remove manual title)
+      "ignore this nagents:ca95a60c::my-title"    → no group, just title
+
+    Returns a dict for hook to handle, or None if not found.
+    """
+    if not prompt or "nagents:" not in prompt:
+        return None
+
+    idx = prompt.find("nagents:")
+    cmd_str = prompt[idx + len("nagents:"):]
+    cmd_str = cmd_str.split("\n")[0].strip()
+
+    parts = cmd_str.split(":", 2)
+    if len(parts) < 1 or not parts[0]:
+        return None
+
+    sess_id = parts[0].strip()
+    group = parts[1].strip() if len(parts) > 1 else ""
+    title = parts[2].strip() if len(parts) > 2 else ""
+
+    uuid = sess_id.replace("sess_", "")[:8]
+
+    # Both empty = reset
+    if not group and not title:
+        return {
+            "_nagents_cmd": True,
+            "_reset": True,
+            "sess_id_prefix": uuid,
+            "title": "",
+            "group": "",
+        }
+
+    return {
+        "_nagents_cmd": True,
+        "_reset": False,
+        "sess_id_prefix": uuid,
+        "title": title,
+        "group": group,
+    }
 
 
 def shorten_path(path: str | None) -> str | None:

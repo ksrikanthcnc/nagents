@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
               main: resolve(__dirname, "index.html"),
               overlay: resolve(__dirname, "overlay.html"),
               bsb: resolve(__dirname, "bsb.html"),
+              settings: resolve(__dirname, "settings.html"),
             },
       },
     },

@@ -63,7 +63,110 @@ def main():
     if not update:
         sys.exit(0)
 
+    # Handle nagents: command (user setting title/group)
+    if update.get("_nagents_cmd"):
+        handle_nagents_cmd(update)
+        sys.exit(0)
+
+    # Auto-title from prompt (skip if manually set via nagents:)
+    if trigger == "UserPromptSubmit":
+        pass  # prompt already sent in EventUpdate; app uses it for display
+
     post_event(update, trigger)
+    sys.exit(0)
+
+
+def handle_nagents_cmd(cmd: dict) -> None:
+    """Handle nagents: command — set title/group on a session by UUID prefix."""
+    prefix = cmd.get("sess_id_prefix", "")
+    title = cmd.get("title", "")
+    group = cmd.get("group", "")
+    is_reset = cmd.get("_reset", False)
+
+    if not prefix:
+        return
+
+    if is_reset:
+        _remove_manual_title(prefix)
+        # Also clear in nagents server
+        for id_prefix in [f"cli3-{prefix}", f"cli2-{prefix}", f"ide-{prefix}"]:
+            try:
+                data = json.dumps({"session_id": id_prefix, "title": ""}).encode()
+                req = urllib.request.Request(
+                    f"{NAGENTS_URL}/title",
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                urllib.request.urlopen(req, timeout=2)
+            except Exception:
+                pass
+        return
+
+    # Format: "v3:group" or just "v3" if no group
+    full_group = f"v3:{group}" if group else "v3"
+    display_title = f"{full_group}:{title}" if title else full_group
+
+    for id_prefix in [f"cli3-{prefix}", f"cli2-{prefix}", f"ide-{prefix}"]:
+        try:
+            data = json.dumps({"session_id": id_prefix, "title": title}).encode()
+            req = urllib.request.Request(
+                f"{NAGENTS_URL}/title",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=2)
+        except Exception:
+            pass
+    _mark_manual_title(prefix, title, group)
+
+
+TITLES_FILE = Path(__file__).parent.parent.parent / "data/sessions.json"
+
+
+def _mark_manual_title(uuid_prefix: str, title: str, group: str) -> None:
+    """Persist manual title to data/sessions.json."""
+    TITLES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    sessions = {}
+    if TITLES_FILE.exists():
+        try:
+            sessions = json.loads(TITLES_FILE.read_text())
+        except Exception:
+            pass
+    for id_prefix in [f"cli3-{uuid_prefix}", f"cli2-{uuid_prefix}", f"ide-{uuid_prefix}"]:
+        entry = sessions.get(id_prefix, {})
+        if not isinstance(entry, dict):
+            entry = {}
+        entry["title"] = title
+        if group:
+            entry["group"] = group
+        sessions[id_prefix] = entry
+    TITLES_FILE.write_text(json.dumps(sessions, indent=2) + "\n")
+
+
+def _remove_manual_title(uuid_prefix: str) -> None:
+    """Remove manual title (reset to defaults)."""
+    if not TITLES_FILE.exists():
+        return
+    try:
+        sessions = json.loads(TITLES_FILE.read_text())
+    except Exception:
+        return
+    changed = False
+    for id_prefix in [f"cli3-{uuid_prefix}", f"cli2-{uuid_prefix}", f"ide-{uuid_prefix}"]:
+        if id_prefix in sessions:
+            entry = sessions[id_prefix]
+            if isinstance(entry, dict):
+                entry.pop("title", None)
+                entry.pop("group", None)
+                if not entry:
+                    del sessions[id_prefix]
+            else:
+                del sessions[id_prefix]
+            changed = True
+    if changed:
+        TITLES_FILE.write_text(json.dumps(sessions, indent=2) + "\n")
     sys.exit(0)
 
 

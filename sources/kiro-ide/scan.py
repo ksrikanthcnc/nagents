@@ -142,7 +142,12 @@ def read_workspace_path(ws_dir: Path) -> str:
         data = json.loads(ws_json.read_text())
         workspace = data.get("workspace", "")
         if workspace.startswith("file://"):
-            return str(Path(workspace[7:]).parent)
+            ws_path = workspace[7:]
+            if ws_path.endswith(".code-workspace"):
+                # Multi-root workspace: use workspace file's parent as path
+                # but group will use filename stem (handled in path_to_group)
+                return ws_path
+            return str(Path(ws_path).parent)
         folder = data.get("folder", "")
         if folder.startswith("file://"):
             return folder[7:]
@@ -212,6 +217,9 @@ def path_to_group(ws_path: str) -> str:
     if not ws_path:
         return "ide"
     p = Path(ws_path)
+    # .code-workspace file → use filename stem as group
+    if ws_path.endswith(".code-workspace"):
+        return p.stem
     name = p.name
     if not name:
         return "ide"

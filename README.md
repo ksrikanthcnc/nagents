@@ -1,191 +1,343 @@
-# nagents
+# nagents (nagents)
 
-Nagging AI Agents — desktop companion app where animated characters follow your cursor when AI agent sessions need attention.
+A desktop companion app that visualizes AI agent sessions as animated characters on your screen. Characters follow your cursor, roam freely, orbit as dots, and "nag" you when agents need attention — all in a transparent overlay window.
 
-Think: Clippy meets tmux sessions. Each running AI agent (Kiro IDE, CLI, Crew) gets a character that visually represents its state. Done agents nag you to respond. Working agents roam freely. Stale sessions shrink to dots orbiting your cursor.
+Built with Tauri 2 (Rust backend) + vanilla TypeScript frontend + Vite.
 
-## How it works
+## What It Does
 
-A transparent overlay window sits on top of everything. Characters appear when agents need you:
+nagents monitors your running Kiro IDE, CLI, and Crew sessions and represents each as an animated character on a transparent desktop overlay. Characters respond to agent state in real time:
 
-- **Follow cursor** — agent finished, needs your response (nagging you)
-- **Free roam** — agent working, or low-priority done (background awareness)
-- **Dot orbit** — overflow, orbits cursor as a small dot
-- **Hidden** — too many, shown as `+N` badge at cursor
+- **Following cursor** — high-priority sessions (pinned, needing attention) physically follow your mouse
+- **Roaming** — working sessions wander the screen independently
+- **Orbiting as dots** — overflow sessions orbit the cursor as scaled-down dots
+- **Hidden** — remaining sessions show as a "+N" badge
 
-Priority waterfall decides placement: `approval > idle(?) > idle(done) > working`. Each zone has configurable max slots. Sessions sorted by LIFO (newest first), FIFO, LRU, frequency, or priority — configurable and chainable.
+When an agent needs your attention (stuck tool, waiting for approval, idle too long), its character gets a pulsing alert ring and moves to follow your cursor — literally nagging you.
 
 ## Features
 
-### Overlay
-- Transparent fullscreen window (Tauri + WebView)
-- Physics-based movement (follow, roam, orbit)
-- 10 animated characters (ghost, cat, skeleton, robot, owl, mushroom, flame, crystal, cloud, blob)
-- Per-character animations (walk, alert, idle, sleep)
-- Eye tracking (eyes follow cursor)
-- Group connections (same-group chars linked with dashed lines, nearest-neighbor chain)
-- Group attraction (same-group chars gently pull toward each other)
-- Collision avoidance between chars
-- GC walk-off animation (chars walk to screen edge when session closes)
-- Hidden count badge (`+N` at cursor center)
-- Smooth cursor interpolation (configurable lerp)
+### Overlay (transparent fullscreen)
+- Physics-based character movement with spring dynamics and collision detection
+- Priority waterfall: pinned → attention → idle-question → free-idle → working
+- Configurable zone limits (max followers, roamers, dots)
+- SVG connection lines between same-group characters
+- Eye tracking (characters look at your cursor)
+- Character facing (flip direction based on movement)
+- Sub-agent satellites (mini characters orbit parents when workers spawn)
+- Poof-in/poof-out appear/disappear animations
+- Walk-off animation when sessions end (character exits to nearest edge)
+- Battery saver mode (single char, slow physics, or BSB-only)
 
-### Panel (Control Center)
-- Grid layout with char SVGs + session names
-- Grouped by source (CLI, Crew, IDE) with sub-groups by workspace
-- CLI/Crew supports `group:title` naming (e.g. "PPTP:fix-bug" → group PPTP)
-- ON SCREEN meta group showing overlay sessions
-- Collapsible groups (persisted to localStorage)
-- Right-click to change character (persisted to backend)
-- Health bar (token usage)
-- Tooltip with full session details
-- Overlay edit mode (toggle click-through)
+### Panel (control center window)
+- All sessions grouped by source (CLI, Crew, IDE) with collapsible hierarchy
+- Left-click to pin/unpin, Shift+click to mute/unmute
+- Right-click for character picker (swap any session's character)
+- Health bar showing context token usage
+- Activity indicators with tool/event status
+- Tooltips with full session details on hover
+- Hide overlay for 5min / 1hr / forever
 
-### Mode Assignment (`modes.ts`)
-- Pure logic module, no DOM
-- Priority waterfall: pinned → attention → idle(?) → idle(done) → working
-- Configurable zones: `max_followers`, `max_roamers`, `max_dots`
-- Follower ordering: `fifo`, `lifo`, `lru`, `freq`, `priority`, `round_robin`
-- Chainable: `"priority,lifo"` = sort by urgency, break ties with newest
-- `group_as_one` mode: `single` (one rep), `cluster` (all close), `carousel` (rotate)
-- `pin_counts_toward_max` option
-- Persistent queue ordering (survives across sync cycles)
+### Battery Saver Box (BSB)
+- Compact draggable window as alternative to full overlay
+- Shows sessions grouped by state (NEEDS YOU, WORKING, DONE)
+- Configurable layout (horizontal, vertical, grid)
+- Transparent background with configurable opacity
 
-### Character System
-- Plugin architecture: add `ui/characters/<id>/` with manifest + SVG + CSS
-- Actions: idle, walk, alert, sleep, think, celebrate, wave, disappear
-- Per-character CSS classes applied in overlay (ghost-walk, cat-alert, etc.)
-- Random assignment from pool on new sessions
-- User override via panel right-click (persisted to backend)
+### Settings Window
+- Schema-driven auto-generated UI
+- Mode selector (full / lite / off)
+- All physics parameters tunable live
+- Changes are hot-reloaded (no restart)
 
-### Backend (Rust/Tauri)
-- HTTP server (:3335) for hooks and state queries
-- Session state management (in-memory HashMap, persisted on shutdown)
-- Scanner orchestrator (spawns source executables periodically)
-- Attention computation (stuck detector, priority rules, 5s loop)
-- Config hot-reload (watches config.yaml)
-- Event persistence (JSONL per session for debug + restart recovery)
-- Shutdown persistence (full session snapshot to `data/sessions.json`)
+### Character System (plugin architecture)
+- 13 characters: ghost, cat, skeleton, robot, owl, mushroom, flame, crystal, cloud, blob, wisp, spark, orb
+- Each character is self-contained (SVG + CSS animations + manifest)
+- Per-source character pools (configurable in config.yaml)
+- Per-session override via right-click in panel
+- Actions: idle, walk, talk, alert, sleep, celebrate, think, wave, disappear
 
-### Sources
-- **kiro-ide** — discovers IDE sessions from Kiro's SQLite storage
-- **kiro-cli-v2/v3** — discovers CLI sessions from process list
-- **kiro-crew** — discovers Crew sessions from crew config
-- **Hook dispatch** — unified entry point for all Kiro hooks (PreToolUse, PostToolUse, Stop, UserPromptSubmit)
+### Hook Integration (IDE event pipeline)
+- Captures PreToolUse, PostToolUse, Stop, UserPromptSubmit from Kiro
+- Enriches events with file paths, tool status, task progress, worker lifecycle
+- Classifies sessions by source (IDE, CLI v2, CLI v3, Crew)
+- Formats action text with emoji icons per tool type
 
-### Enriched Events
-- `tool_ok` — tool exit success/failure
-- `tool_result` — short result text (e.g. "3/5: Fix bug")
-- `prompt` — user's last prompt
-- `description` — agent's self-summary
-- `status` — agent status (in_progress, completed, waiting_on_user)
-- `priority` — hook-set priority (high, normal, low)
-- `last_user_ts` — timestamp of last user interaction
-- `interaction_count` — number of user interactions (for frequency sorting)
+### Attention System
+- Source-explicit attention (hooks set directly)
+- Core rules: tool stuck >30s → approval needed, running >120s → stuck
+- Waiting statuses trigger attention (waiting_on_user, waiting_for_approval)
+- Attention-since timestamps for recency ordering
 
-## Architecture
+### State Persistence
+- Sessions survive app restarts (if downtime < 1 hour)
+- Pin/mute/title preferences persisted to data/sessions.json
+- Event cache in JSONL for recovery
+- Config hot-reload via filesystem watcher
+
+## Architecture Overview
 
 ```
-src-tauri/src/
-  lib.rs        — Tauri app setup, shutdown persistence
-  state.rs      — Session store, push_event, push_sessions, GC
-  server.rs     — HTTP endpoints (/state, /event, /sessions, /cursor, /title, /character)
-  attention.rs  — Attention computation loop (stuck detector, priority rules)
-  scanner.rs    — Scanner orchestrator (spawns source executables)
-  overlay.rs    — Overlay window management, cursor broadcast
-  config.rs     — Config hot-reload
+┌─────────────────────────────────────────────────────────────┐
+│                     Tauri Desktop App                         │
+├──────────────────────┬──────────────────────────────────────┤
+│   Rust Backend       │   TypeScript Frontend (Vite)          │
+│                      │                                       │
+│  ┌─────────────┐    │   ┌──────────┐  ┌─────────────────┐  │
+│  │ HTTP Server │◄───┼───│  Panel   │  │    Overlay       │  │
+│  │  :3335      │    │   │ (control)│  │ (transparent)    │  │
+│  └──────┬──────┘    │   └──────────┘  │  ┌───────────┐  │  │
+│         │           │                  │  │  Physics   │  │  │
+│  ┌──────▼──────┐    │   ┌──────────┐  │  │  Engine    │  │  │
+│  │Session Store│    │   │   BSB    │  │  └───────────┘  │  │
+│  │ (in-memory) │    │   │(compact) │  │  ┌───────────┐  │  │
+│  └──────┬──────┘    │   └──────────┘  │  │ Characters │  │  │
+│         │           │                  │  │  (13 SVG)  │  │  │
+│  ┌──────▼──────┐    │   ┌──────────┐  │  └───────────┘  │  │
+│  │  Attention  │    │   │ Settings │  └─────────────────┘  │
+│  │   Loop (5s) │    │   └──────────┘                       │
+│  └─────────────┘    │                                       │
+│                      │                                       │
+│  ┌─────────────┐    │                                       │
+│  │  Scanners   │    │                                       │
+│  │ (Python)    │    │                                       │
+│  └─────────────┘    │                                       │
+│                      │                                       │
+│  ┌─────────────┐    │                                       │
+│  │Config Watch │    │                                       │
+│  │(hot-reload) │    │                                       │
+│  └─────────────┘    │                                       │
+├──────────────────────┴──────────────────────────────────────┤
+│                External: Kiro IDE Hooks                       │
+│  PreToolUse → PostToolUse → Stop → UserPromptSubmit          │
+│       ↓ hook-dispatch.py → translate → POST /event           │
+└─────────────────────────────────────────────────────────────┘
+```
 
-ui/
-  overlay/
-    overlay.ts  — Physics, rendering, DOM management
-    modes.ts    — Pure mode assignment logic (waterfall, sorting)
-    overlay.css — Styles, animations, transitions
-  panel/
-    panel.ts    — Control center grid
-    panel.css   — Panel styles
-  shared/
-    types.ts    — TypeScript interfaces
-    bridge.ts   — Tauri/HTTP bridge, state polling
-  characters/
-    registry.ts — Character discovery
-    types.ts    — Plugin interface
-    ghost/cat/skeleton/robot/owl/mushroom/flame/crystal/cloud/blob/
+## Project Structure
 
-sources/
-  hook-dispatch.py  — Unified hook entry point
-  translate.py      — Event translation utilities
-  kiro-ide/         — IDE scanner + hook
-  kiro-cli-v2/     — CLI v2 scanner + hook
-  kiro-cli-v3/     — CLI v3 scanner + hook
-  kiro-crew/       — Crew scanner
+```
+nagents/
+├── src-tauri/src/           # Rust backend
+│   ├── lib.rs               # App entry, Tauri setup, persistence
+│   ├── server.rs            # HTTP API (POST /event, GET /state, etc.)
+│   ├── state.rs             # SessionStore (in-memory, thread-safe)
+│   ├── scanner.rs           # Scanner orchestrator (spawns Python scripts)
+│   ├── attention.rs         # Attention computation loop (every 5s)
+│   ├── config.rs            # Config loading + hot-reload via notify
+│   ├── overlay.rs           # Overlay window management (Tauri)
+│   └── cursor.rs            # macOS cursor position (CoreGraphics)
+├── ui/                      # TypeScript frontend
+│   ├── main.ts              # Panel entry point
+│   ├── overlay-entry.ts     # Overlay entry point
+│   ├── panel/               # Control center
+│   │   ├── panel.ts         # Session list, grouping, interactions
+│   │   └── panel.css        # Panel styling (dark theme)
+│   ├── overlay/             # Transparent overlay
+│   │   ├── overlay.ts       # Physics engine, rendering, sync
+│   │   ├── overlay.css      # Mode styles, transitions, satellites
+│   │   └── modes.ts         # Priority waterfall, zone assignment
+│   ├── bsb/                 # Battery Saver Box
+│   │   ├── bsb.ts           # Compact session display
+│   │   └── bsb.css          # BSB styling
+│   ├── settings/            # Settings window
+│   │   ├── settings-ui.ts   # Schema-driven form generation
+│   │   └── settings.css     # Settings styling
+│   ├── characters/          # 13 character plugins
+│   │   ├── registry.ts      # Character lookup by ID
+│   │   ├── types.ts         # CharacterDef interface
+│   │   └── <id>/            # Per-character folder
+│   │       ├── manifest.ts  # Actions, metadata, SVG import
+│   │       ├── <id>.svg     # Character artwork
+│   │       └── animations.css # Keyframes per action
+│   └── shared/              # Cross-window utilities
+│       ├── types.ts         # Session, Config, StateSnapshot interfaces
+│       ├── bridge.ts        # Tauri IPC + HTTP fallback
+│       ├── settings.ts      # localStorage → config priority cascade
+│       ├── config-schema.ts # Settings schema definitions
+│       └── char-template.ts # Shared character HTML renderer
+├── sources/                 # Session discovery + event hooks
+│   ├── hook-dispatch.py     # Routes hooks to correct source handler
+│   ├── kiro_translate.py    # Shared event enrichment logic
+│   ├── kiro-ide/            # IDE session scanner + hook handler
+│   ├── kiro-crew/           # Crew session scanner
+│   ├── kiro-cli-v2/         # CLI v2 scanner + hook
+│   └── kiro-cli-v3/         # CLI v3 scanner + hook
+├── demo/                    # Standalone demo (GitHub Pages)
+│   ├── index.html           # Demo entry point
+│   └── demo.ts              # Simulated overlay with mock data
+├── tests/                   # Vitest tests
+├── data/                    # Runtime state (gitignored)
+│   ├── sessions.json        # Persisted pin/mute/title state
+│   ├── events/              # JSONL event cache per session
+│   └── app_closed_at        # Shutdown timestamp
+├── comms/                   # Multi-agent collaboration
+│   ├── app-agent/           # Core logic agent
+│   ├── anim-agent/          # Visual/animation agent
+│   ├── data-agent/          # Data sources agent
+│   └── test-agent/          # QA/testing agent
+├── config.yaml              # Main configuration (hot-reloaded)
+├── config.local.yaml        # Local overrides (gitignored)
+├── vite.config.ts           # Vite build config (normal + demo mode)
+├── package.json             # Dependencies and scripts
+├── start.sh                 # tmux-based app launcher
+└── .github/workflows/       # GitHub Pages demo deployment
+```
 
-config.yaml         — All settings (hot-reloaded)
+## Getting Started
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (latest stable)
+- [Node.js](https://nodejs.org/) 20+
+- [Tauri CLI](https://v2.tauri.app/start/prerequisites/) prerequisites (Xcode tools on macOS)
+
+### Development
+
+```bash
+# Install JS dependencies
+npm install
+
+# Run full app (Rust + Vite + native windows)
+npm run tauri:dev
+
+# Or use the tmux launcher
+./start.sh start
+
+# Run frontend only (browser mode, no Tauri)
+npm run dev
+
+# Run demo mode
+npm run demo:dev
+```
+
+### Build
+
+```bash
+# Production app bundle
+npm run tauri:build
+
+# Demo for GitHub Pages
+npm run demo:build
+```
+
+### Testing
+
+```bash
+npm test              # Run tests once
+npm run test:watch    # Watch mode
 ```
 
 ## Configuration
 
+Edit `config.yaml` (changes are hot-reloaded):
+
 ```yaml
-overlay:
-  follow_strength: 0.04      # Physics pull toward cursor
-  roam_strength: 0.008       # Physics pull toward roam target
-  collision_distance: 100    # Min distance between chars (px)
-  revolve_radius: 50         # Dot orbit radius
-  dot_scale: 0.5             # Dot shrink factor
-  cursor_fps: 5              # Cursor HTTP poll rate
-  cursor_smoothing: 0.07     # Lerp factor (lower=smoother, higher=snappier)
-  physics_fps: 60            # Render loop rate
-  max_followers: 2           # Cursor follow slots
-  max_roamers: 3             # Free roam slots
-  max_dots: 5                # Dot orbit slots
-  follower_mode: "priority,lifo"  # Sorting chain
-  group_as_one: false        # Merge same-group chars
-  group_display: cluster     # single | cluster | carousel
-  round_robin_sec: 10        # Rotation interval
+# HTTP server port
+http_port: 3335
 
+# Sources: scanner commands + intervals
+sources:
+  kiro-ide:
+    scanner: "python3 sources/kiro-ide/scan.py"
+    interval_sec: 60
+    hook: true
+    enabled: true
+
+# Attention rules
 attention_rules:
-  tool_stuck_sec: 30         # Tool event age → approval
-  running_stuck_sec: 120     # Running age → stuck
+  idle_threshold_sec: 30
+  tool_stuck_sec: 30
+  running_stuck_sec: 120
+  waiting_statuses:
+    - waiting_on_user
+    - waiting_for_approval
+
+# Overlay physics and behavior
+overlay:
+  overlay_mode: full          # full | lite | off
+  max_followers: 2
+  max_roamers: 3
+  max_dots: 5
+  follow_strength: 0.008
+  physics_fps: 60
+  char_size: 44
+  working_mode: roam          # roam | queue
+
+# Character pools per source
+characters:
+  kiro-crew: ghost,flame,crystal
+  kiro-cli-v2: cat,skeleton,owl
+  kiro-ide: ghost,robot,mushroom,cloud
 ```
 
-## Testing
+Local overrides go in `config.local.yaml` (gitignored, deep-merged on top).
 
-```bash
-python3 test-flow.py           # 20-assertion lifecycle test
-python3 test-lifecycle.py      # Full 6-phase visual lifecycle
-python3 test-overlay.py zones  # Zone threshold test
-python3 test-overlay.py status # Current backend state
+## HTTP API
+
+The Rust backend exposes a local HTTP API on port 3335:
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/health` | Liveness check |
+| GET | `/state` | Full state snapshot (all sessions) |
+| GET | `/config` | Current merged config |
+| GET | `/cursor` | Current cursor position (macOS) |
+| POST | `/event` | Push event update for a session |
+| POST | `/sessions` | Scanner pushes session batch |
+| POST | `/title` | Set session display title |
+| POST | `/character` | Set session character |
+| POST | `/config` | Patch config.local.yaml |
+
+## Hook Setup
+
+Install the Kiro hook to enable real-time event tracking:
+
+```json
+{
+  "version": "v1",
+  "hooks": [
+    { "name": "nagents: tool start", "trigger": "PreToolUse",
+      "action": { "type": "command", "command": "python3 <path>/sources/kiro-ide/hook.py" } },
+    { "name": "nagents: tool end", "trigger": "PostToolUse",
+      "action": { "type": "command", "command": "python3 <path>/sources/kiro-ide/hook.py" } },
+    { "name": "nagents: session stop", "trigger": "Stop",
+      "action": { "type": "command", "command": "python3 <path>/sources/kiro-ide/hook.py" } },
+    { "name": "nagents: user prompt", "trigger": "UserPromptSubmit",
+      "action": { "type": "command", "command": "python3 <path>/sources/kiro-ide/hook.py" } }
+  ]
+}
 ```
 
-## Development
+## Adding a Character
 
-```bash
-./start.sh          # Start (tmux + cargo tauri dev)
-./start.sh stop     # Stop
-```
+1. Create `ui/characters/<id>/` with:
+   - `manifest.ts` implementing `CharacterDef` (actions map, SVG import)
+   - `<id>.svg` (64×64 viewBox, semantic class names for animated parts)
+   - `animations.css` (keyframes for idle, walk, alert, think, etc.)
+2. Register in `ui/characters/registry.ts`
+3. Import CSS in `ui/main.ts` and `ui/overlay-entry.ts`
 
-Requires: Rust, Node.js, Tauri CLI (`cargo install tauri-cli`).
+## Overlay Modes
 
-## Demo (GitHub Pages)
+| Mode | Behavior |
+|------|----------|
+| **full** | All features: follow, roam, dots, connections, collisions |
+| **lite** | Single follower, no roam/dots, 30fps, slow cursor tracking |
+| **off** | Overlay hidden, BSB window shown instead |
 
-A standalone web demo showcasing the overlay behavior:
-- Dropdown to select source (CLI/IDE/Crew)
-- Text input for `group:title`
-- Buttons to change state (working → done → approval → stuck)
-- Randomize button (spawns N sessions with random states)
-- Full lifecycle replay (auto-runs through all phases)
-- Pure frontend — no Tauri/Rust needed, just the overlay + modes.ts
+## Known Issues
 
-## Roadmap
+See [BUGS.md](./BUGS.md) for tracked issues. Summary of code-level concerns:
 
-- [ ] Demo page (GitHub Pages)
-- [ ] Pin UI (panel right-click → pin session/group)
-- [ ] Panel meta sidebar (colored zones: following/roaming/dots/hidden)
-- [ ] Smooth transition animations (CSS: appear/hide/mode-change)
-- [ ] External source plugins (Copilot, Claude, Cursor)
-- [ ] Notification sounds (configurable per priority)
-- [ ] macOS menu bar integration
-- [ ] Sleep/wake handling (pause timers during display sleep)
+- `source_as_group` config field exists in types but has no behavioral implementation
+- Panel log message says "1.5s" but actual poll interval is 3000ms
+- `#overlay-edit-btn` handler code exists but the button is not rendered in panel HTML
+- `sub_agent_names` field in types.ts is dead — overlay uses `workers` via type assertion
+- Duplicate HTTP POST when changing character (posts to both `/character` and `/event`)
+- `animFrameId` is never used to cancel the animation loop (minor cleanup issue)
+- Legacy CSS class aliases (`.char-appearing`/`.char-hiding`) coexist with newer `.char-poof-in`/`.char-poof-out`
 
 ## License
 
-MIT
+Private — not published.

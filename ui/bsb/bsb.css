@@ -17,6 +17,7 @@ html, body {
   border: 1px solid rgba(167, 139, 250, 0.12);
   border-radius: 10px;
   cursor: grab;
+  transition: width 0.3s ease, height 0.3s ease;
 }
 #bsb:active { cursor: grabbing; }
 
@@ -42,6 +43,7 @@ html, body {
   gap: 2px;
   padding: 3px 4px;
   border-radius: 6px;
+  transition: opacity 0.2s ease;
 }
 
 .bsb-label {
@@ -58,12 +60,67 @@ html, body {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
+  transition: flex-direction 0.3s ease;
 }
 
 /* Dividers */
 .bsb-divider {
   width: 100%; height: 1px;
   background: rgba(167, 139, 250, 0.12);
+  transition: width 0.2s ease, height 0.2s ease;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
+
+/* Appear: chars pop in when added */
+@keyframes bsb-pop-in {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Disappear: chars shrink out */
+@keyframes bsb-pop-out {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3); }
+}
+
+/* Layout transition: brief crossfade on container content */
+@keyframes bsb-layout-shift {
+  0% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* Apply appear animation to all char elements */
+.char-tpl {
+  animation: bsb-pop-in 0.25s ease-out both;
+}
+
+/* Stagger: each successive char animates slightly later */
+.char-tpl:nth-child(2) { animation-delay: 0.04s; }
+.char-tpl:nth-child(3) { animation-delay: 0.08s; }
+.char-tpl:nth-child(4) { animation-delay: 0.12s; }
+.char-tpl:nth-child(5) { animation-delay: 0.16s; }
+
+/* Leaving chars (added via JS before removal) */
+.char-tpl.bsb-leaving {
+  animation: bsb-pop-out 0.2s ease-in both;
+  pointer-events: none;
+}
+
+/* Layout changed: brief fade-in on container */
+#bsb.bsb-layout-shift {
+  animation: bsb-layout-shift 0.3s ease-out;
+}
+
+/* Attention pulse: subtle glow when state changes */
+@keyframes bsb-pulse {
+  0% { border-color: rgba(167, 139, 250, 0.4); }
+  100% { border-color: rgba(167, 139, 250, 0.12); }
+}
+
+#bsb.bsb-pulse {
+  animation: bsb-pulse 0.6s ease-out;
 }
 
 /* ─── Section hues (light background tint per state) ─────────────────────── */

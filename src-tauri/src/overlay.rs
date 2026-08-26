@@ -29,9 +29,10 @@ pub fn start_cursor_broadcast(app: AppHandle) {
 /// Create (or show) the transparent overlay window.
 #[tauri::command]
 pub fn create_overlay(app: AppHandle) -> Result<(), String> {
+    // Always destroy and recreate to ensure fresh code (no WebKit cache issues)
     if let Some(overlay) = app.get_webview_window("overlay") {
-        overlay.show().map_err(|e| e.to_string())?;
-        return Ok(());
+        let _ = overlay.destroy();
+        std::thread::sleep(Duration::from_millis(200));
     }
 
     // Use App URL — Tauri injects IPC bridge properly
@@ -52,9 +53,11 @@ pub fn create_overlay(app: AppHandle) -> Result<(), String> {
     overlay
         .set_ignore_cursor_events(true)
         .map_err(|e| e.to_string())?;
+    // Hide from screen share/screenshots (macOS: sharingType = .none)
+    overlay.set_content_protected(true).map_err(|e| e.to_string())?;
     overlay.show().map_err(|e| e.to_string())?;
 
-    info!("[overlay] window created");
+    info!("[overlay] window created (fresh)");
     Ok(())
 }
 
@@ -118,4 +121,31 @@ pub fn hide_bsb_window(app: AppHandle) -> Result<(), String> {
 /// Get global cursor position (platform-specific).
 pub fn get_cursor_position() -> (f64, f64) {
     crate::cursor::get_cursor_position()
+}
+
+/// Show the settings window (creates if not exists).
+#[tauri::command]
+pub fn show_settings_window(app: AppHandle) -> Result<(), String> {
+    use tauri::WebviewWindowBuilder;
+    use tauri::WebviewUrl;
+
+    if let Some(win) = app.get_webview_window("settings") {
+        win.show().map_err(|e| e.to_string())?;
+        win.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let url = WebviewUrl::App("settings.html".into());
+
+    let win = WebviewWindowBuilder::new(&app, "settings", url)
+        .title("nagents — Settings")
+        .decorations(true)
+        .resizable(true)
+        .inner_size(500.0, 600.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    win.show().map_err(|e| e.to_string())?;
+    info!("[settings] window created");
+    Ok(())
 }

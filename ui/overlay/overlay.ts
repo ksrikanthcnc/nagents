@@ -9,7 +9,7 @@
  */
 
 import type { Session, CursorPosition, OverlayConfig } from "../shared/types";
-import { pollState, getConfig, setOverlayClickthrough, log } from "../shared/bridge";
+import { pollState, getConfig, setOverlayClickthrough, log, onConfigChanged, onStateChanged } from "../shared/bridge";
 import { getCharacter } from "../characters/registry";
 import { computeModes, type CharMode, type CharState, type ModeConfig, MODE_DEFAULTS } from "./modes";
 
@@ -35,6 +35,7 @@ interface OverlayChar {
 // ─── State ──────────────────────────────────────────────────────────────────
 
 let cursor: CursorPosition = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+let cursorTarget: CursorPosition = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 const chars: Map<string, OverlayChar> = new Map();
 let container: HTMLElement | null = null;
 let animFrameId: number | null = null;
@@ -44,6 +45,7 @@ let lastSummaryLog = 0;
 let hiddenBadgeEl: HTMLElement | null = null;
 /** True when all chars have mode=hidden (skip cursor poll) */
 let allCharsHidden = false;
+let frameInterval = 1000 / 60;
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -77,6 +79,29 @@ let cfg: OverlayConfig = {
 const DAMPING = 0.88;
 let CHAR_SIZE = 44; // base char size, configurable via cfg.char_size
 
+// ─── Overlay Mode Presets ────────────────────────────────────────────────────
+
+/** Apply overlay_mode preset overrides to cfg.
+ * "lite": 1 follower, no roam/dots, slow cursor, no connectors.
+ * "off": handled externally (overlay hidden, BSB shown).
+ */
+function applyOverlayMode(): void {
+  const mode = (cfg as any).overlay_mode || "full";
+  if (mode === "lite") {
+    cfg.max_followers = 1;
+    cfg.max_roamers = 0;
+    cfg.max_dots = 0;
+    cfg.cursor_fps = 1;
+    (cfg as any).cursor_smoothing = 0.04;
+    cfg.follow_strength = 0.003;
+    (cfg as any).connectors = false;
+    (cfg as any).collision_distance = 0;
+    cfg.physics_fps = 30; // 30fps is smooth enough for 1 slow char
+  }
+  // "full" = no overrides, use config as-is
+  // "off" = handled by battery_saver flow (overlay hidden)
+}
+
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 export async function initOverlay(el: HTMLElement): Promise<void> {
@@ -91,13 +116,14 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   try {
     const appConfig = await getConfig();
     if (appConfig.overlay) cfg = appConfig.overlay;
+    applyOverlayMode();
     if ((cfg as any).char_size) CHAR_SIZE = (cfg as any).char_size;
-    log("overlay", `config loaded: followers=${cfg.max_followers} roamers=${cfg.max_roamers} dots=${cfg.max_dots} charSize=${CHAR_SIZE}`);
+    log("overlay", `config loaded: mode=${(cfg as any).overlay_mode || "full"} followers=${cfg.max_followers} roamers=${cfg.max_roamers} dots=${cfg.max_dots} charSize=${CHAR_SIZE}`);
   } catch {
     log("overlay", "config load failed, using defaults");
   }
 
-  const cursorInterval = Math.round(1000 / cfg.cursor_fps);
+  let cursorInterval = Math.round(1000 / cfg.cursor_fps);
   (async () => {
     while (true) {
       // Pause cursor poll when no chars on screen or all chars hidden
@@ -109,8 +135,8 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
         const resp = await fetch("http://127.0.0.1:3335/cursor");
         if (resp.ok) {
           const raw = await resp.json();
-          cursor.x = raw.x;
-          cursor.y = raw.y - 38; // menu bar offset (macOS ~38px)
+          cursorTarget.x = raw.x;
+          cursorTarget.y = raw.y - 38; // menu bar offset (macOS ~38px)
           cursorReady = true;
         }
       } catch {}
@@ -118,20 +144,69 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
     }
   })();
 
-  let configPollCount = 0;
-  pollState(async (state) => {
-    if (!cursorReady) return;
-    // Re-read config every 5 polls (~5s)
-    configPollCount++;
-    if (configPollCount % 5 === 0) {
-      try { const fresh = await getConfig(); if (fresh.overlay) { cfg = fresh.overlay; if ((cfg as any).char_size) CHAR_SIZE = (cfg as any).char_size; } } catch {}
+  // Listen for config changes (fs watch events from Rust, instant)
+  onConfigChanged((fresh) => {
+    if (fresh.overlay) {
+      const prevWorkingMode = (cfg as any).working_mode;
+      cfg = fresh.overlay;
+      applyOverlayMode();
+      if ((cfg as any).char_size) CHAR_SIZE = (cfg as any).char_size;
+      cursorInterval = Math.round(1000 / cfg.cursor_fps);
+      frameInterval = 1000 / cfg.physics_fps;
+      // Poof all working chars when working_mode changes (visual cue)
+      if (prevWorkingMode && prevWorkingMode !== (cfg as any).working_mode) {
+        for (const char of chars.values()) {
+          if (char.session.event === "running" || char.session.event === "tool") {
+            char.el.classList.remove("char-poof");
+            void char.el.offsetWidth;
+            char.el.classList.add("char-poof");
+          }
+        }
+      }
+      log("overlay", `config updated: mode=${(cfg as any).overlay_mode || "full"} fps=${cfg.physics_fps} cursor=${cfg.cursor_fps}`);
     }
+  });
+
+  // Fallback: re-read config every 10s in case Tauri events don't reach this window
+  setInterval(async () => {
+    try {
+      const fresh = await getConfig();
+      if (fresh.overlay) {
+        cfg = fresh.overlay;
+        applyOverlayMode();
+        if ((cfg as any).char_size) CHAR_SIZE = (cfg as any).char_size;
+        cursorInterval = Math.round(1000 / cfg.cursor_fps);
+        frameInterval = 1000 / cfg.physics_fps;
+      }
+    } catch {}
+  }, 10000);
+
+  onStateChanged(async (state) => {
+    if (!cursorReady) return;
     // ALL sessions shown on overlay. Waterfall determines zone (follow/roam/dot/hidden).
     syncChars(state.sessions.filter(s => s.active));
-  }, 1000);
+  });
 
   startRenderLoop();
   log("overlay", "render loop started");
+
+  // Sleep/wake detection: pause overlay after system sleep, resume with delay
+  let lastTimestamp = Date.now();
+  setInterval(() => {
+    const now = Date.now();
+    const gap = now - lastTimestamp;
+    lastTimestamp = now;
+    // If >10s gap between checks (interval is 2s), system was sleeping
+    if (gap > 10000) {
+      const delay = ((cfg as any).startup_delay_sec ?? 5) * 1000;
+      log("overlay", `wake detected (gap=${Math.round(gap/1000)}s), pausing for ${delay/1000}s`);
+      allCharsHidden = true; // pause physics
+      setTimeout(() => {
+        allCharsHidden = false;
+        log("overlay", "resumed after wake delay");
+      }, delay);
+    }
+  }, 2000);
 }
 
 // ─── Sync ───────────────────────────────────────────────────────────────────
@@ -169,7 +244,7 @@ function syncChars(sessions: Session[]): void {
         log("overlay", `${char.session.name}: leaving (walk-off)`);
       }
       // Check if off screen → actually remove
-      if (char.x < -CHAR_SIZE * 2 || char.x > window.innerWidth + CHAR_SIZE ||
+      if (goneMs > 10000 || char.x < -CHAR_SIZE * 2 || char.x > window.innerWidth + CHAR_SIZE ||
           char.y < -CHAR_SIZE * 2 || char.y > window.innerHeight + CHAR_SIZE) {
         char.el.remove();
         chars.delete(id);
@@ -198,7 +273,15 @@ function syncChars(sessions: Session[]): void {
       log("overlay", `added: ${session.name}`);
     } else {
       const char = chars.get(session.id)!;
+      // Detect pin/mute state change → poof animation
+      const prevPinned = char.session.pinned;
+      const prevMuted = (char.session as any).muted;
       char.session = session;
+      if (prevPinned !== session.pinned || prevMuted !== (session as any).muted) {
+        char.el.classList.remove("char-poof");
+        void char.el.offsetWidth;
+        char.el.classList.add("char-poof");
+      }
       // Clear removal debounce if session came back
       delete char.el.dataset.goneAt;
       // Update char SVG if character changed (user picked in panel)
@@ -234,7 +317,6 @@ function syncChars(sessions: Session[]): void {
 
 /** Cached previous assignments — only recompute when inputs change meaningfully */
 let prevAssignments: Map<string, import("./modes").ModeAssignment> = new Map();
-let prevPriorityHash = "";
 
 function applyModes(): void {
   const charArray = Array.from(chars.values()).filter(c => !c.el.dataset.leaving);
@@ -248,7 +330,7 @@ function applyModes(): void {
     interactionCount: c.session.interaction_count ?? 0,
   }));
 
-  const batterySaverOn = localStorage.getItem("nagents:battery_saver") === "true";
+  const batterySaverOn = localStorage.getItem("nagents:battery_saver") === "true" || (cfg as any).overlay_mode === "off";
 
   const modeCfg: ModeConfig = {
     max_followers: batterySaverOn ? 1 : (cfg.max_followers ?? MODE_DEFAULTS.max_followers),
@@ -260,31 +342,24 @@ function applyModes(): void {
     group_as_one: localStorage.getItem("nagents:group_as_one") === "true" || (cfg.group_as_one ?? MODE_DEFAULTS.group_as_one),
     group_display: localStorage.getItem("nagents:group_display") || (cfg as any).group_display || "cluster",
     working_mode: (cfg as any).working_mode || "roam",
+    working_counts_toward_max: (cfg as any).working_counts_toward_max ?? false,
+    attention_follows: (cfg as any).attention_follows ?? true,
+    freq_half_life_min: (cfg as any).freq_half_life_min ?? 60,
   };
+  // Compute modes only when state has meaningfully changed
+  const stateFingerprint = states.map(s =>
+    `${s.sessionId}:${s.session.event}:${s.session.attention}:${s.session.pinned}:${(s.session as any).muted}:${s.session.active}`
+  ).sort().join(",");
 
-  // Only recompute modes if something meaningful changed:
-  // - session set changed (added/removed)
-  // - any session's priority LEVEL changed (not timestamp)
-  // - pinned state changed
-  // - config changed
-  const currentIds = states.map(s => s.sessionId).sort().join(",");
-  const currentPriorityHash = states.map(s => {
-    const p = s.session;
-    const level = (!p.attention) ? 0 :
-      (p.event === "approval" || p.event === "stuck") ? 4 :
-      (p.event === "idle") ? 3 : 1;
-    return `${s.sessionId}:${level}:${p.pinned ? "P" : ""}:${p.last_user_ts || 0}`;
-  }).sort().join("|") + `|${modeCfg.max_followers}:${modeCfg.max_roamers}:${modeCfg.max_dots}:${modeCfg.group_as_one}:${modeCfg.group_display}:${batterySaverOn}`;
+  const assignments = computeModes(states, modeCfg);
 
-  let assignments: Map<string, import("./modes").ModeAssignment>;
-  if (currentPriorityHash === prevPriorityHash && prevAssignments.size > 0) {
-    // No meaningful change — reuse previous assignments
-    assignments = prevAssignments;
-  } else {
-    assignments = computeModes(states, modeCfg);
-    prevAssignments = assignments;
-    prevPriorityHash = currentPriorityHash;
+  // Only publish + apply DOM changes if assignments actually differ
+  const newAssignmentStr = JSON.stringify(Array.from(assignments.entries()).sort());
+  const prevAssignmentStr = JSON.stringify(Array.from(prevAssignments.entries()).sort());
+  const modesChanged = newAssignmentStr !== prevAssignmentStr;
+  prevAssignments = assignments;
 
+  if (modesChanged) {
     // Publish assignments to localStorage so panel (separate webview) can read them
     const assignmentData: Record<string, string> = {};
     for (const [id, a] of assignments) {
@@ -309,6 +384,14 @@ function applyModes(): void {
         char.el.style.width = `${CHAR_SIZE}px`;
         char.el.style.fontSize = "";
         char.el.style.display = "";
+        // Restore text labels when leaving dot mode
+        char.el.querySelectorAll(".overlay-char-group, .overlay-char-title, .overlay-char-action")
+          .forEach((l: Element) => { (l as HTMLElement).style.display = ""; });
+      }
+      if (newMode === "revolve") {
+        // Hide dot text labels (display:none = no render cost)
+        char.el.querySelectorAll(".overlay-char-group, .overlay-char-title, .overlay-char-action")
+          .forEach((l: Element) => { (l as HTMLElement).style.display = "none"; });
       }
       if (newMode === "roam" && prevMode !== "roam") {
         char.spawnedAt = Date.now();
@@ -360,7 +443,7 @@ function startRenderLoop(): void {
   svg.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;";
   container!.appendChild(svg);
 
-  let frameInterval = 1000 / cfg.physics_fps;
+  frameInterval = 1000 / cfg.physics_fps;
   let lastFrame = 0;
   let frameCount = 0;
 
@@ -389,17 +472,23 @@ function startRenderLoop(): void {
     lastFrame = now;
     frameCount++;
     updatePhysics(cachedBatterySaver, cachedHiddenUntil);
-    // Draw connections (skip in battery saver mode)
-    if (!cachedBatterySaver && frameCount % 3 === 0) {
+    // Draw connections (skip in battery saver or when disabled)
+    const connectorsEnabled = (cfg as any).connectors !== false;
+    if (!cachedBatterySaver && connectorsEnabled && frameCount % 3 === 0) {
       drawConnections(svg);
-    } else if (cachedBatterySaver && svg.innerHTML) {
-      svg.innerHTML = ""; // Clear existing lines when entering battery saver
+    } else if ((cachedBatterySaver || !connectorsEnabled) && svg.innerHTML) {
+      svg.innerHTML = "";
     }
   }
   animFrameId = requestAnimationFrame(tick);
 }
 
 function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
+  // Lerp cursor toward target (smooths jumps from slow poll rate)
+  const smoothing = (cfg as any).cursor_smoothing || 0.12;
+  cursor.x += (cursorTarget.x - cursor.x) * smoothing;
+  cursor.y += (cursorTarget.y - cursor.y) * smoothing;
+
   const charArray = Array.from(chars.values());
   const now = Date.now();
 
@@ -489,6 +578,7 @@ function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
       char.el.style.transformOrigin = `${cx}px ${cy}px`;
       char.el.classList.add("char-dot");
       char.el.classList.remove("char-following", "char-roaming", "char-working");
+      // Dot text opacity set via CSS custom property (only on mode enter, see below)
       // Render position and skip physics
       const newLeft = Math.round(char.x);
       const newTop = Math.round(char.y);
@@ -677,6 +767,13 @@ function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
     const isWorking = char.session.event === "running" || char.session.event === "tool";
     char.el.classList.toggle("char-working", isWorking);
     char.el.classList.toggle("char-attention", !!char.session.attention);
+
+    // Accelerating pulse: starts at 2.5s, speeds up to 0.6s over 5 minutes
+    if (char.session.attention && char.session.attention_since) {
+      const waitingSec = (Date.now() / 1000) - char.session.attention_since;
+      const speed = Math.max(0.6, 2.5 - (waitingSec / 300) * 1.9); // 0s→2.5s, 300s→0.6s
+      char.el.style.setProperty("--pulse-speed", `${speed.toFixed(2)}s`);
+    }
 
     applyCharAnim(char, char.mode === "follow" && char.session.attention ? "alert" : char.mode === "follow" ? "idle" : "walk");
     applyFacing(char);

@@ -85,8 +85,8 @@ const CHAR_SIZE = 44;
 
 // ─── Simulation Data ────────────────────────────────────────────────────────
 
-const SOURCES = ["kiro-ide", "kiro-cli", "crew"] as const;
-const GROUPS = ["haive", "PPTP", "infra", "data-pipeline", "frontend", "ops", "ml-train", "deploy"];
+const SOURCES = ["ide", "cli", "crew"] as const;
+const GROUPS = ["webapp", "backend", "infra", "data-pipeline", "frontend", "ops", "ml-train", "deploy"];
 const TASKS = [
   "fix-pipeline", "add-logging", "update-deps", "refactor-auth", "scale-pods",
   "debug-crash", "write-tests", "migrate-db", "optimize-query", "review-pr",
@@ -136,8 +136,10 @@ function updateAttentionQueue(): void {
   const listEl = document.getElementById("attention-list");
   if (!listEl) return;
 
-  // Get chars that are following (need attention)
-  const followers = Array.from(chars.values()).filter(c => c.mode === "follow");
+  // Get chars that are following AND need attention (not just running)
+  const followers = Array.from(chars.values()).filter(
+    c => c.mode === "follow" && c.session.attention === true
+  );
 
   listEl.innerHTML = "";
   if (followers.length === 0) {
@@ -206,6 +208,7 @@ function createMockSession(overrides?: Partial<Session>): Session {
     attention_since: isAttention ? Date.now() : null,
     on_overlay: true,
     pinned: false,
+    muted: false,
     tool_ok: null,
     tool_result: null,
     prompt: null,
@@ -302,7 +305,6 @@ function applyModes(): void {
     sessionId: c.session.id,
     session: c.session,
     currentMode: c.mode,
-    modeSetAt: c.modeSetAt,
     spawnedAt: c.spawnedAt,
     lastUserTs: c.session.last_user_ts ?? c.spawnedAt,
     interactionCount: c.session.interaction_count ?? 0,
@@ -317,6 +319,7 @@ function applyModes(): void {
     pin_counts_toward_max: cfg.pin_counts_toward_max,
     group_as_one: cfg.group_as_one,
     group_display: "cluster",
+    working_mode: "roam",
   };
 
   const assignments = computeModes(states, modeCfg);
@@ -809,10 +812,14 @@ function runSimulation(): void {
         const target = running[Math.floor(Math.random() * running.length)];
         const newTool = TOOLS[Math.floor(Math.random() * TOOLS.length)];
         const newFile = FILES[Math.floor(Math.random() * FILES.length)];
+        // Occasionally show sub-agent activity
+        const hasSubAgent = Math.random() < 0.15;
         updateSession(target.session.id, {
           event: "tool",
           tool: newTool,
           file: newFile,
+          sub_agents: hasSubAgent ? 1 : 0,
+          sub_agent_names: hasSubAgent ? ["context-gatherer"] : [],
           mtime: Date.now(),
         });
       }

@@ -137,3 +137,90 @@ export function log(module: string, msg: string, data?: unknown): void {
     console.log(`[${ts}] [${module}]`, msg);
   }
 }
+
+// ─── State Change Listener ──────────────────────────────────────────────────
+
+/**
+ * Listen for state-changed events from Rust (emitted on every session/event push).
+ * Calls handler immediately with current state, then on every change.
+ * Falls back to polling if Tauri events unavailable (browser mode).
+ */
+export async function onStateChanged(
+  handler: (state: StateSnapshot) => void,
+  fallbackIntervalMs = 1500
+): Promise<() => void> {
+  // Immediate call
+  try {
+    const state = await getState();
+    handler(state);
+  } catch {}
+
+  if (isTauri()) {
+    try {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen("state-changed", async () => {
+        try {
+          const state = await getState();
+          handler(state);
+        } catch {}
+      });
+      return unlisten;
+    } catch {}
+  }
+
+  // Fallback: poll (browser mode)
+  let active = true;
+  (async () => {
+    while (active) {
+      await new Promise(r => setTimeout(r, fallbackIntervalMs));
+      if (!active) break;
+      try {
+        const state = await getState();
+        handler(state);
+      } catch {}
+    }
+  })();
+  return () => { active = false; };
+}
+
+
+/**
+ * Listen for config-changed events from Rust fs watcher.
+ * Calls handler immediately with current config, then on every change.
+ * Returns a cleanup function.
+ */
+export async function onConfigChanged(handler: (config: Config) => void): Promise<() => void> {
+  // Immediate call with current config
+  try {
+    const cfg = await getConfig();
+    handler(cfg);
+  } catch {}
+
+  // Listen for Tauri events
+  if (isTauri()) {
+    try {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen("config-changed", async () => {
+        try {
+          const cfg = await getConfig();
+          handler(cfg);
+        } catch {}
+      });
+      return unlisten;
+    } catch {}
+  }
+
+  // Fallback: poll every 3s (browser mode / non-Tauri)
+  let active = true;
+  (async () => {
+    while (active) {
+      await new Promise(r => setTimeout(r, 3000));
+      if (!active) break;
+      try {
+        const cfg = await getConfig();
+        handler(cfg);
+      } catch {}
+    }
+  })();
+  return () => { active = false; };
+}

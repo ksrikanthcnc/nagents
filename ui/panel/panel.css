@@ -213,9 +213,39 @@ body {
   background: rgba(167, 139, 250, 0.06);
 }
 
+.session-muted {
+  opacity: 0.5;
+  border: 1px solid rgba(100, 100, 120, 0.3);
+}
+
 .pin-badge {
   font-size: 8px;
   margin-left: 2px;
+}
+
+.mute-badge {
+  font-size: 8px;
+  margin-left: 2px;
+}
+
+.group-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+
+.group-pin-btn, .group-mute-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  opacity: 0.4;
+  padding: 0 2px;
+  transition: opacity 0.15s;
+}
+
+.group-pin-btn:hover, .group-mute-btn:hover {
+  opacity: 1;
 }
 
 /* ─── Character SVG — 48px fixed ─────────────────────────────────────────── */

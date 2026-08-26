@@ -36,6 +36,8 @@ export interface Session {
   on_overlay: boolean;
   /** User-pinned: always visible, never dots/hides. Set via panel context menu. */
   pinned: boolean;
+  /** User-muted: lowest priority in waterfall. For known-useless sessions. */
+  muted: boolean;
   // ─── Enriched fields (from hooks) ───────────────────────────────────
   /** Tool exit success (true=0, false=nonzero). Null = not applicable. */
   tool_ok: boolean | null;

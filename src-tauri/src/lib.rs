@@ -96,10 +96,11 @@ pub fn run() {
             // Resolve config path (project root / config.yaml)
             let config_path = resolve_config_path(app);
             let config = ConfigHandle::load(&config_path);
-            config.watch();
+            config.watch(Some(app.handle().clone()));
 
             // Create session store
             let store = SessionStore::new();
+            store.set_app_handle(app.handle().clone());
 
             // Set character pools from config (source → pool of char IDs)
             // Config format: "ghost" (single) or will be extended to lists later
@@ -118,10 +119,27 @@ pub fn run() {
             // Clear stale attention for non-idle sessions (fixes #022: missed hook clears during downtime)
             store.clear_stale_attention();
 
-            // Restore pinned state (persisted separately, survives any downtime)
-            let pinned_ids = load_pinned(&project_root);
-            if !pinned_ids.is_empty() {
-                store.restore_pinned(&pinned_ids);
+            // Restore pinned/muted/title state from data/sessions.json
+            let meta = load_session_meta(&project_root);
+            if !meta.is_empty() {
+                // Enforce exclusivity: muted wins over pinned (can't be both)
+                let pinned_ids: Vec<String> = meta.iter()
+                    .filter(|(_, m)| m.pinned && !m.muted)
+                    .map(|(id, _)| id.clone()).collect();
+                let muted_ids: Vec<String> = meta.iter()
+                    .filter(|(_, m)| m.muted)
+                    .map(|(id, _)| id.clone()).collect();
+                if !pinned_ids.is_empty() { store.restore_pinned(&pinned_ids); }
+                if !muted_ids.is_empty() { store.restore_muted(&muted_ids); }
+                // Titles restored via store method
+                for (id, m) in &meta {
+                    if let Some(title) = &m.title {
+                        store.set_title(id, title);
+                    }
+                }
+                info!("[nagents] restored session meta: {} pinned, {} muted, {} titles",
+                    pinned_ids.len(), muted_ids.len(),
+                    meta.values().filter(|m| m.title.is_some()).count());
             }
 
             // Start HTTP server for external hook pushes
@@ -162,6 +180,7 @@ pub fn run() {
             overlay::set_overlay_clickthrough,
             overlay::show_bsb_window,
             overlay::hide_bsb_window,
+            overlay::show_settings_window,
         ])
         .run(tauri::generate_context!())
         .expect("error running nagents");
@@ -335,25 +354,129 @@ fn persist_sessions(store: &state::SessionStore, project_root: &PathBuf) {
             log::warn!("[shutdown] failed to persist sessions: {}", e);
         }
     }
-    // Also persist pinned state separately (survives any downtime)
-    persist_pinned(store, project_root);
+    // Also persist pinned/muted/titles to data/sessions.json
+    persist_session_meta(store, project_root);
 }
 
-/// Persist pinned session IDs to data/pinned.json (always restored, regardless of downtime).
-pub fn persist_pinned(store: &state::SessionStore, project_root: &PathBuf) {
+/// Per-session metadata persisted to data/sessions.json.
+/// Stores pinned, muted, and title overrides in one file.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct SessionMeta {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pinned: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub muted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+}
+
+const SESSION_META_FILE: &str = "data/sessions.json";
+
+/// Persist session metadata (pinned, muted, titles) to data/sessions.json.
+pub fn persist_session_meta(store: &state::SessionStore, project_root: &PathBuf) {
     use std::fs;
-    let pinned_ids = store.get_pinned_ids();
-    let path = project_root.join("data/pinned.json");
+    use std::collections::HashMap;
+
+    let sessions = store.get_all();
+    let mut meta: HashMap<String, SessionMeta> = HashMap::new();
+
+    for s in &sessions {
+        let has_data = s.pinned || s.muted;
+        if has_data {
+            meta.insert(s.id.clone(), SessionMeta {
+                pinned: s.pinned && !s.muted, // exclusivity: muted wins
+                muted: s.muted,
+                title: None,
+            });
+        }
+    }
+
+    // Merge existing titles (from data/titles.json or already in sessions.json)
+    let path = project_root.join(SESSION_META_FILE);
+    if let Ok(existing_json) = fs::read_to_string(&path) {
+        if let Ok(existing) = serde_json::from_str::<HashMap<String, SessionMeta>>(&existing_json) {
+            for (id, existing_meta) in existing {
+                if let Some(title) = existing_meta.title {
+                    meta.entry(id).or_default().title = Some(title);
+                }
+            }
+        }
+    }
+
     let _ = fs::create_dir_all(project_root.join("data"));
-    let _ = fs::write(&path, serde_json::to_string(&pinned_ids).unwrap_or_default());
+    if let Ok(json) = serde_json::to_string_pretty(&meta) {
+        let _ = fs::write(&path, json + "\n");
+    }
 }
 
-/// Load pinned session IDs from data/pinned.json.
-fn load_pinned(project_root: &PathBuf) -> Vec<String> {
+/// Load session metadata from data/sessions.json.
+/// On first run, migrates from legacy pinned.json + titles.json.
+pub fn load_session_meta(project_root: &PathBuf) -> std::collections::HashMap<String, SessionMeta> {
     use std::fs;
-    let path = project_root.join("data/pinned.json");
-    match fs::read_to_string(&path) {
-        Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
-        Err(_) => vec![],
+    use std::collections::HashMap;
+
+    let path = project_root.join(SESSION_META_FILE);
+
+    // If sessions.json exists, use it directly
+    if let Ok(json) = fs::read_to_string(&path) {
+        if let Ok(meta) = serde_json::from_str::<HashMap<String, SessionMeta>>(&json) {
+            return meta;
+        }
+    }
+
+    // First run: migrate from legacy files
+    let mut meta: HashMap<String, SessionMeta> = HashMap::new();
+
+    let pinned_path = project_root.join("data/pinned.json");
+    if let Ok(json) = fs::read_to_string(&pinned_path) {
+        if let Ok(ids) = serde_json::from_str::<Vec<String>>(&json) {
+            for id in ids {
+                meta.entry(id).or_default().pinned = true;
+            }
+        }
+        let _ = fs::remove_file(&pinned_path);
+        info!("[migrate] migrated pinned.json → sessions.json");
+    }
+
+    let titles_path = project_root.join("data/titles.json");
+    if let Ok(json) = fs::read_to_string(&titles_path) {
+        if let Ok(titles) = serde_json::from_str::<HashMap<String, String>>(&json) {
+            for (id, title) in titles {
+                meta.entry(id).or_default().title = Some(title);
+            }
+        }
+        let _ = fs::remove_file(&titles_path);
+        info!("[migrate] migrated titles.json → sessions.json");
+    }
+
+    // Write the merged result
+    if !meta.is_empty() {
+        let _ = fs::create_dir_all(project_root.join("data"));
+        if let Ok(json) = serde_json::to_string_pretty(&meta) {
+            let _ = fs::write(&path, json + "\n");
+        }
+    }
+
+    meta
+}
+
+/// Persist a single title update into sessions.json.
+pub fn persist_title_to_meta(session_id: &str, title: &str, project_root: &PathBuf) {
+    use std::fs;
+    use std::collections::HashMap;
+
+    let path = project_root.join(SESSION_META_FILE);
+    let _ = fs::create_dir_all(project_root.join("data"));
+
+    let mut meta: HashMap<String, SessionMeta> = if let Ok(json) = fs::read_to_string(&path) {
+        serde_json::from_str(&json).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    meta.entry(session_id.to_string()).or_default().title = Some(title.to_string());
+
+    if let Ok(json) = serde_json::to_string_pretty(&meta) {
+        let _ = fs::write(&path, json + "\n");
     }
 }

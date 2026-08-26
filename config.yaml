@@ -57,8 +57,11 @@ panel_order:
 
 # ─── Overlay Physics ─────────────────────────────────────────────────────────
 # Speed and behavior controls for overlay characters.
+# overlay_mode: full (all features), lite (1 char, slow, no connectors), off (BSB only)
 
 overlay:
+  overlay_mode: full             # full | lite | off
+  connectors: false               # Show SVG connection lines between grouped chars
   follow_strength: 0.008        # How strongly chars follow cursor (0.01-0.1)
   roam_strength: 0.008         # How strongly chars move to roam targets
   roam_max_speed: 3            # Max roam speed (pixels/frame)
@@ -80,6 +83,10 @@ overlay:
   max_roamers: 3              # Max free-roaming chars
   max_dots: 5                  # Max dots orbiting cursor
   pin_counts_toward_max: false # Pinned chars are extra (critical tasks), don't consume follower slots
+  attention_follows: true      # Attention sessions always follow (exempt from max_followers, like pinned)
+  show_over_fullscreen: true   # Show overlay on top of fullscreen apps (macOS)
+  hide_from_capture: true      # Hide overlay from screen share/screenshots (macOS)
+  startup_delay_sec: 5         # Seconds to wait after wake/start before showing overlay
   group_as_one: false          # Merge same-group sessions into one visual unit
   # group_display: cluster (all visible, close), single (one rep), carousel (rotate)
   group_display: cluster
@@ -88,11 +95,13 @@ overlay:
   # Base character size in pixels (all scaling is proportional to this)
   char_size: 44
   # Follower ordering (based on last_user_ts, not agent mtime)
-  # Options: fifo, lifo, lru, priority, round_robin (comma-separated chain)
+  # Options: fifo, lifo, lru, priority, round_robin, freq (comma-separated chain)
   follower_mode: "lifo"
+  freq_half_life_min: 60        # Half-life for freq dampening (minutes). Lower = recent bursts win faster.
   round_robin_sec: 3          # Rotation interval for cluster center (seconds)
   # Working sessions: "roam" (always roam, don't take follow slots) or "queue" (normal waterfall)
   working_mode: roam
+  working_counts_toward_max: false  # false = working roamers are extra (like pinned), don't consume roam slots
   # Battery saver box settings
   bsb_max_chars: 5            # Max chars shown in battery saver box
   bsb_opacity: 0              # Background opacity (0.0 = fully transparent, 1.0 = opaque)

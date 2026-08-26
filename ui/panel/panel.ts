@@ -7,7 +7,7 @@
  */
 
 import type { Session, SessionGroup, StateSnapshot, Config } from "../shared/types";
-import { pollState, getConfig, setOverlayClickthrough, log } from "../shared/bridge";
+import { pollState, getConfig, setOverlayClickthrough, log, onStateChanged } from "../shared/bridge";
 import { getCharacter, listCharacters } from "../characters/registry";
 import type { CharacterAction } from "../characters/types";
 
@@ -39,12 +39,20 @@ export async function initPanel(el: HTMLElement): Promise<void> {
   config = await getConfig();
   log("panel", "config loaded", config);
 
-  pollState((state) => {
+  onStateChanged((state) => {
     currentState = state;
-    updatePanel();
-  }, 3000);
+    // Skip DOM updates when panel is not visible (energy saving)
+    if (!document.hidden) {
+      updatePanel();
+    }
+  });
 
-  log("panel", "polling started (1.5s)");
+  // Re-render when panel becomes visible again
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && currentState) updatePanel();
+  });
+
+  log("panel", "state listener started (event-based)");
 }
 
 // ─── Persistence ────────────────────────────────────────────────────────────
@@ -61,7 +69,7 @@ function saveCharOverrides(): void {
 
 /** Hash a session's visible state (to detect what actually changed). */
 function hashSession(session: Session): string {
-  return `${session.character}|${session.event}|${session.attention}|${session.active}|${session.tool}|${session.tokens}|${session.on_overlay}|${session.pinned}`;
+  return `${session.character}|${session.event}|${session.attention}|${session.active}|${session.tool}|${session.tokens}|${session.on_overlay}|${session.pinned}|${session.muted}`;
 }
 
 /**
@@ -71,8 +79,8 @@ function hashSession(session: Session): string {
 function updatePanel(): void {
   if (!container || !currentState || !config) return;
 
-  // Compute current structural key (IDs + pinned states — pinned changes grouping)
-  const currentIds = currentState.sessions.map((s) => `${s.id}:${s.pinned ? "P" : ""}`).sort().join(",");
+  // Compute current structural key (IDs + pinned/muted states — changes grouping)
+  const currentIds = currentState.sessions.map((s) => `${s.id}:${s.pinned ? "P" : ""}${s.muted ? "M" : ""}`).sort().join(",");
 
   // If structure changed OR first render, do full render
   if (currentIds !== lastSessionIds || !container.querySelector(".panel-header")) {
@@ -145,84 +153,6 @@ function updateSessionElement(session: Session): void {
 }
 
 
-/** Render settings form for overlay config. */
-function renderSettings(): string {
-  if (!config) return "";
-  const ov = (config as any).overlay || {};
-  const groupAsOne = localStorage.getItem("nagents:group_as_one") === "true" || ov.group_as_one || false;
-  const groupDisplay = localStorage.getItem("nagents:group_display") || ov.group_display || "cluster";
-  return `<div class="settings-grid">
-    <label>Followers<input type="number" class="cfg-input" data-key="max_followers" value="${ov.max_followers ?? 2}" min="0" max="10"></label>
-    <label>Roamers<input type="number" class="cfg-input" data-key="max_roamers" value="${ov.max_roamers ?? 3}" min="0" max="10"></label>
-    <label>Dots<input type="number" class="cfg-input" data-key="max_dots" value="${ov.max_dots ?? 5}" min="0" max="20"></label>
-    <label>Orbit radius<input type="number" class="cfg-input" data-key="revolve_radius" value="${ov.revolve_radius ?? 50}" min="20" max="150"></label>
-    <label>Dot scale<input type="number" class="cfg-input" data-key="dot_scale" value="${ov.dot_scale ?? 0.55}" min="0.2" max="1" step="0.05"></label>
-    <label>Char size<input type="number" class="cfg-input" data-key="char_size" value="${(ov as any).char_size ?? 44}" min="24" max="80"></label>
-    <label>Collision dist<input type="number" class="cfg-input" data-key="collision_distance" value="${ov.collision_distance ?? 100}" min="30" max="200"></label>
-    <label>Follow strength<input type="number" class="cfg-input" data-key="follow_strength" value="${ov.follow_strength ?? 0.04}" min="0.01" max="0.2" step="0.01"></label>
-    <label>Roam strength<input type="number" class="cfg-input" data-key="roam_strength" value="${ov.roam_strength ?? 0.008}" min="0.002" max="0.05" step="0.002"></label>
-    <label>Follower mode<select class="cfg-input" data-key="follower_mode">
-      <option value="lifo" ${ov.follower_mode === "lifo" ? "selected" : ""}>LIFO</option>
-      <option value="fifo" ${ov.follower_mode === "fifo" ? "selected" : ""}>FIFO</option>
-      <option value="lru" ${ov.follower_mode === "lru" ? "selected" : ""}>LRU</option>
-      <option value="priority,lifo" ${ov.follower_mode === "priority,lifo" ? "selected" : ""}>Priority+LIFO</option>
-      <option value="round_robin" ${ov.follower_mode === "round_robin" ? "selected" : ""}>Round Robin</option>
-    </select></label>
-    <label>Panel mode<select class="cfg-input" data-key="panel_mode">
-      <option value="compact" ${ov.panel_mode === "compact" ? "selected" : ""}>Compact</option>
-      <option value="comfortable" ${ov.panel_mode === "comfortable" ? "selected" : ""}>Comfortable</option>
-    </select></label>
-    <label>Group mode<select class="cfg-input" data-key="group_display" id="group-display-select">
-      <option value="cluster" ${groupDisplay === "cluster" ? "selected" : ""}>Cluster</option>
-      <option value="single" ${groupDisplay === "single" ? "selected" : ""}>Single</option>
-    </select></label>
-    <label>Rotate sec<input type="number" class="cfg-input" data-key="round_robin_sec" value="${ov.round_robin_sec ?? 3}" min="1" max="60"></label>
-    <label class="toolbar-toggle">
-      <input type="checkbox" class="cfg-input" data-key="group_as_one" id="group-as-one-toggle" ${groupAsOne ? "checked" : ""} />
-      <span>Group as one</span>
-    </label>
-    <label class="toolbar-toggle">
-      <input type="checkbox" id="battery-saver-toggle" ${localStorage.getItem("nagents:battery_saver") === "true" ? "checked" : ""} />
-      <span>Battery saver</span>
-    </label>
-    <label>BSB chars<input type="number" class="cfg-input" data-key="bsb_max_chars" value="${(ov as any).bsb_max_chars ?? 5}" min="1" max="20"></label>
-    <label>BSB layout<select class="cfg-input" data-key="bsb_layout">
-      <option value="grid" ${((ov as any).bsb_layout || "grid") === "grid" ? "selected" : ""}>Grid</option>
-      <option value="horizontal" ${(ov as any).bsb_layout === "horizontal" ? "selected" : ""}>Horizontal</option>
-      <option value="vertical" ${(ov as any).bsb_layout === "vertical" ? "selected" : ""}>Vertical</option>
-    </select></label>
-  </div>
-  <button class="settings-save-btn" id="settings-save-btn">Save to config.local.yaml</button>`;
-}
-
-/** Collect settings form values and POST to /config. */
-function saveSettings(): void {
-  if (!container) return;
-  const inputs = container.querySelectorAll(".cfg-input");
-  const overlay: Record<string, unknown> = {};
-  inputs.forEach((el) => {
-    const key = (el as HTMLElement).dataset.key!;
-    if ((el as HTMLInputElement).type === "checkbox") {
-      overlay[key] = (el as HTMLInputElement).checked;
-      localStorage.setItem(`nagents:${key}`, String((el as HTMLInputElement).checked));
-    } else {
-      const val = (el as HTMLInputElement | HTMLSelectElement).value;
-      const num = parseFloat(val);
-      overlay[key] = isNaN(num) ? val : num;
-      localStorage.setItem(`nagents:${key}`, val);
-    }
-  });
-  fetch("http://127.0.0.1:3335/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ overlay }),
-  }).then(() => {
-    log("panel", "settings saved to config.local.yaml");
-  }).catch((e) => {
-    log("panel", `settings save error: ${e}`);
-  });
-}
-
 /** Recursively render sub-groups. depth controls indentation CSS class. */
 function renderSubGroups(groups: SessionGroup[], depth: number): string {
   let html = "";
@@ -239,6 +169,10 @@ function renderSubGroups(groups: SessionGroup[], depth: number): string {
         <span class="group-label">${sub.label}</span>
         ${attentionBadge}
         <span class="group-count">${sessionCount}</span>
+        <span class="group-actions">
+          <button class="group-pin-btn" data-group-id="${sub.id}" title="Pin all in group">📌</button>
+          <button class="group-mute-btn" data-group-id="${sub.id}" title="Mute all in group">🔇</button>
+        </span>
       </div>`;
 
     if (!isSubCollapsed) {
@@ -284,6 +218,7 @@ function render(): void {
       <option value="0">Hide forever</option>
     </select>
     <button class="toolbar-btn" id="config-reload-btn" title="Reload config">⟳</button>
+    <button class="toolbar-btn" id="settings-btn" title="Settings">⚙</button>
   </header>`;
 
   const panelMode = (config as any).overlay?.panel_mode || "comfortable";
@@ -312,19 +247,6 @@ function render(): void {
 
   html += `</div>`;
 
-  // ─── Settings section ─────────────────────────────────────────────
-  const isSettingsOpen = collapsed.has("settings") ? false : true; // default open = false
-  const settingsCollapsed = !collapsed.has("settings"); // inverted: settings default collapsed
-  html += `<div class="meta-group ${settingsCollapsed ? "" : "meta-collapsed"}" data-group="settings">
-    <div class="meta-header" data-toggle="settings">
-      <span class="group-arrow">${settingsCollapsed ? "▾" : "▸"}</span>
-      <span class="meta-label" style="color: var(--text-muted)">SETTINGS</span>
-    </div>
-    ${settingsCollapsed ? `<div class="meta-content settings-content">
-      ${renderSettings()}
-    </div>` : ""}
-  </div>`;
-
   container.innerHTML = html;
   attachEventHandlers();
 }
@@ -334,7 +256,9 @@ function attachEventHandlers(): void {
 
   // Group/meta collapse toggle
   container.querySelectorAll("[data-toggle]").forEach((el) => {
-    el.addEventListener("click", () => {
+    el.addEventListener("click", (e) => {
+      // Ignore clicks on pin button (handled separately)
+      if ((e.target as HTMLElement).closest(".group-pin-btn") || (e.target as HTMLElement).closest(".group-mute-btn")) return;
       const groupId = (el as HTMLElement).dataset.toggle!;
       if (collapsed.has(groupId)) {
         collapsed.delete(groupId);
@@ -346,24 +270,47 @@ function attachEventHandlers(): void {
     });
   });
 
-  // Left-click session to pin/unpin
+  // Left-click session to pin/unpin, shift+click to mute/unmute
   container.querySelectorAll(".session[data-id]").forEach((el) => {
     el.addEventListener("click", (e) => {
       const sessionId = (el as HTMLElement).dataset.id!;
-      const isPinned = (el as HTMLElement).classList.contains("session-pinned");
-      fetch("http://127.0.0.1:3335/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, pinned: !isPinned }),
-      }).catch(() => {});
-      log("panel", `pin toggle: ${sessionId} → ${!isPinned}`);
-      // Optimistic update: immediately update state and re-render
-      if (currentState) {
-        const session = currentState.sessions.find(s => s.id === sessionId);
-        if (session) {
-          session.pinned = !isPinned;
-          lastSessionIds = ""; // force structural re-render
-          updatePanel();
+      const ev = e as MouseEvent;
+
+      if (ev.shiftKey) {
+        // Shift+click = mute/unmute
+        const isMuted = (el as HTMLElement).classList.contains("session-muted");
+        fetch("http://127.0.0.1:3335/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, muted: !isMuted }),
+        }).catch(() => {});
+        log("panel", `mute toggle: ${sessionId} → ${!isMuted}`);
+        if (currentState) {
+          const session = currentState.sessions.find(s => s.id === sessionId);
+          if (session) {
+            session.muted = !isMuted;
+            if (!isMuted) session.pinned = false;
+            lastSessionIds = "";
+            updatePanel();
+          }
+        }
+      } else {
+        // Normal click = pin/unpin
+        const isPinned = (el as HTMLElement).classList.contains("session-pinned");
+        fetch("http://127.0.0.1:3335/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, pinned: !isPinned }),
+        }).catch(() => {});
+        log("panel", `pin toggle: ${sessionId} → ${!isPinned}`);
+        if (currentState) {
+          const session = currentState.sessions.find(s => s.id === sessionId);
+          if (session) {
+            session.pinned = !isPinned;
+            if (!isPinned) session.muted = false;
+            lastSessionIds = "";
+            updatePanel();
+          }
         }
       }
     });
@@ -398,11 +345,27 @@ function attachEventHandlers(): void {
   if (reloadBtn) {
     reloadBtn.addEventListener("click", async () => {
       try {
+        // Force scanners to re-scan + reload config
+        await fetch("http://127.0.0.1:3335/scan");
         config = await getConfig();
-        log("panel", "config reloaded");
+        log("panel", "reloaded (config + scan)");
         render();
       } catch (e) {
-        log("panel", `config reload error: ${e}`);
+        log("panel", `reload error: ${e}`);
+      }
+    });
+  }
+
+  // Settings button — open settings window
+  const settingsBtn = container.querySelector("#settings-btn");
+  if (settingsBtn) {
+    settingsBtn.addEventListener("click", async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("show_settings_window");
+      } catch (e) {
+        // Fallback: open in browser
+        window.open("http://localhost:5180/settings.html", "_blank");
       }
     });
   }
@@ -426,38 +389,65 @@ function attachEventHandlers(): void {
     });
   }
 
-  // Settings save button
-  const saveBtn = container.querySelector("#settings-save-btn");
-  if (saveBtn) {
-    saveBtn.addEventListener("click", () => saveSettings());
+  // Pin/Mute group buttons — uses sub.id to find sessions in that panel group
+  function getSessionsForGroupId(groupId: string): Session[] {
+    if (!currentState) return [];
+    // The group ID encodes the panel sub-group. Find all sessions whose
+    // panel grouping matches. We rebuild the same logic used for rendering.
+    // Simpler: search all sessions for those whose rendered group element matches.
+    // Actually simplest: store session IDs on the group element.
+    // For now: filter by the sessions currently in the DOM under that group.
+    const groupEl = container!.querySelector(`[data-group="${groupId}"] .group-sessions`);
+    if (!groupEl) return [];
+    const ids = Array.from(groupEl.querySelectorAll(".session[data-id]")).map(
+      el => (el as HTMLElement).dataset.id!
+    );
+    return currentState.sessions.filter(s => ids.includes(s.id));
   }
 
-  // Battery saver toggle
-  const batteryToggle = container.querySelector("#battery-saver-toggle") as HTMLInputElement | null;
-  if (batteryToggle) {
-    batteryToggle.addEventListener("change", () => {
-      localStorage.setItem("nagents:battery_saver", batteryToggle.checked ? "true" : "false");
-      log("panel", `battery saver: ${batteryToggle.checked}`);
+  container.querySelectorAll(".group-pin-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const groupId = (btn as HTMLElement).dataset.groupId!;
+      const sessions = getSessionsForGroupId(groupId);
+      if (sessions.length === 0) return;
+      const anyPinned = sessions.some(s => s.pinned);
+      for (const s of sessions) {
+        fetch("http://127.0.0.1:3335/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: s.id, pinned: !anyPinned }),
+        }).catch(() => {});
+        s.pinned = !anyPinned;
+        if (!anyPinned) s.muted = false;
+      }
+      log("panel", `${anyPinned ? "unpinned" : "pinned"} group ${groupId} (${sessions.length})`);
+      lastSessionIds = "";
+      updatePanel();
     });
-  }
+  });
 
-  // Group-as-one toggle (in settings)
-  const groupToggle = container.querySelector("#group-as-one-toggle") as HTMLInputElement | null;
-  if (groupToggle) {
-    groupToggle.addEventListener("change", () => {
-      localStorage.setItem("nagents:group_as_one", groupToggle.checked ? "true" : "false");
-      log("panel", `group_as_one: ${groupToggle.checked}`);
+  container.querySelectorAll(".group-mute-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const groupId = (btn as HTMLElement).dataset.groupId!;
+      const sessions = getSessionsForGroupId(groupId);
+      if (sessions.length === 0) return;
+      const anyMuted = sessions.some(s => s.muted);
+      for (const s of sessions) {
+        fetch("http://127.0.0.1:3335/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: s.id, muted: !anyMuted }),
+        }).catch(() => {});
+        s.muted = !anyMuted;
+        if (!anyMuted) s.pinned = false;
+      }
+      log("panel", `${anyMuted ? "unmuted" : "muted"} group ${groupId} (${sessions.length})`);
+      lastSessionIds = "";
+      updatePanel();
     });
-  }
-
-  // Group display mode select (in settings) — immediate effect
-  const groupSelect = container.querySelector("#group-display-select") as HTMLSelectElement | null;
-  if (groupSelect) {
-    groupSelect.addEventListener("change", () => {
-      localStorage.setItem("nagents:group_display", groupSelect.value);
-      log("panel", `group_display: ${groupSelect.value}`);
-    });
-  }
+  });
 }
 
 // ─── Character Picker (right-click menu) ────────────────────────────────────
@@ -528,6 +518,7 @@ function renderSession(session: Session): string {
   const char = getCharacter(charId);
   const attentionClass = session.attention ? "session-attention" : "";
   const pinnedClass = session.pinned ? "session-pinned" : "";
+  const mutedClass = session.muted ? "session-muted" : "";
 
   const action = sessionToAction(session);
   const actionDef = char.actions[action];
@@ -593,15 +584,16 @@ function renderSession(session: Session): string {
   if (session.file) tooltipParts.push(`<div class="tooltip-row">file: <span>${session.file}</span></div>`);
   if (session.attention_reason) tooltipParts.push(`<div class="tooltip-row">attention: <span>${session.attention_reason}</span></div>`);
   if (session.tokens > 0) tooltipParts.push(`<div class="tooltip-row">tokens: <span>${(session.tokens / 1000).toFixed(0)}k/${(session.maxTokens / 1000).toFixed(0)}k</span></div>`);
-  tooltipParts.push(`<div class="tooltip-row" style="opacity:0.5">right-click to change char</div>`);
+  tooltipParts.push(`<div class="tooltip-row" style="opacity:0.5">click: pin | shift+click: mute | right-click: char</div>`);
 
   const groupLabel = session.group || session.source;
 
   const pinBadge = session.pinned ? `<span class="pin-badge">📌</span>` : "";
+  const muteBadge = session.muted ? `<span class="mute-badge">🔇</span>` : "";
 
-  return `<div class="session ${attentionClass} ${pinnedClass}" data-id="${session.id}">
+  return `<div class="session ${attentionClass} ${pinnedClass} ${mutedClass}" data-id="${session.id}">
     <div class="session-group-label">${groupLabel}</div>
-    <div class="session-name-short">${name}${dotBadge}${pinBadge}</div>
+    <div class="session-name-short">${name}${dotBadge}${pinBadge}${muteBadge}</div>
     <div class="session-char ${animClass}" data-char="${charId}">
       ${char.svg}
     </div>
@@ -646,6 +638,8 @@ function sessionToAction(session: Session): CharacterAction {
 function panelSessionSort(a: Session, b: Session): number {
   // Pinned first
   if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+  // Muted last
+  if (a.muted !== b.muted) return a.muted ? 1 : -1;
   // Then by last_user_ts (LIFO: newest first — default mode)
   const aTs = a.last_user_ts || 0;
   const bTs = b.last_user_ts || 0;
@@ -661,14 +655,19 @@ function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
   if (onScreen.length > 0) {
     const subGroups: SessionGroup[] = [];
 
-    // ── PINNED (mid-level) ──
-    const pinned = onScreen.filter(s => s.pinned);
-    if (pinned.length > 0) {
-      subGroups.push({
-        id: "on-pinned", label: "PINNED", source: "on-screen" as any,
-        sessions: pinned, isMeta: false,
-      });
-    }
+    // ── PINNED (mid-level) — always shown ──
+    const pinned = onScreen.filter(s => s.pinned && !s.muted);
+    subGroups.push({
+      id: "on-pinned", label: "PINNED", source: "on-screen" as any,
+      sessions: pinned, isMeta: false,
+    });
+
+    // ── MUTED (mid-level) — always shown ──
+    const muted = onScreen.filter(s => s.muted && !s.pinned);
+    subGroups.push({
+      id: "on-muted", label: "MUTED", source: "on-screen" as any,
+      sessions: muted, isMeta: false,
+    });
 
     // ── ZONE (mid-level): FOLLOWING / ROAMING / DOT / HIDDEN ──
     // Read actual mode assignments from overlay (published via localStorage)
@@ -676,34 +675,36 @@ function groupSessions(sessions: Session[], order: string[]): SessionGroup[] {
       localStorage.getItem("nagents:mode_assignments") || "{}"
     );
 
-    const following: Session[] = [];
-    const roaming: Session[] = [];
-    const dotSessions: Session[] = [];
-    const hiddenSessions: Session[] = [];
+    // Skip zone display if overlay hasn't published assignments yet
+    if (Object.keys(modeData).length > 0) {
+      const following: Session[] = [];
+      const roaming: Session[] = [];
+      const dotSessions: Session[] = [];
+      const hiddenSessions: Session[] = [];
 
-    for (const s of onScreen) {
-      if (s.pinned) continue; // pinned shown separately above
-      const mode = modeData[s.id] || "hidden";
-      switch (mode) {
-        case "follow": following.push(s); break;
-        case "roam": roaming.push(s); break;
-        case "revolve": dotSessions.push(s); break;
-        case "hidden": hiddenSessions.push(s); break;
+      for (const s of onScreen) {
+        const mode = modeData[s.id] || "hidden";
+        switch (mode) {
+          case "follow": following.push(s); break;
+          case "roam": roaming.push(s); break;
+          case "revolve": dotSessions.push(s); break;
+          case "hidden": hiddenSessions.push(s); break;
+        }
       }
-    }
 
-    const zoneChildren: SessionGroup[] = [];
-    if (following.length > 0) zoneChildren.push({ id: "on-zone-follow", label: "FOLLOWING", source: "on-screen" as any, sessions: following });
-    if (roaming.length > 0) zoneChildren.push({ id: "on-zone-roam", label: "ROAMING", source: "on-screen" as any, sessions: roaming });
-    if (dotSessions.length > 0) zoneChildren.push({ id: "on-zone-dot", label: "DOT", source: "on-screen" as any, sessions: dotSessions });
-    if (hiddenSessions.length > 0) zoneChildren.push({ id: "on-zone-hidden", label: "HIDDEN", source: "on-screen" as any, sessions: hiddenSessions });
+      const zoneChildren: SessionGroup[] = [];
+      if (following.length > 0) zoneChildren.push({ id: "on-zone-follow", label: "FOLLOWING", source: "on-screen" as any, sessions: following });
+      if (roaming.length > 0) zoneChildren.push({ id: "on-zone-roam", label: "ROAMING", source: "on-screen" as any, sessions: roaming });
+      if (dotSessions.length > 0) zoneChildren.push({ id: "on-zone-dot", label: "DOT", source: "on-screen" as any, sessions: dotSessions });
+      if (hiddenSessions.length > 0) zoneChildren.push({ id: "on-zone-hidden", label: "HIDDEN", source: "on-screen" as any, sessions: hiddenSessions });
 
-    if (zoneChildren.length > 0) {
-      subGroups.push({
-        id: "on-zone", label: "ZONE", source: "on-screen" as any,
-        sessions: onScreen, subGroups: zoneChildren, isMeta: true,
-      });
-    }
+      if (zoneChildren.length > 0) {
+        subGroups.push({
+          id: "on-zone", label: "ZONE", source: "on-screen" as any,
+          sessions: onScreen, subGroups: zoneChildren, isMeta: true,
+        });
+      }
+    } // end if (modeData has entries)
 
     // ── STATE (mid-level): NEEDS YOU / DONE / WORKING ──
     const stateChildren: SessionGroup[] = [];

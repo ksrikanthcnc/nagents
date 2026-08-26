@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Ghost glow -->
+    <filter id="ghost-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <!-- Cursor shadow -->
+    <filter id="cursor-shadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- NO background — transparent -->
+
+  <!-- Ghost character (large, centered, dominates the icon) -->
+  <g filter="url(#ghost-glow)" transform="translate(100, 80) scale(5.5)">
+    <!-- Body -->
+    <path d="M32 4C18 4 12 16 12 28v20c0 2 2 4 4 2l4-4 4 4c2 2 4 2 4 0l4-4 4 4c2 2 4 2 4 0l4-4 4 4c2 2 4 0 4-2V28C52 16 46 4 32 4z"
+      fill="#ffffff" fill-opacity="0.95" stroke="#e0e0e0" stroke-width="0.6"/>
+    <!-- Left eye -->
+    <circle cx="24" cy="24" r="4" fill="#1a1a2e"/>
+    <!-- Right eye -->
+    <circle cx="40" cy="24" r="4" fill="#1a1a2e"/>
+    <!-- Eye highlights (looking at cursor — up and left) -->
+    <circle cx="22.5" cy="22.5" r="1.8" fill="#a78bfa"/>
+    <circle cx="38.5" cy="22.5" r="1.8" fill="#a78bfa"/>
+    <!-- Mouth -->
+    <ellipse cx="32" cy="36" rx="3" ry="3.5" fill="#1a1a2e" fill-opacity="0.7"/>
+    <!-- Blush -->
+    <circle cx="18" cy="30" r="3" fill="#ffb3b3" fill-opacity="0.45"/>
+    <circle cx="46" cy="30" r="3" fill="#ffb3b3" fill-opacity="0.45"/>
+  </g>
+
+  <!-- Cursor (small, realistic size — top-left, like it's leading the ghost) -->
+  <g filter="url(#cursor-shadow)" transform="translate(60, 40) scale(0.9)">
+    <path d="M0 0 L0 100 L25 75 L43 115 L58 108 L40 68 L72 68 Z"
+      fill="#ffffff" stroke="#1a1a1a" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Subtle trail particles (showing ghost following cursor) -->
+  <circle cx="145" cy="155" r="5" fill="#a78bfa" fill-opacity="0.35"/>
+  <circle cx="125" cy="130" r="3.5" fill="#a78bfa" fill-opacity="0.25"/>
+  <circle cx="160" cy="135" r="2.5" fill="#a78bfa" fill-opacity="0.18"/>
+</svg>

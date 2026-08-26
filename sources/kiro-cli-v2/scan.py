@@ -2,19 +2,20 @@
 """
 Kiro CLI v2 source scanner.
 
-Discovers active v2 CLI sessions via ps detection.
-v2 sessions run as: kiro-cli-chat chat --resume-id <uuid>
+Discovers active v2 CLI sessions via lock files.
+v2 sessions create: ~/.kiro/sessions/cli/{uuid}.lock (with PID)
+                    ~/.kiro/sessions/cli/{uuid}.json (session metadata)
 
-The --resume-id UUID maps directly to session files in ~/.kiro/sessions/cli/
-which contain title, cwd, timestamps.
+Detection: scan *.lock files, check PID alive, read .json for title.
+No ps grep — works regardless of how CLI was launched.
+
+ID scheme: cli2-{uuid[:8]}
 
 Outputs JSON array to stdout (consumed by nagents Rust backend).
-
-Usage: python3 sources/kiro-cli-v2/scan.py
 """
 
 import json
-import subprocess
+import os
 import sys
 import time
 from datetime import datetime
@@ -22,7 +23,7 @@ from pathlib import Path
 
 HOME = Path.home()
 CLI_SESSIONS_DIR = HOME / ".kiro/sessions/cli"
-TITLES_FILE = Path(__file__).parent.parent.parent / "data/titles.json"
+SESSIONS_FILE = Path(__file__).parent.parent.parent / "data/sessions.json"
 
 
 def log(msg: str) -> None:
@@ -30,54 +31,42 @@ def log(msg: str) -> None:
 
 
 def discover() -> list[dict]:
-    """Return active v2 CLI sessions."""
+    """Return active v2 CLI sessions from lock files."""
     sessions = []
-    seen_pids: set[str] = set()
     titles_override = load_titles()
 
-    ps_lines = get_ps_lines()
+    if not CLI_SESSIONS_DIR.exists():
+        return sessions
 
-    for line in ps_lines:
-        if "kiro-cli-chat" not in line or "grep" in line:
-            continue
-
-        parts = line.strip().split(None, 1)
-        if len(parts) < 2:
-            continue
-        pid, cmd = parts[0], parts[1]
-
-        # Must be: kiro-cli-chat chat --resume-id <uuid>
-        if "kiro-cli-chat chat" not in cmd:
-            continue
-        if "--resume-id" not in cmd:
-            continue
-        # Skip crew sub-agents
-        if "acp" in cmd:
-            continue
-        # Skip shell wrappers
-        if cmd.startswith("zsh"):
+    for lock_file in CLI_SESSIONS_DIR.glob("*.lock"):
+        # Skip v3 sessions (sess_ prefix)
+        if lock_file.stem.startswith("sess_"):
             continue
 
-        if pid in seen_pids:
-            continue
-        seen_pids.add(pid)
+        try:
+            lock_data = json.loads(lock_file.read_text())
+            pid = lock_data.get("pid")
+            if not pid:
+                continue
 
-        # Extract session UUID
-        session_id = extract_resume_id(cmd)
-        if not session_id:
+            # Check PID is alive
+            os.kill(int(pid), 0)
+        except (ProcessLookupError, PermissionError, OSError, json.JSONDecodeError, ValueError):
             continue
 
+        session_id = lock_file.stem
+        nagents_id = f"cli2-{session_id[:8]}"
         title, cwd, mtime = enrich(session_id)
-
-        session_nagents_id = f"cli2-{session_id[:8]}"
-        display_title = resolve_title(session_nagents_id, titles_override) or title or f"CLI ({session_id[:8]})"
+        override_title, override_group = resolve_title(nagents_id, titles_override)
+        display_title = override_title or title or session_id[:8]
+        display_group = override_group or "cli"
 
         sessions.append({
-            "id": session_nagents_id,
+            "id": nagents_id,
             "source": "kiro-cli-v2",
             "name": display_title[:50],
             "workspace": cwd.replace(str(HOME), "~") if cwd else "",
-            "group": "cli",
+            "group": display_group,
             "active": True,
             "event": None,
             "attention_source": None,
@@ -97,28 +86,8 @@ def discover() -> list[dict]:
     return sessions
 
 
-def get_ps_lines() -> list[str]:
-    try:
-        result = subprocess.run(
-            ["ps", "-eo", "pid,command"],
-            capture_output=True, text=True, timeout=5
-        )
-        return result.stdout.splitlines()
-    except Exception as e:
-        log(f"ps failed: {e}")
-        return []
-
-
-def extract_resume_id(cmd: str) -> str:
-    """Extract UUID from --resume-id argument."""
-    try:
-        return cmd.split("--resume-id")[1].strip().split()[0]
-    except (IndexError, ValueError):
-        return ""
-
-
 def enrich(session_id: str) -> tuple[str, str, float]:
-    """Get title, cwd, mtime from session file."""
+    """Get title, cwd, mtime from session .json file."""
     title = ""
     cwd = ""
     mtime = time.time()
@@ -142,7 +111,7 @@ def enrich(session_id: str) -> tuple[str, str, float]:
 
 
 def clean_title(raw: str) -> str:
-    """Filter out non-user titles (system prompts, memory agents)."""
+    """Filter out non-user titles."""
     if not raw:
         return ""
     skip_prefixes = [
@@ -160,24 +129,41 @@ def clean_title(raw: str) -> str:
 
 
 def load_titles() -> dict:
-    """Load user-assigned title overrides."""
-    if TITLES_FILE.exists():
+    """Load user-assigned title overrides from data/sessions.json."""
+    if SESSIONS_FILE.exists():
         try:
-            return json.loads(TITLES_FILE.read_text())
+            data = json.loads(SESSIONS_FILE.read_text())
+            titles = {}
+            for sid, meta in data.items():
+                if isinstance(meta, dict) and meta.get("title"):
+                    titles[sid] = meta["title"]
+                elif isinstance(meta, str):
+                    titles[sid] = meta
+            return titles
         except Exception:
             pass
     return {}
 
 
-def resolve_title(session_id: str, titles: dict) -> str:
-    """Check if there's a title override (exact or prefix match)."""
+def resolve_title(session_id: str, titles: dict) -> tuple[str, str]:
+    """
+    Check if there's a title override.
+    Returns (title, group_override).
+    """
+    raw = ""
     if session_id in titles:
-        return titles[session_id]
-    # Prefix match
-    for key, title in titles.items():
-        if session_id.startswith(key):
-            return title
-    return ""
+        raw = titles[session_id]
+    else:
+        for key, val in titles.items():
+            if session_id.startswith(key):
+                raw = val
+                break
+    if not raw:
+        return "", ""
+    if ":" in raw:
+        group, title = raw.split(":", 1)
+        return title, group
+    return raw, ""
 
 
 def main():

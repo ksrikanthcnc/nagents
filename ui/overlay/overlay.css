@@ -127,6 +127,11 @@ html, body {
   filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.5));
 }
 
+/* Dots: pause all SVG idle animations (energy saving) */
+.char-dot * {
+  animation-play-state: paused !important;
+}
+
 /* Dots: text hidden via display:none in JS (zero render cost) */
 .char-dot .overlay-char-group,
 .char-dot .overlay-char-title,
@@ -155,14 +160,14 @@ html, body {
   inset: -4px;
   border-radius: 50%;
   border: 2px solid rgba(245, 158, 11, 0.5);
-  animation: alert-pulse-ring 2s ease-out infinite;
+  animation: alert-pulse-ring var(--pulse-speed, 2.5s) ease-out infinite;
   pointer-events: none;
 }
 
 .char-dot.char-attention .overlay-char-svg::before {
   inset: -2px;
   border-width: 1.5px;
-  animation: alert-pulse-ring 2.5s ease-out infinite;
+  animation: alert-pulse-ring var(--pulse-speed, 2.5s) ease-out infinite;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */

@@ -8,6 +8,7 @@ use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use tauri::Emitter;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -235,7 +236,8 @@ impl ConfigHandle {
 
     /// Start watching for changes (spawns background thread).
     /// Watches both config.yaml and config.local.yaml.
-    pub fn watch(&self) {
+    /// Emits "config-changed" event to all windows when config reloads.
+    pub fn watch(&self, app_handle: Option<tauri::AppHandle>) {
         let inner = self.inner.clone();
         let path = self.path.clone();
 
@@ -266,6 +268,10 @@ impl ConfigHandle {
                         let mut cfg = inner.lock().unwrap();
                         *cfg = new_config;
                         info!("[config] hot-reloaded (merged with local)");
+                        // Emit event to all frontend windows
+                        if let Some(ref handle) = app_handle {
+                            let _ = handle.emit("config-changed", ());
+                        }
                     }
                 }
             }

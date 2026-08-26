@@ -2,7 +2,7 @@
 //!
 //! Field ownership:
 //!   Scanner owns: id, source, name, workspace, group, tokens, max_tokens, active
-//!   Hooks own:    event, attention_source, tool, file
+//!   Hooks own:    event, tool, file
 //!   Both write:   mtime (most recent wins)
 //!
 //! The store merges updates by session_id. Scanner does full-replace of meta fields.
@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Emitter;
 
 /// A single agent session.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -29,9 +30,7 @@ pub struct Session {
     #[serde(default)]
     pub event: Option<String>,
     /// Source-provided attention flag (None = let core rules decide)
-    #[serde(default)]
-    pub attention_source: Option<bool>,
-    /// Computed attention (source + core rules). Updated by attention module.
+    /// Computed attention (derived from event age by attention module). Not set by hooks.
     #[serde(default)]
     pub attention: bool,
     #[serde(default)]
@@ -59,6 +58,10 @@ pub struct Session {
     /// Set via panel context menu. Persisted.
     #[serde(default)]
     pub pinned: bool,
+    /// User-muted: always hidden on overlay, lowest priority.
+    /// For known-useless sessions you want to ignore. Persisted.
+    #[serde(default)]
+    pub muted: bool,
     /// Last tool success/fail (true=ok, false=error). Cleared on new turn.
     #[serde(default)]
     pub tool_ok: Option<bool>,
@@ -102,8 +105,6 @@ pub struct EventUpdate {
     #[serde(default)]
     pub event: Option<String>,
     #[serde(default)]
-    pub attention: Option<bool>,
-    #[serde(default)]
     pub tool: Option<String>,
     #[serde(default)]
     pub file: Option<String>,
@@ -128,6 +129,8 @@ pub struct EventUpdate {
     pub worker: Option<String>,
     #[serde(default)]
     pub pinned: Option<bool>,
+    #[serde(default)]
+    pub muted: Option<bool>,
 }
 
 /// Full state snapshot (sent to frontend).
@@ -196,6 +199,8 @@ pub struct SessionStore {
     inner: Arc<Mutex<HashMap<String, Session>>>,
     /// Per-source character pools (set from config at startup).
     char_pools: Arc<Mutex<HashMap<String, Vec<String>>>>,
+    /// AppHandle for emitting events to frontend windows.
+    app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
 }
 
 impl SessionStore {
@@ -203,6 +208,19 @@ impl SessionStore {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
             char_pools: Arc::new(Mutex::new(HashMap::new())),
+            app_handle: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Set the AppHandle for emitting events (called once at startup).
+    pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+        *self.app_handle.lock().unwrap() = Some(handle);
+    }
+
+    /// Emit state-changed event to all frontend windows.
+    fn emit_state_changed(&self) {
+        if let Some(ref handle) = *self.app_handle.lock().unwrap() {
+            let _ = handle.emit("state-changed", ());
         }
     }
 
@@ -217,7 +235,7 @@ impl SessionStore {
         for session in store.values_mut() {
             if session.attention && session.event.as_deref() != Some("idle") {
                 session.attention = false;
-                session.attention_source = None;
+                
             }
         }
     }
@@ -280,7 +298,6 @@ impl SessionStore {
                     new_session.mtime = now_epoch();
                 }
                 new_session.event = None;
-                new_session.attention_source = None;
                 new_session.attention = false;
                 new_session.attention_reason = None;
                 new_session.tool = None;
@@ -322,6 +339,8 @@ impl SessionStore {
             source,
             dead.len()
         );
+        // Notify frontend windows
+        self.emit_state_changed();
     }
 
     /// Hook pushes a partial event update for one session.
@@ -354,7 +373,7 @@ impl SessionStore {
                 group: String::new(),
                 active: true,
                 event: None,
-                attention_source: None,
+                
                 attention: false,
                 attention_reason: None,
                 tool: None,
@@ -366,6 +385,7 @@ impl SessionStore {
                 attention_since: None,
                 on_overlay: false,
                 pinned: false,
+                muted: false,
                 tool_ok: None,
                 tool_result: None,
                 prompt: None,
@@ -389,23 +409,6 @@ impl SessionStore {
         // Apply hook-owned fields
         if let Some(event) = &update.event {
             session.event = Some(event.clone());
-        }
-        if let Some(attention) = update.attention {
-            session.attention_source = Some(attention);
-            session.attention = attention;
-            if !attention {
-                // User responded (clearing attention) → update last_user_ts
-                session.last_user_ts = Some(now_epoch());
-                session.interaction_count += 1;
-                session.attention_reason = None;
-                session.attention_since = None;
-                session.on_overlay = false;
-            } else {
-                session.attention_reason = Some("source".into());
-                if session.attention_since.is_none() {
-                    session.attention_since = Some(now_epoch());
-                }
-            }
         }
         // "" = clear to None, Some(value) = set, None = don't touch
         if let Some(ref tool) = update.tool {
@@ -460,6 +463,13 @@ impl SessionStore {
         }
         if let Some(pinned) = update.pinned {
             session.pinned = pinned;
+            // Pin and mute are mutually exclusive
+            if pinned { session.muted = false; }
+        }
+        if let Some(muted) = update.muted {
+            session.muted = muted;
+            // Mute and pin are mutually exclusive
+            if muted { session.pinned = false; }
         }
         if let Some(mtime) = update.mtime {
             session.mtime = mtime;
@@ -471,6 +481,7 @@ impl SessionStore {
             "[state] event: {} → event={:?}, tool={:?}",
             session.name, session.event, session.tool
         );
+        self.emit_state_changed();
         true
     }
 
@@ -492,6 +503,8 @@ impl SessionStore {
     {
         let mut store = self.inner.lock().unwrap();
         f(&mut store);
+        drop(store);
+        self.emit_state_changed();
     }
 
     /// Set title/name for a session (user or agent assigned).
@@ -573,5 +586,22 @@ impl SessionStore {
             }
         }
         info!("[state] restored {} pinned sessions", ids.len());
+    }
+
+    /// Get all muted session IDs (for persistence).
+    pub fn get_muted_ids(&self) -> Vec<String> {
+        let store = self.inner.lock().unwrap();
+        store.values().filter(|s| s.muted).map(|s| s.id.clone()).collect()
+    }
+
+    /// Restore muted state from a list of session IDs.
+    pub fn restore_muted(&self, ids: &[String]) {
+        let mut store = self.inner.lock().unwrap();
+        for id in ids {
+            if let Some(session) = store.get_mut(id) {
+                session.muted = true;
+            }
+        }
+        info!("[state] restored {} muted sessions", ids.len());
     }
 }
