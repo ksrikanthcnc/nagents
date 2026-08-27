@@ -41,7 +41,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'nagents ${{ github.ref_name }}'
           releaseBody: 'Desktop companion for AI agent sessions.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}
 
@@ -62,4 +62,4 @@ jobs:
         with:
           files: |
             nagents-*.zip
-          draft: true
+          draft: false
