@@ -177,22 +177,6 @@ const CHAR_POOL: &[&str] = &[
     "mushroom", "flame", "crystal", "cloud", "blob",
 ];
 
-/// Pick a random character from the pool.
-fn random_character() -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    use std::time::SystemTime;
-    // Simple pseudo-random based on current time nanoseconds
-    let seed = SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    let mut hasher = DefaultHasher::new();
-    seed.hash(&mut hasher);
-    let idx = (hasher.finish() as usize) % CHAR_POOL.len();
-    CHAR_POOL[idx].to_string()
-}
-
 /// Thread-safe session store.
 #[derive(Clone)]
 pub struct SessionStore {
@@ -240,26 +224,23 @@ impl SessionStore {
         }
     }
 
-    /// Pick a random character from the source's pool (falls back to global pool).
-    fn pick_character(&self, source: &str) -> String {
-        let pools = self.char_pools.lock().unwrap();
-        let pool = pools.get(source).filter(|p| !p.is_empty());
-        let chars: &[String] = match pool {
-            Some(p) => p,
-            None => return random_character(),
-        };
-        // Simple pseudo-random
+    /// Pick a character for a session from its source's pool (falls back to
+    /// global pool). DETERMINISTIC: seeded by the session id, so the same
+    /// session always gets the same character — stable across restarts and
+    /// reinstalls, with no persistence needed. (Clock-based seeding previously
+    /// re-randomized every char on every launch.)
+    fn pick_character(&self, source: &str, session_id: &str) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        use std::time::SystemTime;
-        let seed = SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .subsec_nanos();
         let mut hasher = DefaultHasher::new();
-        seed.hash(&mut hasher);
-        let idx = (hasher.finish() as usize) % chars.len();
-        chars[idx].clone()
+        session_id.hash(&mut hasher);
+        let h = hasher.finish() as usize;
+
+        let pools = self.char_pools.lock().unwrap();
+        match pools.get(source).filter(|p| !p.is_empty()) {
+            Some(chars) => chars[h % chars.len()].clone(),
+            None => CHAR_POOL[h % CHAR_POOL.len()].to_string(),
+        }
     }
 
     /// Scanner pushes a batch of sessions for one source.
@@ -313,9 +294,9 @@ impl SessionStore {
                 new_session.action_text = None;
                 new_session.sub_agents = 0;
                 new_session.workers = Vec::new();
-                // Assign random character from source pool if none set
+                // Assign a deterministic character (by session id) if none set.
                 if new_session.character.is_none() {
-                    new_session.character = Some(self.pick_character(&new_session.source));
+                    new_session.character = Some(self.pick_character(&new_session.source, &new_session.id));
                 }
                 store.insert(session.id.clone(), new_session);
                 info!("[state] new session: {} ({})", session.name, session.id);
@@ -405,6 +386,25 @@ impl SessionStore {
             store.insert(update.session_id.clone(), minimal);
             store.get_mut(&update.session_id).unwrap()
         };
+
+        // ─── Turn-boundary cleanup of stale sub-agents/workers ──────────────
+        // A sub-agent that dies (crash/kill) never sends its "-name" done event,
+        // so its satellite would orbit forever. Kiro currently tears down all
+        // sub-agents when the main turn ends, so a turn boundary means any
+        // in-flight workers are done: clear them on Stop (event=idle) or on a
+        // fresh user turn (non-empty prompt = UserPromptSubmit).
+        // NOTE: revisit if Kiro ever supports sub-agents that outlive the turn
+        // (continuous background) — then we'd need per-worker liveness instead.
+        let is_stop = update.event.as_deref() == Some("idle");
+        let is_new_turn = update.prompt.as_deref().map(|p| !p.is_empty()).unwrap_or(false);
+        if (is_stop || is_new_turn) && (!session.workers.is_empty() || session.sub_agents > 0) {
+            debug!(
+                "[state] {} turn boundary → clearing {} stale worker(s)",
+                session.name, session.workers.len()
+            );
+            session.workers.clear();
+            session.sub_agents = 0;
+        }
 
         // Apply hook-owned fields
         if let Some(event) = &update.event {

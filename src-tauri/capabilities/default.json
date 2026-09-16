@@ -11,6 +11,8 @@
     "core:window:allow-hide",
     "core:window:allow-close",
     "core:window:allow-set-ignore-cursor-events",
-    "core:window:allow-outer-position"
+    "core:window:allow-outer-position",
+    "dialog:allow-save",
+    "dialog:allow-open"
   ]
 }
