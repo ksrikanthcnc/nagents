@@ -85,6 +85,21 @@ html, body {
 .overlay-char-action:empty { display: none; }
 .action-icon { margin-right: 3px; font-size: 11px; }
 
+/* ─── Elapsed timer (running tools) ──────────────────────────────────────── */
+
+.overlay-char-timer {
+  font: 600 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  text-align: center;
+}
+.overlay-char-timer:empty { display: none; }
+
 /* Anti-flip for text in transparent windows */
 .overlay-char-group,
 .overlay-char-title,
@@ -135,7 +150,8 @@ html, body {
 /* Dots: text hidden via display:none in JS (zero render cost) */
 .char-dot .overlay-char-group,
 .char-dot .overlay-char-title,
-.char-dot .overlay-char-action {
+.char-dot .overlay-char-action,
+.char-dot .overlay-char-timer {
   display: none;
 }
 
@@ -143,6 +159,15 @@ html, body {
 
 .char-clustered {
   opacity: 0.75;
+}
+
+/* ─── Cluster sun: the anchor that earned the group's slot (prio-giver) ───── */
+/* Warm halo so it's distinct from planets, even while it orbits in carousel. */
+.char-sun .overlay-char-svg {
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.85)) drop-shadow(0 0 12px rgba(251, 191, 36, 0.4));
+}
+.char-sun.char-clustered {
+  opacity: 0.95;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
@@ -168,6 +193,35 @@ html, body {
   inset: -2px;
   border-width: 1.5px;
   animation: alert-pulse-ring var(--pulse-speed, 2.5s) ease-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Stuck: shake + red pulse (tool running past threshold)                    */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes stuck-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-2px) rotate(-1.5deg); }
+  40% { transform: translateX(2px) rotate(1.5deg); }
+  60% { transform: translateX(-1.5px) rotate(-1deg); }
+  80% { transform: translateX(1.5px) rotate(1deg); }
+}
+
+@keyframes stuck-red-pulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.5)); }
+  50% { filter: drop-shadow(0 0 9px rgba(239, 68, 68, 0.95)); }
+}
+
+/* Shake the SVG, red-pulse the whole char */
+.char-stuck .overlay-char-svg {
+  animation: stuck-shake 0.5s ease-in-out infinite;
+}
+.char-stuck {
+  animation: stuck-red-pulse 1.2s ease-in-out infinite;
+}
+.char-stuck .overlay-char-timer {
+  color: #fff;
+  background: rgba(239, 68, 68, 0.85);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
@@ -452,3 +506,16 @@ html, body {
   color: rgba(167, 139, 250, 0.8);
   text-align: center;
 }
+
+/* Pin/mute badge — small icon at top-right of char */
+.overlay-char-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5));
+  z-index: 1;
+}
+.overlay-char-badge:empty { display: none; }

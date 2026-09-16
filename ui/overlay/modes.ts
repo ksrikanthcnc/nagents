@@ -32,6 +32,19 @@ export interface ModeAssignment {
   clusteredTo?: string;
   /** Hidden due to group_as_one (don't count in +N badge) */
   groupHidden?: boolean;
+  /**
+   * Cluster anchor: the deterministic, highest-priority member that owns the
+   * group's waterfall slot. Its position is the solar system's fixed center.
+   * True on the anchor itself. The anchor gets a distinct glow (the "sun" that
+   * earned the slot) and never changes on a timer — only on priority changes.
+   */
+  clusterAnchor?: boolean;
+  /**
+   * Cluster center seat (carousel mode only): the member currently rendered at
+   * the bright center. Rotates every round_robin_sec when cluster_carousel is on.
+   * When carousel is off, this equals the anchor.
+   */
+  clusterCenter?: boolean;
 }
 
 export interface CharState {
@@ -61,6 +74,12 @@ export interface ModeConfig {
   attention_follows?: boolean;
   /** Half-life for freq dampening in minutes. Default 60. */
   freq_half_life_min?: number;
+  /**
+   * Cluster carousel: rotate which member sits at the bright center seat every
+   * round_robin_sec. Default false (simple: fixed sun anchor + orbiting planets).
+   * The anchor (prio-giver) keeps its glow even while orbiting.
+   */
+  cluster_carousel?: boolean;
 }
 
 export const MODE_DEFAULTS: ModeConfig = {
@@ -74,7 +93,8 @@ export const MODE_DEFAULTS: ModeConfig = {
   group_display: "cluster",
   working_mode: "roam",
   working_counts_toward_max: false,
-  attention_follows: false,
+  attention_follows: true,
+  cluster_carousel: false,
 };
 
 // ─── Round-robin state ──────────────────────────────────────────────────────
@@ -100,14 +120,22 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
   const result = new Map<string, ModeAssignment>();
 
   // ─── Pinned + Attention: always follow (exempt from max_followers) ──
+  // Attention-follows applies to any session needing you: attention flag set
+  // (waiting_on_user), or escalated events (approval/stuck). Toggleable via
+  // attention_follows (default true). Set false to make attention sessions
+  // queue normally into follow/roam/dot slots.
   const pinned: CharState[] = [];
   let normal: CharState[] = [];
+  const attentionFollows = cfg.attention_follows !== false;
 
   for (const c of chars) {
+    const needsYou = c.session.attention
+      || c.session.event === "approval"
+      || c.session.event === "stuck";
     if (c.session.pinned || c.session.priority === "high") {
       pinned.push(c);
       result.set(c.sessionId, { sessionId: c.sessionId, mode: "follow" });
-    } else if (c.session.attention && cfg.attention_follows !== false) {
+    } else if (needsYou && attentionFollows) {
       pinned.push(c);
       result.set(c.sessionId, { sessionId: c.sessionId, mode: "follow" });
     } else {
@@ -142,23 +170,57 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
         }
       }
     } else {
-      // "cluster" or "carousel" (merged): one center char, others orbit it.
-      // Center rotates every round_robin_sec.
+      // "cluster": solar system. One deterministic ANCHOR (the sun) owns the
+      // group's waterfall slot → the system's position is stable and never
+      // teleports on a timer. Other members orbit it as planets (all visible).
+      //
+      // Anchor = highest priority, tie-broken by a STABLE key (sessionId, which
+      // maps to creation order). NOT time-based, so timed rotation can't move
+      // the system. The anchor only changes when a member's priority tier
+      // actually changes (e.g. one hits approval/attention) — a legit re-anchor.
+      //
+      // Carousel (cluster_carousel=true): the bright CENTER SEAT rotates every
+      // round_robin_sec among members. The anchor keeps its glow even while it's
+      // temporarily orbiting, so you always know which session earned the slot.
       const now = Date.now();
       for (const [, members] of groupMembers) {
-        // Determine who is center (rotates by time)
-        const centerIdx = Math.floor(now / (cfg.round_robin_sec * 1000)) % members.length;
-        const centerChar = members[centerIdx];
-        // Center goes into waterfall (gets a mode slot)
-        ungrouped.push(centerChar);
-        // Others cluster around center
-        for (let i = 0; i < members.length; i++) {
-          if (i === centerIdx) continue;
-          result.set(members[i].sessionId, {
-            sessionId: members[i].sessionId,
-            mode: "follow", // placeholder, overridden to center's mode after waterfall
-            clusteredTo: centerChar.sessionId,
-          });
+        // members[] is already sorted by priority desc. Stable tie-break within
+        // the top tier by sessionId so the anchor is fully deterministic.
+        const topPrio = getPriorityLevel(members[0]);
+        const anchor = members
+          .filter(m => getPriorityLevel(m) === topPrio)
+          .sort((a, b) => a.sessionId.localeCompare(b.sessionId))[0];
+
+        // Anchor owns the waterfall slot (drives the whole system's position).
+        ungrouped.push(anchor);
+
+        // Center seat: anchor by default; rotates among members if carousel on.
+        let centerId = anchor.sessionId;
+        if (cfg.cluster_carousel && members.length > 1) {
+          const seatIdx = Math.floor(now / (cfg.round_robin_sec * 1000)) % members.length;
+          centerId = members[seatIdx].sessionId;
+        }
+
+        for (const m of members) {
+          const isAnchor = m.sessionId === anchor.sessionId;
+          const isCenter = m.sessionId === centerId;
+          if (isAnchor) {
+            // Anchor's own assignment is set by the waterfall below; annotate it.
+            // (We record anchor/center flags now; mode filled in during placement.)
+            result.set(m.sessionId, {
+              sessionId: m.sessionId,
+              mode: "follow", // placeholder, overwritten by waterfall
+              clusterAnchor: true,
+              clusterCenter: isCenter,
+            });
+          } else {
+            result.set(m.sessionId, {
+              sessionId: m.sessionId,
+              mode: "follow", // placeholder, overridden to anchor's mode after waterfall
+              clusteredTo: anchor.sessionId,
+              clusterCenter: isCenter,
+            });
+          }
         }
       }
     }
@@ -216,7 +278,10 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
     } else {
       mode = "hidden";
     }
-    result.set(c.sessionId, { sessionId: c.sessionId, mode });
+    // Preserve any cluster flags already set for this char (anchor/center) so
+    // the waterfall only fills in the mode, not clobbers the annotations.
+    const existing = result.get(c.sessionId);
+    result.set(c.sessionId, { ...existing, sessionId: c.sessionId, mode });
   }
 
   // Update clustered chars to match their representative's mode

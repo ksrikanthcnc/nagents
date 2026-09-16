@@ -88,8 +88,11 @@ overlay:
   hide_from_capture: true      # Hide overlay from screen share/screenshots (macOS)
   startup_delay_sec: 5         # Seconds to wait after wake/start before showing overlay
   group_as_one: false          # Merge same-group sessions into one visual unit
-  # group_display: cluster (all visible, close), single (one rep), carousel (rotate)
+  # group_display: cluster (all visible, close), single (one rep)
   group_display: cluster
+  # cluster_carousel: rotate the bright center seat among members (default off).
+  # Off = fixed glowing sun (the prio-giving anchor) + orbiting planets.
+  cluster_carousel: false
   # Panel display mode: compact (32px chars, tight) or comfortable (48px, spacious)
   panel_mode: compact
   panel_group_sort: recency     # Sub-group ordering: alpha (A-Z) or recency (most recent activity first)

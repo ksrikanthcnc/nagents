@@ -12,22 +12,73 @@
 use crate::config::ConfigHandle;
 use crate::state::{Session, SessionStore};
 use log::{debug, error, info, warn};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
-/// Start the scanner orchestrator (background thread per source).
+/// Base tick interval (seconds) for the consolidated scanner loop.
+/// Every tick we check which sources are due (per their interval_sec) and run them.
+/// 5s base keeps fast (hook-backed) CLI scanners responsive while still
+/// collapsing all sources into a single coordinator thread.
+const BASE_TICK_SEC: u64 = 5;
+
+/// Start the scanner orchestrator — a SINGLE coordinator thread.
+///
+/// Instead of one thread per source, one loop ticks every `BASE_TICK_SEC` and
+/// spawns each enabled scanner when its own `interval_sec` has elapsed. Config
+/// is re-read each tick, so enabling/disabling sources or changing intervals
+/// hot-reloads without a restart.
+///
 /// `project_root` is used as CWD when spawning scanner commands.
 pub fn start(store: SessionStore, config: ConfigHandle, project_root: PathBuf) {
+    thread::spawn(move || {
+        info!(
+            "[scanner] consolidated loop started (base tick {}s, cwd={:?})",
+            BASE_TICK_SEC, project_root
+        );
+
+        // Per-source epoch (seconds) of last run. Missing = never run → run now.
+        let mut last_run: HashMap<String, u64> = HashMap::new();
+
+        // Initial scan of all enabled sources immediately at startup.
+        run_due_scanners(&store, &config, &project_root, &mut last_run, true);
+
+        loop {
+            thread::sleep(Duration::from_secs(BASE_TICK_SEC));
+            run_due_scanners(&store, &config, &project_root, &mut last_run, false);
+        }
+    });
+}
+
+/// One tick: for each enabled source with a scanner command, run it if its
+/// interval has elapsed (or `force` on the initial pass). Each scanner runs on
+/// its own short-lived worker thread so a slow scanner can't block the others.
+fn run_due_scanners(
+    store: &SessionStore,
+    config: &ConfigHandle,
+    project_root: &PathBuf,
+    last_run: &mut HashMap<String, u64>,
+    force: bool,
+) {
     let cfg = config.get();
+    let now = crate::state::now_epoch() as u64;
+
+    // Drop bookkeeping for sources that no longer exist / are disabled.
+    last_run.retain(|id, _| {
+        cfg.sources
+            .get(id)
+            .map(|s| s.enabled && s.scanner.is_some())
+            .unwrap_or(false)
+    });
+
+    let mut handles = Vec::new();
 
     for (source_id, source_cfg) in &cfg.sources {
         if !source_cfg.enabled {
-            info!("[scanner] {} disabled, skipping", source_id);
             continue;
         }
-
         let scanner_cmd = match &source_cfg.scanner {
             Some(cmd) => cmd.clone(),
             None => {
@@ -36,47 +87,44 @@ pub fn start(store: SessionStore, config: ConfigHandle, project_root: PathBuf) {
             }
         };
 
-        let interval = Duration::from_secs(source_cfg.interval_sec);
+        let interval = source_cfg.interval_sec.max(1);
+        let due = force
+            || match last_run.get(source_id) {
+                Some(&last) => now.saturating_sub(last) >= interval,
+                None => true,
+            };
+        if !due {
+            continue;
+        }
+        last_run.insert(source_id.clone(), now);
+
         let store = store.clone();
         let source_id = source_id.clone();
         let root = project_root.clone();
+        let first = force;
 
-        thread::spawn(move || {
-            info!(
-                "[scanner] {} started (every {}s, cwd={:?}): {}",
-                source_id,
-                interval.as_secs(),
-                root,
-                scanner_cmd
-            );
-
-            // Scan immediately at startup
+        handles.push(thread::spawn(move || {
             match run_scanner(&scanner_cmd, &source_id, &root) {
                 Ok(sessions) => {
                     let count = sessions.len();
                     store.push_sessions(sessions);
-                    info!("[scanner] {} initial scan: {} sessions", source_id, count);
-                }
-                Err(e) => {
-                    warn!("[scanner] {} initial scan error: {}", source_id, e);
-                }
-            }
-
-            // Then periodically
-            loop {
-                thread::sleep(interval);
-                match run_scanner(&scanner_cmd, &source_id, &root) {
-                    Ok(sessions) => {
-                        let count = sessions.len();
-                        store.push_sessions(sessions);
+                    if first {
+                        info!("[scanner] {} initial scan: {} sessions", source_id, count);
+                    } else {
                         debug!("[scanner] {} → {} sessions", source_id, count);
                     }
-                    Err(e) => {
-                        warn!("[scanner] {} error: {}", source_id, e);
-                    }
+                }
+                Err(e) => {
+                    warn!("[scanner] {} error: {}", source_id, e);
                 }
             }
-        });
+        }));
+    }
+
+    // Wait for this tick's scanners so slow ones don't overlap the next tick's
+    // run of the same source (bounded by BASE_TICK_SEC scheduling).
+    for h in handles {
+        let _ = h.join();
     }
 }
 

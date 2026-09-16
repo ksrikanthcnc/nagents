@@ -42,6 +42,12 @@ export const CONFIG_SCHEMA: SettingDef[] = [
       { value: "off", label: "Off (BSB only)" },
     ],
   },
+  {
+    key: "auto_battery_mode", label: "Auto Battery Mode", type: "select", section: "mode",
+    description: "Automatically switch to BSB when on battery power. Restores full mode when plugged in.",
+    default: "true",
+    options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }],
+  },
 
   // ─── Overlay ──────────────────────────────────────────────────────────
   {
@@ -75,6 +81,12 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     description: "How working sessions (running/tool) are displayed. Roam: skip follow, always roam. Queue: normal waterfall.",
     default: "roam",
     options: [{ value: "roam", label: "Roam" }, { value: "queue", label: "Queue" }],
+  },
+  {
+    key: "attention_follows", label: "Attention Follows", type: "select", section: "overlay",
+    description: "Sessions needing you (approval/stuck/waiting) always follow your cursor, bypassing the follower limit. Off: they queue normally.",
+    default: "true",
+    options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }],
   },
 
   // ─── Physics ──────────────────────────────────────────────────────────
@@ -163,6 +175,12 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     description: "How grouped sessions are shown. Cluster: orbit center char. Single: one representative.",
     default: "cluster",
     options: [{ value: "cluster", label: "Cluster" }, { value: "single", label: "Single" }],
+  },
+  {
+    key: "cluster_carousel", label: "Cluster Carousel", type: "select", section: "ordering",
+    description: "In cluster mode, rotate which member sits at the bright center seat every few seconds. Off: fixed glowing sun + orbiting planets.",
+    default: "false",
+    options: [{ value: "false", label: "Off (fixed sun)" }, { value: "true", label: "On (rotate)" }],
   },
   {
     key: "pin_counts_toward_max", label: "Pin Counts", type: "select", section: "ordering",

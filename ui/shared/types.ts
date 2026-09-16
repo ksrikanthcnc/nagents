@@ -125,6 +125,7 @@ export interface OverlayConfig {
   working_mode?: string;
   working_counts_toward_max?: boolean;
   attention_follows?: boolean;
+  cluster_carousel?: boolean;
   connectors?: boolean;
   bsb_max_chars?: number;
   bsb_layout?: string;
@@ -133,6 +134,11 @@ export interface OverlayConfig {
   hide_from_capture?: boolean;
   startup_delay_sec?: number;
   group_display?: string;
+  auto_battery_mode?: boolean | string;
+  /** Runtime: true when on battery (set by backend, not user). */
+  battery_saver?: boolean | string;
+  /** Runtime: epoch ms until overlay is hidden. */
+  overlay_hidden_until?: number;
 }
 
 export interface Config {

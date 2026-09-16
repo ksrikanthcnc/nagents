@@ -15,12 +15,96 @@ import {
 import type { OverlayChar } from "./overlay-state";
 import { applyCharAnim, applyFacing, trackEyes } from "./rendering";
 import { renderSatellites, satellites } from "./satellites";
-import { randomRoamTarget, distTo, getActionText } from "./dom";
+import { randomRoamTarget, distTo, getActionText, updateCharTimer } from "./dom";
+
+// ─── Cluster placement helpers (solar system) ───────────────────────────────
+
+/** Stable orbit index for a member among its visible cluster peers. */
+function orbitIndexOf(char: OverlayChar, peers: OverlayChar[]): { idx: number; count: number } {
+  // Sort peers by sessionId for a stable, non-jittery orbit assignment.
+  const sorted = peers
+    .filter(c => c.el.style.display !== "none")
+    .sort((a, b) => a.session.id.localeCompare(b.session.id));
+  return { idx: Math.max(0, sorted.indexOf(char)), count: Math.max(1, sorted.length) };
+}
+
+/** Render a member at the cluster's center seat (full-ish size, on top). */
+function placeClusterCenter(char: OverlayChar, cx: number, cy: number): void {
+  char.x = cx;
+  char.y = cy;
+  char.vx = 0;
+  char.vy = 0;
+  char.el.style.transform = "";
+  char.el.style.transformOrigin = "center center";
+  char.el.style.opacity = "";
+  char.el.style.zIndex = "2";
+  char.el.classList.remove("char-clustered");
+  const left = Math.round(char.x);
+  const top = Math.round(char.y);
+  if (left !== (char as any)._lastLeft || top !== (char as any)._lastTop) {
+    char.el.style.left = `${left}px`;
+    char.el.style.top = `${top}px`;
+    (char as any)._lastLeft = left;
+    (char as any)._lastTop = top;
+  }
+}
+
+/**
+ * Render a member as an orbiting planet around a center char.
+ * `center` provides the system center (its physics position). When `selfCenter`
+ * is true, `char` IS the anchor being rendered off-seat: we orbit around its own
+ * physics position without disturbing char.x/char.y (so planets keep the true
+ * center), applying only a DOM offset.
+ */
+function placeClusterPlanet(
+  char: OverlayChar,
+  center: OverlayChar,
+  charArray: OverlayChar[],
+  selfCenter = false,
+): void {
+  // Peers = everyone orbiting this anchor (excluding whoever currently holds the
+  // center seat, since they're drawn at center), plus the anchor itself when
+  // it's off-seat (so it takes an orbit slot too).
+  const anchorId = center.session.id;
+  const peers = charArray.filter(c =>
+    (c.clusteredTo === anchorId && !c.clusterCenter) ||
+    (c.clusterAnchor && c.session.id === anchorId && !c.clusterCenter)
+  );
+  const { idx, count } = orbitIndexOf(char, peers);
+  const angle = (2 * Math.PI * idx) / count;
+  const orbitRadius = CHAR_SIZE * 0.8;
+  const px = center.x + Math.cos(angle) * orbitRadius;
+  const py = center.y + Math.sin(angle) * orbitRadius;
+  const scale = (cfg.dot_scale || 0.55) * 0.7;
+
+  if (!selfCenter) {
+    char.x = px;
+    char.y = py;
+    char.vx = 0;
+    char.vy = 0;
+  }
+  char.el.style.transform = `scale(${scale})`;
+  char.el.style.transformOrigin = "center center";
+  char.el.style.opacity = "";
+  char.el.style.zIndex = "0";
+  char.el.classList.add("char-clustered");
+  const left = Math.round(px);
+  const top = Math.round(py);
+  if (left !== (char as any)._lastLeft || top !== (char as any)._lastTop) {
+    char.el.style.left = `${left}px`;
+    char.el.style.top = `${top}px`;
+    (char as any)._lastLeft = left;
+    (char as any)._lastTop = top;
+  }
+}
 
 // ─── BSB Box (Battery Saver Box) ────────────────────────────────────────────
 
 let bsbBoxEl: HTMLElement | null = null;
 let bsbPrevHtml = "";
+
+// Throttle elapsed-timer refresh (text only changes once/sec, no need for 60fps).
+let lastTimerUpdate = 0;
 
 function renderBsbBox(charArray: OverlayChar[]): void {
   if (!container) return;
@@ -146,6 +230,11 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
   const charArray = Array.from(chars.values());
   const now = Date.now();
 
+  // Refresh elapsed timers ~2x/sec (text changes at most once/sec).
+  const refreshTimers = now - lastTimerUpdate > 500;
+  if (refreshTimers) lastTimerUpdate = now;
+  const nowSec = now / 1000;
+
   // Check overlay hide flag (set by panel)
   if (hiddenUntil === Infinity || (hiddenUntil > 0 && now < hiddenUntil)) {
     for (const c of charArray) c.el.style.display = "none";
@@ -155,7 +244,7 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     return;
   } else if (container && container.style.opacity === "0") {
     container.style.opacity = "";
-    localStorage.removeItem("nagents:overlay_hidden_until");
+    fetch(`http://${location.hostname}:3335/runtime`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({overlay_hidden_until:0})}).catch(()=>{});
   }
 
   // Skip physics entirely if no visible chars (power saving)
@@ -223,7 +312,7 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
       char.el.style.transform = `translate(${-cx}px, ${-cy}px) scale(${dotScale})`;
       char.el.style.transformOrigin = `${cx}px ${cy}px`;
       char.el.classList.add("char-dot");
-      char.el.classList.remove("char-following", "char-roaming", "char-working");
+      char.el.classList.remove("char-following", "char-roaming", "char-working", "char-stuck");
       // Render position and skip physics
       const newLeft = Math.round(char.x);
       const newTop = Math.round(char.y);
@@ -277,7 +366,13 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
       char.el.style.fontSize = "";
     }
 
-    // ─── Cluster override: fixed position around center char ────────────
+    // ─── Cluster override: planets orbit the anchor (the fixed sun) ──────
+    // The anchor owns the waterfall slot; its physics position is the stable
+    // center of the solar system. Non-anchor members orbit that center.
+    // Carousel: whichever member holds clusterCenter renders at the center
+    // seat (full size); the rest — including the anchor when it's not the
+    // current seat — orbit. The center LOCATION is always the anchor's
+    // position, so rotating the seat never moves the system.
     if (char.clusteredTo) {
       const rep = chars.get(char.clusteredTo);
       if (rep && rep.el.style.display !== "none") {
@@ -285,28 +380,12 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
           char.el.style.display = "none";
           continue;
         }
-        const clusterMembers = charArray.filter(c => c.clusteredTo === char.clusteredTo && c.el.style.display !== "none");
-        const clusterIdx = clusterMembers.indexOf(char);
-        const clusterCount = clusterMembers.length;
-        const orbitAngle = (2 * Math.PI * clusterIdx) / Math.max(1, clusterCount);
-        const orbitRadius = CHAR_SIZE * 0.8;
-        char.x = rep.x + Math.cos(orbitAngle) * orbitRadius;
-        char.y = rep.y + Math.sin(orbitAngle) * orbitRadius;
-        char.vx = 0;
-        char.vy = 0;
-        const clusterScale = (cfg.dot_scale || 0.55) * 0.7;
-        char.el.style.transform = `scale(${clusterScale})`;
-        char.el.style.transformOrigin = "center center";
-        char.el.style.opacity = "";
-        char.el.style.zIndex = "0";
-        char.el.classList.add("char-clustered");
-        const newLeft = Math.round(char.x);
-        const newTop = Math.round(char.y);
-        if (newLeft !== (char as any)._lastLeft || newTop !== (char as any)._lastTop) {
-          char.el.style.left = `${newLeft}px`;
-          char.el.style.top = `${newTop}px`;
-          (char as any)._lastLeft = newLeft;
-          (char as any)._lastTop = newTop;
+        if (char.clusterCenter) {
+          // This planet is the current center seat → sit at the anchor's spot,
+          // full size. (Anchor will detect it's off-seat and orbit instead.)
+          placeClusterCenter(char, rep.x, rep.y);
+        } else {
+          placeClusterPlanet(char, rep, charArray);
         }
         continue;
       }
@@ -378,6 +457,24 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     char.x = Math.max(-50, Math.min(window.innerWidth + 50, char.x));
     char.y = Math.max(-50, Math.min(window.innerHeight + 50, char.y));
 
+    // ─── Carousel: anchor off-seat → render on orbit, keep true center ──
+    // char.x/char.y stay at the system center (planets orbit it); only the
+    // DOM position is offset so the anchor visually joins the orbit ring.
+    if (char.clusterAnchor && !char.clusterCenter) {
+      placeClusterPlanet(char, char, charArray, /*selfCenter=*/true);
+      char.el.classList.toggle("char-working", char.session.event === "running" || char.session.event === "tool");
+      char.el.classList.toggle("char-attention", !!char.session.attention);
+      if (refreshTimers) updateCharTimer(char.el, char.session, nowSec);
+      applyCharAnim(char, "idle");
+      continue;
+    }
+    // Anchor on-seat (or non-carousel) with a center seat → full size at center.
+    if (char.clusterAnchor && char.clusterCenter) {
+      char.el.style.transform = "";
+      char.el.style.zIndex = "2";
+      char.el.classList.remove("char-clustered");
+    }
+
     // ─── Render position (skip DOM write if unchanged) ─────────────
     const newLeft = Math.round(char.x);
     const newTop = Math.round(char.y);
@@ -392,6 +489,9 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     const isWorking = char.session.event === "running" || char.session.event === "tool";
     char.el.classList.toggle("char-working", isWorking);
     char.el.classList.toggle("char-attention", !!char.session.attention);
+
+    // Elapsed timer + stuck animation (follow/roam chars; dots hide labels)
+    if (refreshTimers) updateCharTimer(char.el, char.session, nowSec);
 
     // Accelerating pulse
     if (char.session.attention && char.session.attention_since) {

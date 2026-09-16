@@ -133,6 +133,13 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   startRenderLoop();
   log("overlay", "render loop started");
 
+  // ─── Auto Battery Mode ──────────────────────────────────────────────
+  // Power state is managed by Rust backend as runtime config overrides.
+  // When on battery → Rust sets battery_saver=true in runtime config.
+  // GET /config returns effective config (user + runtime merged).
+  // The overlay just reads cfg.battery_saver — no localStorage needed.
+  log("overlay", "battery mode managed by backend runtime config");
+
   // Sleep/wake detection
   let lastTimestamp = Date.now();
   setInterval(() => {
@@ -217,6 +224,9 @@ function syncChars(sessions: Session[]): void {
         char.el.classList.remove("char-poof");
         void char.el.offsetWidth;
         char.el.classList.add("char-poof");
+        // Update pin/mute badge
+        const badgeEl = char.el.querySelector(".overlay-char-badge");
+        if (badgeEl) badgeEl.textContent = session.pinned ? "📌" : session.muted ? "🔇" : "";
       }
       delete char.el.dataset.goneAt;
       // Update char SVG if character changed
@@ -264,7 +274,7 @@ function applyModes(): void {
     interactionCount: c.session.interaction_count ?? 0,
   }));
 
-  const batterySaverOn = localStorage.getItem("nagents:battery_saver") === "true" || cfg.overlay_mode === "off";
+  const batterySaverOn = cfg.battery_saver === true || cfg.battery_saver === "true" || cfg.overlay_mode === "off";
 
   const modeCfg: ModeConfig = {
     max_followers: batterySaverOn ? 1 : (cfg.max_followers ?? MODE_DEFAULTS.max_followers),
@@ -279,6 +289,7 @@ function applyModes(): void {
     working_counts_toward_max: cfg.working_counts_toward_max ?? false,
     attention_follows: cfg.attention_follows ?? true,
     freq_half_life_min: cfg.freq_half_life_min ?? 60,
+    cluster_carousel: localStorage.getItem("nagents:cluster_carousel") === "true" || (cfg.cluster_carousel ?? false),
   };
 
   const assignments = computeModes(states, modeCfg);
@@ -336,6 +347,10 @@ function applyModes(): void {
 
     char.mode = newMode;
     char.clusteredTo = assignment.clusteredTo || null;
+    char.clusterAnchor = assignment.clusterAnchor || false;
+    char.clusterCenter = assignment.clusterCenter || false;
+    // Glow on the anchor (the prio-giving sun), even while it orbits in carousel.
+    char.el.classList.toggle("char-sun", !!assignment.clusterAnchor);
     char.el.style.opacity = "";
 
     if (newMode === "hidden" || batterySaverOn) {
@@ -374,8 +389,8 @@ function startRenderLoop(): void {
   let lastFrame = 0;
   let frameCount = 0;
 
-  let cachedBatterySaver = localStorage.getItem("nagents:battery_saver") === "true";
-  let cachedHiddenUntil = Number(localStorage.getItem("nagents:overlay_hidden_until") || "0");
+  let cachedBatterySaver = cfg.battery_saver === true || cfg.battery_saver === "true";
+  let cachedHiddenUntil = Number(cfg.overlay_hidden_until || 0);
   let cacheRefreshCounter = 0;
 
   function tick(now: number) {
@@ -384,12 +399,12 @@ function startRenderLoop(): void {
     cacheRefreshCounter++;
     if (cacheRefreshCounter >= 60) {
       cacheRefreshCounter = 0;
-      const newBatterySaver = localStorage.getItem("nagents:battery_saver") === "true";
+      const newBatterySaver = cfg.battery_saver === true || cfg.battery_saver === "true";
       if (newBatterySaver !== cachedBatterySaver) {
         log("overlay", `battery saver changed: ${cachedBatterySaver} → ${newBatterySaver}`);
       }
       cachedBatterySaver = newBatterySaver;
-      cachedHiddenUntil = Number(localStorage.getItem("nagents:overlay_hidden_until") || "0");
+      cachedHiddenUntil = Number(cfg.overlay_hidden_until || 0);
     }
 
     const effectiveInterval = cachedBatterySaver ? 66 : frameInterval;

@@ -25,6 +25,10 @@ export interface OverlayChar {
   modeSetAt: number;
   /** If set, this char is clustered to the given session (targets its position, scales down) */
   clusteredTo: string | null;
+  /** Cluster anchor (the sun that owns the group's waterfall slot). */
+  clusterAnchor?: boolean;
+  /** Cluster center seat (carousel): currently rendered at the bright center. */
+  clusterCenter?: boolean;
 }
 
 // ─── Shared Mutable State ───────────────────────────────────────────────────

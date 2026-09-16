@@ -38,6 +38,8 @@ const SETTING_TYPES: Record<string, SettingType> = {
   bsb_layout: "string",
   bsb_opacity: "number",
   working_mode: "string",
+  attention_follows: "boolean",
+  cluster_carousel: "boolean",
 };
 
 /**

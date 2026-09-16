@@ -27,6 +27,8 @@ export function createCharElement(session: Session): HTMLElement {
     <div class="overlay-char-title" style="font-size:${cfg.font_size_title}px">${session.name}</div>
     <div class="overlay-char-svg char-slot-idle" data-char="${charId}">${charDef.svg}</div>
     <div class="overlay-char-action" style="font-size:${cfg.font_size_action}px">${icon ? `<span class="action-icon">${icon}</span>` : ""}${text}</div>
+    <div class="overlay-char-timer" style="font-size:${cfg.font_size_action}px;display:none"></div>
+    <div class="overlay-char-badge">${session.pinned ? "📌" : session.muted ? "🔇" : ""}</div>
   `;
   el.style.position = "absolute";
   el.style.width = `${CHAR_SIZE}px`;
@@ -94,6 +96,49 @@ export function getActionText(session: Session): string {
 }
 
 function basename(path: string): string { return path.split("/").pop() || path; }
+
+// ─── Elapsed Timer ──────────────────────────────────────────────────────────
+
+/** Seconds a running tool must exceed before it's shown as "stuck" (shake/pulse). */
+export const STUCK_THRESHOLD_SEC = 30;
+
+/** Format elapsed seconds as "M:SS" (e.g. 83 → "1:23"). Caps display at 99:59. */
+export function formatElapsed(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const mins = Math.min(99, Math.floor(s / 60));
+  const secs = s % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Update the elapsed-time badge + stuck animation on a char.
+ * Timer shows for actively-working events (running/tool/approval/stuck).
+ * mtime is epoch seconds of the last event → elapsed = now - mtime.
+ */
+export function updateCharTimer(el: HTMLElement, session: Session, nowSec: number): void {
+  const timerEl = el.querySelector(".overlay-char-timer") as HTMLElement | null;
+  if (!timerEl) return;
+
+  const ev = session.event;
+  const isTiming = ev === "running" || ev === "tool" || ev === "approval" || ev === "stuck";
+  if (!isTiming || !session.mtime) {
+    if (timerEl.style.display !== "none") {
+      timerEl.style.display = "none";
+      timerEl.textContent = "";
+    }
+    if (el.classList.contains("char-stuck")) el.classList.remove("char-stuck");
+    return;
+  }
+
+  const elapsed = nowSec - session.mtime;
+  const text = formatElapsed(elapsed);
+  if (timerEl.textContent !== text) timerEl.textContent = text;
+  if (timerEl.style.display === "none") timerEl.style.display = "";
+
+  // Stuck: escalated event, or timing out past threshold → shake/red pulse.
+  const stuck = ev === "stuck" || ev === "approval" || elapsed > STUCK_THRESHOLD_SEC;
+  el.classList.toggle("char-stuck", stuck);
+}
 
 // ─── Geometry Helpers ───────────────────────────────────────────────────────
 
