@@ -27,6 +27,7 @@ let charOverrides: Record<string, string> = JSON.parse(
 );
 /** Track last rendered session IDs to detect structural changes */
 let lastSessionIds: string = "";
+let searchQuery: string = "";
 /** Track per-session state hash for incremental updates */
 let sessionHashes: Map<string, string> = new Map();
 
@@ -48,6 +49,8 @@ export async function initPanel(el: HTMLElement): Promise<void> {
     if (!document.hidden) {
       updatePanel();
     }
+    // Browser notifications (PWA mode — non-Tauri)
+    checkNotifications(state);
   });
 
   // Re-render when panel becomes visible again
@@ -55,7 +58,56 @@ export async function initPanel(el: HTMLElement): Promise<void> {
     if (!document.hidden && currentState) updatePanel();
   });
 
+  // PWA: register service worker + prompt for notifications
+  if (!isTauri()) {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+    // Ask for notification permission after first interaction
+    if ("Notification" in window && Notification.permission === "default") {
+      const askNotif = () => {
+        Notification.requestPermission().then(p => {
+          if (p === "granted") log("panel", "notifications enabled");
+        });
+        document.removeEventListener("click", askNotif);
+      };
+      document.addEventListener("click", askNotif, { once: true });
+    }
+  }
+
   log("panel", "state listener started (event-based)");
+}
+
+// ─── Browser Notifications (PWA) ────────────────────────────────────────────
+
+const notifiedAttention = new Set<string>();
+
+function isTauri(): boolean { return "__TAURI__" in window; }
+
+function checkNotifications(state: StateSnapshot): void {
+  if (isTauri()) return;  // Tauri has native overlay — no need
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+
+  const currentAttention = new Set<string>();
+  for (const s of state.sessions) {
+    if (!s.active || s.muted) continue;
+    if (s.attention || s.event === "approval" || s.event === "stuck") {
+      currentAttention.add(s.id);
+      if (!notifiedAttention.has(s.id)) {
+        new Notification("nagents", {
+          body: `${s.name} needs your attention`,
+          tag: s.id,
+        } as NotificationOptions);
+      }
+    }
+  }
+  // Clear old
+  for (const id of notifiedAttention) {
+    if (!currentAttention.has(id)) notifiedAttention.delete(id);
+  }
+  for (const id of currentAttention) {
+    notifiedAttention.add(id);
+  }
 }
 
 // ─── Persistence ────────────────────────────────────────────────────────────
@@ -226,6 +278,7 @@ function render(): void {
   const groups = groupSessions(currentState.sessions, config.panel_order);
 
   let html = `<header class="panel-header">
+    <input type="text" class="panel-search" id="panel-search" placeholder="Search sessions..." value="${searchQuery}" />
     <span class="session-count">${currentState.count} sessions</span>
     <select class="toolbar-select" id="theme-select" title="Theme">
       <option value="dark">Dark</option>
@@ -275,6 +328,31 @@ function render(): void {
 
 function attachEventHandlers(): void {
   if (!container) return;
+
+  // Search bar
+  const searchEl = container.querySelector("#panel-search") as HTMLInputElement | null;
+  if (searchEl) {
+    searchEl.addEventListener("input", () => {
+      searchQuery = searchEl.value.toLowerCase();
+      // Filter sessions by search query — hide non-matching session elements
+      container!.querySelectorAll(".session").forEach((el) => {
+        const text = (el as HTMLElement).textContent?.toLowerCase() || "";
+        const id = (el as HTMLElement).dataset.id || "";
+        const match = !searchQuery || text.includes(searchQuery) || id.includes(searchQuery);
+        (el as HTMLElement).style.display = match ? "" : "none";
+      });
+      // Also filter groups — hide groups with no visible sessions
+      container!.querySelectorAll(".group").forEach((groupEl) => {
+        const sessions = groupEl.querySelectorAll(".session");
+        const anyVisible = Array.from(sessions).some(s => (s as HTMLElement).style.display !== "none");
+        (groupEl as HTMLElement).style.display = anyVisible ? "" : "none";
+      });
+    });
+    // Restore focus if was active
+    if (document.activeElement?.className === "panel-search") {
+      searchEl.focus();
+    }
+  }
 
   // Group/meta collapse toggle
   container.querySelectorAll("[data-toggle]").forEach((el) => {
@@ -411,12 +489,12 @@ function attachEventHandlers(): void {
       const val = hideSelect.value;
       if (val === "") {
         // Re-show overlay (eye selected)
-        localStorage.removeItem("nagents:overlay_hidden_until");
+        fetch(`http://${location.hostname}:3335/runtime`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({overlay_hidden_until:0})}).catch(()=>{});
         log("panel", "overlay shown");
       } else {
         const minutes = parseInt(val);
         const hideUntil = minutes === 0 ? Infinity : Date.now() + minutes * 60 * 1000;
-        localStorage.setItem("nagents:overlay_hidden_until", String(hideUntil));
+        fetch(`http://${location.hostname}:3335/runtime`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({overlay_hidden_until:hideUntil})}).catch(()=>{});
         log("panel", `overlay hidden for ${minutes === 0 ? "forever" : minutes + "min"}`);
       }
       // Keep selected value visible to indicate state

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nagents — Logs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+    }
+    .toolbar input {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+    .toolbar button {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .toolbar button:hover { background: #30363d; }
+    .toolbar button.active { background: #388bfd33; border-color: #388bfd; color: #58a6ff; }
+    .toolbar .count { color: #8b949e; font-size: 11px; white-space: nowrap; }
+    #log-container {
+      padding: 4px 0;
+      overflow-y: auto;
+      height: calc(100vh - 36px);
+    }
+    .log-line {
+      padding: 0 10px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-line:hover { background: #161b22; }
+    /* Color by log level */
+    .log-line.level-info { color: #c9d1d9; }
+    .log-line.level-warn { color: #d29922; }
+    .log-line.level-error { color: #f85149; }
+    .log-line.level-debug { color: #8b949e; }
+    /* Highlight keywords */
+    .log-line .hl-time { color: #8b949e; }
+    .log-line .hl-module { color: #58a6ff; }
+    .log-line .hl-session { color: #a5d6ff; }
+    .log-line .hl-event { color: #7ee787; }
+    .log-line .hl-error { color: #f85149; font-weight: 600; }
+    .filtered { display: none; }
+    .scroll-bottom {
+      position: fixed; bottom: 12px; right: 12px;
+      background: #388bfd; color: #fff; border: none;
+      padding: 6px 12px; border-radius: 16px;
+      cursor: pointer; font-size: 11px;
+      display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <input id="filter" type="text" placeholder="Filter logs..." />
+    <button id="btn-info" class="active" data-level="info">INFO</button>
+    <button id="btn-warn" class="active" data-level="warn">WARN</button>
+    <button id="btn-error" class="active" data-level="error">ERR</button>
+    <button id="btn-debug" data-level="debug">DBG</button>
+    <button id="btn-auto">⬇ Auto</button>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="log-container"></div>
+  <button class="scroll-bottom" id="scroll-btn" onclick="scrollToBottom()">↓ New logs</button>
+
+  <script>
+    const API = `http://${location.hostname}:3335`;
+    const container = document.getElementById("log-container");
+    const filterInput = document.getElementById("filter");
+    const countEl = document.getElementById("count");
+    const scrollBtn = document.getElementById("scroll-btn");
+    const autoBtn = document.getElementById("btn-auto");
+
+    let allLines = [];
+    let autoScroll = true;
+    let levels = { info: true, warn: true, error: true, debug: false };
+    let lastTotal = 0;
+
+    // Level toggle buttons
+    document.querySelectorAll("[data-level]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const level = btn.dataset.level;
+        levels[level] = !levels[level];
+        btn.classList.toggle("active", levels[level]);
+        applyFilter();
+      });
+    });
+
+    autoBtn.addEventListener("click", () => {
+      autoScroll = !autoScroll;
+      autoBtn.classList.toggle("active", autoScroll);
+      if (autoScroll) scrollToBottom();
+    });
+    autoBtn.classList.add("active");
+
+    filterInput.addEventListener("input", applyFilter);
+
+    // Detect scroll position
+    container.addEventListener("scroll", () => {
+      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+      if (atBottom) {
+        autoScroll = true;
+        scrollBtn.style.display = "none";
+      } else {
+        autoScroll = false;
+      }
+    });
+
+    function scrollToBottom() {
+      container.scrollTop = container.scrollHeight;
+      scrollBtn.style.display = "none";
+      autoScroll = true;
+    }
+
+    function getLevel(line) {
+      if (line.includes(" ERROR ") || line.includes("[error]")) return "error";
+      if (line.includes(" WARN ") || line.includes("[warn]")) return "warn";
+      if (line.includes(" DEBUG ") || line.includes("[debug]")) return "debug";
+      return "info";
+    }
+
+    function highlightLine(line) {
+      // Highlight timestamp
+      line = line.replace(/^(\[[\d\-T:.Z]+\s+\w+)/, '<span class="hl-time">$1</span>');
+      // Highlight module names [scanner] [server] [power] etc
+      line = line.replace(/\[(\w+)\]/g, '[<span class="hl-module">$1</span>]');
+      // Highlight session IDs
+      line = line.replace(/(ide-[a-f0-9]+|cli[23]-[a-f0-9]+|crew-[a-z0-9\-]+)/g, '<span class="hl-session">$1</span>');
+      // Highlight events
+      line = line.replace(/event=Some\("(\w+)"\)/g, 'event=Some("<span class="hl-event">$1</span>")');
+      // Highlight errors
+      line = line.replace(/(error|failed|Error)/gi, '<span class="hl-error">$1</span>');
+      return line;
+    }
+
+    function renderLine(text) {
+      const level = getLevel(text);
+      const div = document.createElement("div");
+      div.className = `log-line level-${level}`;
+      div.innerHTML = highlightLine(escHtml(text));
+      div.dataset.level = level;
+      div.dataset.raw = text.toLowerCase();
+      return div;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function applyFilter() {
+      const filter = filterInput.value.toLowerCase();
+      const lines = container.querySelectorAll(".log-line");
+      let visible = 0;
+      for (const el of lines) {
+        const level = el.dataset.level;
+        const matchLevel = levels[level];
+        const matchFilter = !filter || el.dataset.raw.includes(filter);
+        const show = matchLevel && matchFilter;
+        el.classList.toggle("filtered", !show);
+        if (show) visible++;
+      }
+      countEl.textContent = `${visible}/${lines.length}`;
+    }
+
+    async function fetchLogs() {
+      try {
+        const resp = await fetch(`${API}/logs?lines=500`);
+        const data = await resp.json();
+
+        if (data.total === lastTotal && data.lines.length === allLines.length) return;
+
+        // Append only new lines
+        const newStart = data.total > lastTotal ? allLines.length : 0;
+        const newLines = data.lines.slice(newStart);
+        lastTotal = data.total;
+        allLines = data.lines;
+
+        if (newStart === 0) {
+          // Full refresh
+          container.innerHTML = "";
+          for (const line of data.lines) {
+            container.appendChild(renderLine(line));
+          }
+        } else {
+          // Append new
+          for (const line of newLines) {
+            container.appendChild(renderLine(line));
+          }
+        }
+
+        applyFilter();
+
+        if (autoScroll) {
+          scrollToBottom();
+        } else if (newLines.length > 0) {
+          scrollBtn.style.display = "";
+          scrollBtn.textContent = `↓ ${newLines.length} new`;
+        }
+      } catch (e) {
+        // Server not running
+      }
+    }
+
+    // Poll every 1s for new logs
+    fetchLogs();
+    setInterval(fetchLogs, 1000);
+  </script>
+</body>
+</html>

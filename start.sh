@@ -85,8 +85,19 @@ case "${1:-start}" in
       exit 1
     fi
     ;;
+  build)
+    cd "$DIR"
+    echo "[nagents] building release..."
+    cargo tauri build 2>&1
+    APP="$DIR/src-tauri/target/release/bundle/macos/nagents.app"
+    DMG="$DIR/src-tauri/target/release/bundle/dmg/nagents_0.1.0_aarch64.dmg"
+    echo ""
+    echo "[nagents] build complete"
+    [ -d "$APP" ] && echo "  App: $APP"
+    [ -f "$DMG" ] && echo "  DMG: $DMG"
+    ;;
   *)
-    echo "Usage: ./start.sh [start|stop|status|logs]"
+    echo "Usage: ./start.sh [start|stop|status|logs|build]"
     exit 1
     ;;
 esac

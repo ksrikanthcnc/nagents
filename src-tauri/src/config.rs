@@ -216,6 +216,9 @@ fn default_waiting_statuses() -> Vec<String> {
 pub struct ConfigHandle {
     inner: Arc<Mutex<Config>>,
     path: PathBuf,
+    /// Runtime overrides — transient state (power mode, temp hide, etc.)
+    /// Applied on top of user config in get_effective(). Never persisted.
+    runtime: Arc<Mutex<HashMap<String, serde_json::Value>>>,
 }
 
 impl ConfigHandle {
@@ -226,12 +229,41 @@ impl ConfigHandle {
         Self {
             inner: Arc::new(Mutex::new(config)),
             path: path.to_path_buf(),
+            runtime: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    /// Get current config snapshot.
+    /// Get raw user config (without runtime overrides).
     pub fn get(&self) -> Config {
         self.inner.lock().unwrap().clone()
+    }
+
+    /// Get effective config: user config + runtime overrides applied.
+    /// Runtime overrides are merged into the overlay.extra map.
+    pub fn get_effective(&self) -> Config {
+        let mut cfg = self.inner.lock().unwrap().clone();
+        let runtime = self.runtime.lock().unwrap();
+        for (key, value) in runtime.iter() {
+            cfg.overlay.extra.insert(key.clone(), value.clone());
+        }
+        cfg
+    }
+
+    /// Set a runtime override (transient, never persisted).
+    pub fn set_runtime(&self, key: &str, value: serde_json::Value, app_handle: Option<&tauri::AppHandle>) {
+        {
+            let mut rt = self.runtime.lock().unwrap();
+            rt.insert(key.to_string(), value);
+        }
+        // Emit config-changed so all windows pick it up
+        if let Some(handle) = app_handle {
+            let _ = handle.emit("config-changed", ());
+        }
+    }
+
+    /// Get all runtime overrides as a map.
+    pub fn get_runtime_all(&self) -> HashMap<String, serde_json::Value> {
+        self.runtime.lock().unwrap().clone()
     }
 
     /// Start watching for changes (spawns background thread).

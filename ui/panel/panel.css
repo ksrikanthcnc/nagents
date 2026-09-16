@@ -855,3 +855,23 @@ body {
   margin-left: 3px;
   font-family: monospace;
 }
+
+/* Search bar */
+.panel-search {
+  flex: 1;
+  min-width: 80px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+.panel-search:focus {
+  border-color: var(--accent, #a78bfa);
+}
+.panel-search::placeholder {
+  color: var(--fg-dim, #888);
+}

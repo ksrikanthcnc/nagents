@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="nagents" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>nagents</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --bg2: #16213e;
+      --fg: #e0e0e0;
+      --fg2: #a0a0a0;
+      --accent: #a78bfa;
+      --accent2: #7c3aed;
+      --border: #2a2a4a;
+      --green: #4ade80;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --orange: #fb923c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .header {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header .counts { display: flex; gap: 12px; font-size: 13px; color: var(--fg2); }
+    .header .count { display: flex; align-items: center; gap: 4px; }
+    .header .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-attention { background: var(--red); }
+    .dot-working { background: var(--green); }
+    .dot-idle { background: var(--yellow); }
+    .dot-muted { background: var(--fg2); opacity: 0.4; }
+
+    /* Status bar */
+    .status-bar {
+      padding: 8px 16px;
+      font-size: 12px;
+      color: var(--fg2);
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between;
+    }
+    .status-bar .connected { color: var(--green); }
+    .status-bar .disconnected { color: var(--red); }
+
+    /* Session list */
+    .sessions { padding: 8px; }
+    .session-group { margin-bottom: 12px; }
+    .group-label {
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+    }
+    .session-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      margin: 2px 4px;
+      border-radius: 8px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .session-card:active { background: #1e2740; }
+
+    /* Session char icon */
+    .session-char {
+      width: 36px; height: 36px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .session-char svg { width: 100%; height: 100%; }
+
+    /* Session info */
+    .session-info { flex: 1; min-width: 0; }
+    .session-name {
+      font-size: 14px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .session-meta {
+      font-size: 12px; color: var(--fg2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    /* Session state badge */
+    .session-state {
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .state-attention { background: rgba(248,113,113,0.2); color: var(--red); }
+    .state-working { background: rgba(74,222,128,0.2); color: var(--green); }
+    .state-idle { background: rgba(251,191,36,0.2); color: var(--yellow); }
+    .state-muted { background: rgba(160,160,160,0.1); color: var(--fg2); }
+
+    /* Notification permission banner */
+    .notif-banner {
+      padding: 12px 16px;
+      background: rgba(167,139,250,0.1);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .notif-banner button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .notif-banner .dismiss {
+      background: none;
+      color: var(--fg2);
+      padding: 6px;
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--fg2);
+    }
+    .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>nagents</h1>
+    <div class="counts" id="counts"></div>
+  </div>
+  <div id="status-bar" class="status-bar">
+    <span id="connection-status">connecting...</span>
+    <span id="notif-status"></span>
+  </div>
+  <div id="notif-banner" class="notif-banner" style="display:none">
+    <span>Enable notifications to get alerts when agents need you</span>
+    <div>
+      <button id="notif-enable">Enable</button>
+      <button class="dismiss" id="notif-dismiss">Later</button>
+    </div>
+  </div>
+  <div id="sessions" class="sessions">
+    <div class="empty">
+      <div class="icon">&#128123;</div>
+      <p>Connecting to nagents...</p>
+    </div>
+  </div>
+
+  <script>
+    // ─── Config ─────────────────────────────────────────────────────────
+    // PWA connects to the nagents HTTP server.
+    // When served by nagents itself, use relative URL.
+    // When opened manually, use the host from URL.
+    const API_BASE = location.port === "3335"
+      ? `${location.protocol}//${location.host}`
+      : "http://127.0.0.1:3335";
+
+    // ─── Character SVGs (inline, no external deps) ──────────────────────
+    const CHAR_SVGS = {
+      ghost: '<svg viewBox="0 0 64 64"><path d="M32 4C18 4 12 16 12 28v20c0 2 2 4 4 2l4-4 4 4c2 2 4 2 4 0l4-4 4 4c2 2 4 2 4 0l4-4 4 4c2 2 4 0 4-2V28C52 16 46 4 32 4z" fill="#fff" fill-opacity="0.9" stroke="#e0e0e0" stroke-width="1"/><circle cx="24" cy="24" r="4" fill="#1a1a2e"/><circle cx="40" cy="24" r="4" fill="#1a1a2e"/><circle cx="22.5" cy="22.5" r="1.8" fill="#a78bfa"/><circle cx="38.5" cy="22.5" r="1.8" fill="#a78bfa"/></svg>',
+      cat: '<svg viewBox="0 0 64 64"><path d="M16 20l-6-14 14 8M48 20l6-14-14 8" fill="#fbbf24" stroke="#d97706" stroke-width="1"/><rect x="14" y="18" width="36" height="30" rx="14" fill="#fbbf24"/><circle cx="26" cy="30" r="3" fill="#1a1a2e"/><circle cx="38" cy="30" r="3" fill="#1a1a2e"/><ellipse cx="32" cy="36" rx="2" ry="1.5" fill="#f87171"/></svg>',
+      default: '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="20" fill="#a78bfa" fill-opacity="0.3" stroke="#a78bfa" stroke-width="1"/><circle cx="26" cy="28" r="3" fill="#a78bfa"/><circle cx="38" cy="28" r="3" fill="#a78bfa"/></svg>',
+    };
+
+    function getCharSvg(charId) {
+      return CHAR_SVGS[charId] || CHAR_SVGS.default;
+    }
+
+    // ─── State ──────────────────────────────────────────────────────────
+    let connected = false;
+    let prevAttentionIds = new Set();
+
+    function getStateBadge(session) {
+      if (session.muted) return { cls: "state-muted", text: "muted" };
+      if (session.attention || session.event === "approval" || session.event === "stuck")
+        return { cls: "state-attention", text: session.event || "needs you" };
+      if (session.event === "running" || session.event === "tool")
+        return { cls: "state-working", text: session.event };
+      if (session.event === "idle")
+        return { cls: "state-idle", text: "done" };
+      return { cls: "state-idle", text: session.event || "idle" };
+    }
+
+    function getActionText(s) {
+      if (s.action_text) return s.action_text;
+      if (s.tool) return s.tool;
+      if (s.description) return s.description;
+      if (s.prompt) return s.prompt.slice(0, 50);
+      return "";
+    }
+
+    function timeSince(epoch) {
+      const sec = Math.floor((Date.now() / 1000) - epoch);
+      if (sec < 60) return "just now";
+      if (sec < 3600) return Math.floor(sec / 60) + "m ago";
+      if (sec < 86400) return Math.floor(sec / 3600) + "h ago";
+      return Math.floor(sec / 86400) + "d ago";
+    }
+
+    // ─── Render ─────────────────────────────────────────────────────────
+    function render(state) {
+      const sessions = state.sessions.filter(s => s.active);
+      const countsEl = document.getElementById("counts");
+      const sessionsEl = document.getElementById("sessions");
+
+      // Counts
+      let attn = 0, working = 0, idle = 0, muted = 0;
+      for (const s of sessions) {
+        if (s.muted) { muted++; continue; }
+        if (s.attention || s.event === "approval" || s.event === "stuck") attn++;
+        else if (s.event === "running" || s.event === "tool") working++;
+        else idle++;
+      }
+      countsEl.innerHTML = `
+        <span class="count"><span class="dot dot-attention"></span>${attn}</span>
+        <span class="count"><span class="dot dot-working"></span>${working}</span>
+        <span class="count"><span class="dot dot-idle"></span>${idle}</span>
+        ${muted ? `<span class="count"><span class="dot dot-muted"></span>${muted}</span>` : ""}
+      `;
+
+      if (sessions.length === 0) {
+        sessionsEl.innerHTML = '<div class="empty"><div class="icon">&#128564;</div><p>No active sessions</p></div>';
+        return;
+      }
+
+      // Group by source
+      const groups = {};
+      for (const s of sessions) {
+        const key = s.group || s.source;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(s);
+      }
+
+      // Sort: attention first, then by mtime
+      const sortSessions = (arr) => arr.sort((a, b) => {
+        const aAttn = a.attention || a.event === "approval" ? 1 : 0;
+        const bAttn = b.attention || b.event === "approval" ? 1 : 0;
+        if (aAttn !== bAttn) return bAttn - aAttn;
+        return (b.mtime || 0) - (a.mtime || 0);
+      });
+
+      let html = "";
+      // Attention group first
+      const attentionSessions = sessions.filter(s =>
+        !s.muted && (s.attention || s.event === "approval" || s.event === "stuck"));
+      if (attentionSessions.length > 0) {
+        html += '<div class="session-group"><div class="group-label" style="color:var(--red)">Needs Your Attention</div>';
+        for (const s of sortSessions(attentionSessions)) {
+          html += renderSession(s);
+        }
+        html += '</div>';
+      }
+
+      // Other groups
+      for (const [group, items] of Object.entries(groups)) {
+        const nonAttention = items.filter(s =>
+          s.muted || (!s.attention && s.event !== "approval" && s.event !== "stuck"));
+        if (nonAttention.length === 0) continue;
+        html += `<div class="session-group"><div class="group-label">${escHtml(group)}</div>`;
+        for (const s of sortSessions(nonAttention)) {
+          html += renderSession(s);
+        }
+        html += '</div>';
+      }
+
+      sessionsEl.innerHTML = html;
+    }
+
+    function renderSession(s) {
+      const badge = getStateBadge(s);
+      const action = getActionText(s);
+      const charSvg = getCharSvg(s.character || "ghost");
+      const time = s.mtime ? timeSince(s.mtime) : "";
+      const meta = [action, time].filter(Boolean).join(" \u00b7 ");
+      return `<div class="session-card">
+        <div class="session-char">${charSvg}</div>
+        <div class="session-info">
+          <div class="session-name">${escHtml(s.name)}</div>
+          ${meta ? `<div class="session-meta">${escHtml(meta)}</div>` : ""}
+        </div>
+        <span class="session-state ${badge.cls}">${badge.text}</span>
+      </div>`;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    // ─── Notifications ──────────────────────────────────────────────────
+    function checkNotifications(sessions) {
+      if (Notification.permission !== "granted") return;
+
+      const currentAttention = new Set();
+      for (const s of sessions) {
+        if (!s.muted && (s.attention || s.event === "approval" || s.event === "stuck")) {
+          currentAttention.add(s.id);
+          // New attention — notify
+          if (!prevAttentionIds.has(s.id)) {
+            new Notification("nagents", {
+              body: `${s.name} needs your attention`,
+              icon: "icon-192.png",
+              tag: s.id,
+              renotify: false,
+            });
+          }
+        }
+      }
+      prevAttentionIds = currentAttention;
+    }
+
+    // ─── Notification UI ────────────────────────────────────────────────
+    function setupNotifBanner() {
+      if (!("Notification" in window)) return;
+      if (Notification.permission === "granted") {
+        document.getElementById("notif-status").textContent = "notifications on";
+        return;
+      }
+      if (Notification.permission === "denied") return;
+
+      // Show banner
+      const banner = document.getElementById("notif-banner");
+      banner.style.display = "";
+      document.getElementById("notif-enable").onclick = async () => {
+        const perm = await Notification.requestPermission();
+        banner.style.display = "none";
+        if (perm === "granted") {
+          document.getElementById("notif-status").textContent = "notifications on";
+        }
+      };
+      document.getElementById("notif-dismiss").onclick = () => {
+        banner.style.display = "none";
+      };
+    }
+
+    // ─── Polling ────────────────────────────────────────────────────────
+    let pollFails = 0;
+
+    async function poll() {
+      try {
+        const resp = await fetch(`${API_BASE}/state`);
+        if (!resp.ok) throw new Error(resp.status);
+        const state = await resp.json();
+
+        if (!connected) {
+          connected = true;
+          document.getElementById("connection-status").innerHTML =
+            '<span class="connected">connected</span>';
+        }
+        pollFails = 0;
+
+        render(state);
+        checkNotifications(state.sessions.filter(s => s.active));
+      } catch (e) {
+        pollFails++;
+        if (connected || pollFails > 2) {
+          connected = false;
+          document.getElementById("connection-status").innerHTML =
+            '<span class="disconnected">disconnected</span>';
+        }
+      }
+    }
+
+    // ─── Init ───────────────────────────────────────────────────────────
+    setupNotifBanner();
+    poll();
+    setInterval(poll, 2000);
+
+    // Register service worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+  </script>
+</body>
+</html>

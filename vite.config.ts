@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
               overlay: resolve(__dirname, "overlay.html"),
               bsb: resolve(__dirname, "bsb.html"),
               settings: resolve(__dirname, "settings.html"),
+              logs: resolve(__dirname, "logs.html"),
             },
       },
     },
@@ -29,6 +30,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: isDemo ? 5181 : 5180,
       strictPort: true,
+      host: true,  // Listen on 0.0.0.0 for LAN access (PWA on phone)
     },
   };
 });

@@ -23,7 +23,8 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-const HTTP_BASE = "http://127.0.0.1:3335";
+// Use same host as the page (works for LAN/PWA) but API port 3335
+const HTTP_BASE = `http://${location.hostname}:3335`;
 
 /** Fetch full state snapshot. */
 export async function getState(): Promise<StateSnapshot> {

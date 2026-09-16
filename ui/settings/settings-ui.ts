@@ -40,7 +40,15 @@ function render(): void {
   }
   html += `</div>`;
 
-  // Sections (skip "mode" since it's the selector above)
+  // Auto battery mode toggle (from mode section, rendered separately)
+  const autoBatteryDef = CONFIG_SCHEMA.find(s => s.key === "auto_battery_mode");
+  if (autoBatteryDef) {
+    html += `<div class="settings-section"><h3 style="margin:0 0 4px">Power</h3>`;
+    html += renderField(autoBatteryDef, ov);
+    html += `</div>`;
+  }
+
+  // Sections (skip "mode" since it's handled above)
   for (const section of getSections()) {
     if (section === "mode") continue;
     const defs = getSection(section);
@@ -90,22 +98,23 @@ function renderField(def: SettingDef, ov: any): string {
 function attachHandlers(): void {
   if (!container) return;
 
-  // Mode selector — special: also sets battery_saver for "off" mode
+  // Mode selector — writes to config (persisted user preference)
+  // If user manually selects a mode, disable auto battery (they're taking control).
   container.querySelectorAll(".mode-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const mode = (btn as HTMLElement).dataset.mode!;
-      // "off" = battery saver on (shows BSB, hides overlay)
-      if (mode === "off") {
-        localStorage.setItem("nagents:battery_saver", "true");
-      } else {
-        localStorage.removeItem("nagents:battery_saver");
-      }
-      fetch("http://127.0.0.1:3335/config", {
+      fetch(`http://${location.hostname}:3335/config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ overlay: { overlay_mode: mode } }),
+        body: JSON.stringify({ overlay: { overlay_mode: mode, auto_battery_mode: false } }),
       }).catch(() => {});
-      log("settings", `mode → ${mode}`);
+      // Clear runtime battery_saver so change is immediate
+      fetch(`http://${location.hostname}:3335/runtime`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ battery_saver: mode === "off" }),
+      }).catch(() => {});
+      log("settings", `mode → ${mode} (auto_battery_mode off)`);
       container!.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
     });
@@ -128,7 +137,7 @@ function attachHandlers(): void {
       else if (value === "false") value = false;
       else if (def?.type === "number") value = parseFloat(String(value));
 
-      fetch("http://127.0.0.1:3335/config", {
+      fetch("http://" + location.hostname + ":3335/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ overlay: { [key]: value } }),
