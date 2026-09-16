@@ -40,4 +40,6 @@ logs/
 config.local.yaml
 .haive.pid
 .haive.log
+.nagents.pid
+.nagents.log
 logs/

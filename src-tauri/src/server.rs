@@ -15,6 +15,7 @@
 
 use crate::state::{now_epoch, EventUpdate, Session, SessionStore};
 use log::{debug, error, info};
+use std::collections::HashMap;
 use std::thread;
 use tiny_http::{Header, Request, Response, Server};
 
@@ -22,8 +23,9 @@ use tiny_http::{Header, Request, Response, Server};
 const EVENTS_DIR: &str = "data/events";
 
 /// Start the HTTP server on the given port (background thread).
-pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16, project_root: std::path::PathBuf) {
-    let addr = format!("127.0.0.1:{}", port);
+pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16, project_root: std::path::PathBuf, app_handle: Option<tauri::AppHandle>) {
+    // Bind on 0.0.0.0 so PWA on local network (phone/tablet) can connect
+    let addr = format!("0.0.0.0:{}", port);
 
     thread::spawn(move || {
         let server = match Server::http(&addr) {
@@ -36,7 +38,7 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
 
         info!("[server] listening on http://{}", addr);
 
-        for request in server.incoming_requests() {
+        for mut request in server.incoming_requests() {
             let method = request.method().to_string();
             let url = request.url().to_string();
             debug!("[server] {} {}", method, url);
@@ -51,7 +53,7 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                     respond_json(request, 200, &json);
                 }
                 ("GET", "/config") => {
-                    let cfg = config.get();
+                    let cfg = config.get_effective();
                     let json = serde_json::to_string(&cfg).unwrap_or_default();
                     respond_json(request, 200, &json);
                 }
@@ -70,10 +72,67 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                     handle_title(request, &store, &project_root);
                 }
                 ("POST", "/character") => {
-                    handle_character(request, &store);
+                    handle_character(request, &store, &project_root);
                 }
                 ("POST", "/config") => {
                     handle_config_patch(request, &project_root);
+                }
+                ("POST", "/runtime") => {
+                    // Set transient runtime overrides (not persisted).
+                    // Body: { "key": value, ... }
+                    let mut body = String::new();
+                    if std::io::Read::read_to_string(request.as_reader(), &mut body).is_ok() {
+                        if let Ok(map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&body) {
+                            for (k, v) in &map {
+                                info!("[server] POST /runtime: {}={}", k, v);
+                                config.set_runtime(k, v.clone(), app_handle.as_ref());
+                            }
+                            respond_json(request, 200, r#"{"ok":true}"#);
+                        } else {
+                            respond_json(request, 400, r#"{"error":"invalid json"}"#);
+                        }
+                    } else {
+                        respond_json(request, 400, r#"{"error":"read failed"}"#);
+                    }
+                }
+                ("GET", "/runtime") => {
+                    // Get current runtime overrides
+                    let rt = config.get_runtime_all();
+                    let json = serde_json::to_string(&rt).unwrap_or_default();
+                    respond_json(request, 200, &json);
+                }
+                ("GET", url) if url.starts_with("/logs") => {
+                    // Serve last N lines from in-memory log buffer
+                    let lines_param = url.split("lines=").nth(1)
+                        .and_then(|s| s.split('&').next())
+                        .and_then(|s| s.parse::<usize>().ok())
+                        .unwrap_or(500);
+                    let lines = crate::logbuf::tail(lines_param);
+                    let total = crate::logbuf::count();
+                    let json = serde_json::json!({
+                        "lines": lines,
+                        "total": total,
+                        "showing": lines.len(),
+                    });
+                    respond_json(request, 200, &json.to_string());
+                }
+                ("GET", "/characters") => {
+                    // Serve all character SVGs as { name: svg_string }
+                    let chars_dir = project_root.join("ui").join("characters");
+                    let mut svgs = serde_json::Map::new();
+                    if let Ok(entries) = std::fs::read_dir(&chars_dir) {
+                        for entry in entries.flatten() {
+                            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                                let name = entry.file_name().to_string_lossy().to_string();
+                                let svg_path = entry.path().join(format!("{}.svg", name));
+                                if let Ok(svg) = std::fs::read_to_string(&svg_path) {
+                                    svgs.insert(name, serde_json::Value::String(svg));
+                                }
+                            }
+                        }
+                    }
+                    let json = serde_json::Value::Object(svgs).to_string();
+                    respond_json(request, 200, &json);
                 }
                 ("GET", "/scan") => {
                     // Force all scanners to run immediately
@@ -146,6 +205,31 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                     let _ = request.respond(resp);
                 }
                 _ => {
+                    // Serve PWA static files from pwa/ directory
+                    if method == "GET" {
+                        let pwa_path = url.strip_prefix("/").unwrap_or(&url);
+                        let pwa_path = if pwa_path.is_empty() || pwa_path == "pwa" || pwa_path == "pwa/" {
+                            "index.html"
+                        } else {
+                            pwa_path.strip_prefix("pwa/").unwrap_or(pwa_path)
+                        };
+                        if let Some(body) = serve_pwa_file(pwa_path, &project_root) {
+                            let content_type = match pwa_path.rsplit('.').next() {
+                                Some("html") => "text/html; charset=utf-8",
+                                Some("js") => "application/javascript",
+                                Some("json") => "application/json",
+                                Some("png") => "image/png",
+                                Some("svg") => "image/svg+xml",
+                                Some("css") => "text/css",
+                                _ => "application/octet-stream",
+                            };
+                            let resp = Response::from_data(body)
+                                .with_header(content_type.parse::<Header>().unwrap_or_else(|_| content_type_json()))
+                                .with_header(cors_origin());
+                            let _ = request.respond(resp);
+                            continue;
+                        }
+                    }
                     let _ =
                         request.respond(Response::from_string("not found").with_status_code(404));
                 }
@@ -202,7 +286,7 @@ fn handle_event(mut request: Request, store: &SessionStore, project_root: &std::
     );
 
     // Persist event to disk for debugging and cache
-    persist_event(&update);
+    persist_event(&update, project_root);
 
     // If pinned or muted state changed, persist immediately
     let needs_meta_persist = update.pinned.is_some() || update.muted.is_some();
@@ -252,7 +336,7 @@ fn handle_title(mut request: Request, store: &SessionStore, project_root: &std::
     respond_json(request, 200, r#"{"ok":true}"#);
 }
 
-fn handle_character(mut request: Request, store: &SessionStore) {
+fn handle_character(mut request: Request, store: &SessionStore, project_root: &std::path::Path) {
     let mut body = String::new();
     if std::io::Read::read_to_string(request.as_reader(), &mut body).is_err() {
         respond_json(request, 400, r#"{"error":"bad body"}"#);
@@ -275,22 +359,24 @@ fn handle_character(mut request: Request, store: &SessionStore) {
     };
 
     store.set_character(&update.session_id, &update.character);
+    // Persist the pick so it survives restarts/reinstalls (not just localStorage).
+    crate::persist_character_to_meta(&update.session_id, &update.character, &project_root.to_path_buf());
     info!("[server] POST /character: {} → {:?}", update.session_id, update.character);
     respond_json(request, 200, r#"{"ok":true}"#);
 }
 
 /// Write event to data/events/<session_id>.jsonl for persistence/debugging.
-fn persist_event(update: &EventUpdate) {
+///
+/// DEV-ONLY: this is debug history. A downloaded/prod app stays lean — live log
+/// inspection is served from the in-memory buffer via GET /logs, so we don't
+/// litter the user's disk with per-session event files. In dev we keep them
+/// under the project root for debugging.
+fn persist_event(update: &EventUpdate, project_root: &std::path::Path) {
+    if !cfg!(debug_assertions) {
+        return; // prod: no event files on disk
+    }
     use std::fs;
     use std::io::Write;
-    use std::path::Path;
-
-    let project_root = if cfg!(debug_assertions) {
-        let manifest = env!("CARGO_MANIFEST_DIR");
-        Path::new(manifest).parent().unwrap_or(Path::new(".")).to_path_buf()
-    } else {
-        std::env::current_dir().unwrap_or_default()
-    };
 
     let events_dir = project_root.join(EVENTS_DIR);
     if fs::create_dir_all(&events_dir).is_err() {
@@ -388,4 +474,20 @@ fn handle_config_patch(mut request: Request, project_root: &std::path::Path) {
             respond_json(request, 500, r#"{"error":"serialize failed"}"#);
         }
     }
+}
+
+/// Serve a PWA static file from the `pwa/` directory.
+/// Returns file contents if found, None otherwise.
+/// Sanitizes path to prevent directory traversal.
+fn serve_pwa_file(path: &str, project_root: &std::path::Path) -> Option<Vec<u8>> {
+    // Sanitize: no .., no absolute paths
+    if path.contains("..") || path.starts_with('/') {
+        return None;
+    }
+    let file_path = project_root.join("pwa").join(path);
+    // Ensure resolved path is within pwa/
+    if !file_path.starts_with(project_root.join("pwa")) {
+        return None;
+    }
+    std::fs::read(&file_path).ok()
 }

@@ -9,6 +9,11 @@ Outputs JSON array to stdout (consumed by nagents Rust backend).
 
 Usage: python3 sources/kiro-crew/scan.py
 """
+# NOTE: The app spawns scanners via `sh -c "python3 ..."`, which on macOS may
+# resolve to the system python (/usr/bin/python3 = 3.9). PEP 604 unions like
+# `Path | None` aren't evaluatable at runtime until 3.10. This future import
+# makes all annotations lazy strings, so the scanners run on 3.7+.
+from __future__ import annotations
 
 import json
 import sys

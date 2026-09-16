@@ -13,6 +13,9 @@ ID scheme: cli2-{uuid[:8]}
 
 Outputs JSON array to stdout (consumed by nagents Rust backend).
 """
+# App spawns scanners via system python (may be 3.9); keep annotations lazy so
+# PEP 604 unions (`X | None`) don't blow up at import time.
+from __future__ import annotations
 
 import json
 import os

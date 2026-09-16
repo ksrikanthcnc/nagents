@@ -10,6 +10,9 @@ Outputs JSON array to stdout (consumed by nagents Rust backend).
 
 Usage: python3 sources/kiro-ide/scan.py
 """
+# App spawns scanners via system python (may be 3.9); keep annotations lazy so
+# PEP 604 unions (`X | None`) don't blow up at import time.
+from __future__ import annotations
 
 import json
 import sqlite3
