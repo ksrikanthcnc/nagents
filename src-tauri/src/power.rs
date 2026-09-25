@@ -151,14 +151,16 @@ pub fn start_monitoring(app: AppHandle, config: crate::config::ConfigHandle) {
         loop {
             thread::sleep(Duration::from_secs(15));
             let state = get_power_state();
+            // Always re-apply: handles config changes (e.g. user toggling
+            // auto_battery_mode off) even when the power state itself didn't
+            // change. Cheap — just reads config + sets one runtime key.
+            apply_power_runtime(&config, &state, Some(&app));
             if state.on_battery != prev.on_battery || state.low_power_mode != prev.low_power_mode {
                 info!("[power] changed: on_battery={} low_power={} level={:?} charging={}",
                     state.on_battery, state.low_power_mode, state.battery_level, state.is_charging);
-                apply_power_runtime(&config, &state, Some(&app));
-                // Also emit event for any frontend that wants to react immediately
                 let _ = app.emit("nagents:power-changed", &state);
-                prev = state;
             }
+            prev = state;
         }
     });
 }
@@ -176,7 +178,14 @@ fn apply_power_runtime(config: &crate::config::ConfigHandle, state: &PowerState,
         })
         .unwrap_or(true);
 
-    if !auto_mode { return; }
+    if !auto_mode {
+        // Auto battery disabled by user: clear any runtime override so the
+        // user's manual overlay_mode takes effect. Without this, a previously-
+        // set battery_saver=true lingers in runtime even after the user toggles
+        // auto_battery_mode off.
+        config.set_runtime("battery_saver", serde_json::Value::Bool(false), app);
+        return;
+    }
 
     let should_bsb = state.on_battery || state.low_power_mode;
     config.set_runtime("battery_saver", serde_json::Value::Bool(should_bsb), app);

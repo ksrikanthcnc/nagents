@@ -59,7 +59,13 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                 }
                 ("GET", "/cursor") => {
                     let (x, y) = crate::overlay::get_cursor_position();
-                    let json = format!(r#"{{"x":{},"y":{}}}"#, x, y);
+                    let b = crate::overlay::overlay_bounds();
+                    let displays = crate::overlay::display_rects();
+                    let displays_json = serde_json::to_string(&displays).unwrap_or_else(|_| "[]".into());
+                    let json = format!(
+                        r#"{{"x":{},"y":{},"ox":{},"oy":{},"vw":{},"vh":{},"displays":{}}}"#,
+                        x, y, b.x, b.y, b.w, b.h, displays_json
+                    );
                     respond_json(request, 200, &json);
                 }
                 ("POST", "/sessions") => {

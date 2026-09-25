@@ -23,11 +23,30 @@ from pathlib import Path
 HOME = Path.home()
 CREW_SNAPSHOTS = HOME / ".kiro/crew/context_snapshots.json"
 CREW_SESSIONS_DIR = HOME / ".kiro/crew/sessions"
+# Authoritative list of currently-OPEN crew chats. context_snapshots.json is a
+# persistent token-usage cache that keeps closed chats forever, so we must
+# intersect with open_slots.json to avoid showing chats the user has closed.
+CREW_OPEN_SLOTS = HOME / ".kiro/crew/open_slots.json"
 
 
 def log(msg: str) -> None:
     """Log to stderr (stdout is reserved for JSON output)."""
     print(f"[kiro-crew] {msg}", file=sys.stderr)
+
+
+def open_keys() -> set | None:
+    """Return the set of currently-open crew chat keys, or None if the file is
+    missing/unreadable (in which case we don't filter, to fail open)."""
+    if not CREW_OPEN_SLOTS.exists():
+        return None
+    try:
+        data = json.loads(CREW_OPEN_SLOTS.read_text())
+        keys = data.get("keys")
+        if isinstance(keys, list):
+            return {str(k).replace("dashboard:", "") for k in keys}
+    except Exception as e:
+        log(f"failed to read open_slots: {e}")
+    return None
 
 
 def discover() -> list[dict]:
@@ -44,8 +63,16 @@ def discover() -> list[dict]:
         log(f"failed to read snapshots: {e}")
         return sessions
 
+    # Only include chats that are currently open (per open_slots.json). If that
+    # file is unavailable, fall open (show all) rather than hide everything.
+    open_set = open_keys()
+    skipped = 0
+
     for key, snap in data.items():
         session_key = key.replace("dashboard:", "")
+        if open_set is not None and session_key not in open_set:
+            skipped += 1
+            continue
         used = snap.get("used_tokens", 0)
         window = snap.get("window_tokens", 1000000)
 
@@ -75,7 +102,7 @@ def discover() -> list[dict]:
             "on_overlay": False,
         })
 
-    log(f"discovered {len(sessions)} sessions")
+    log(f"discovered {len(sessions)} sessions ({skipped} closed, filtered)")
     return sessions
 
 

@@ -224,9 +224,11 @@ function renderSubGroups(groups: SessionGroup[], depth: number): string {
   let html = "";
   let gi = 0;
   for (const sub of sorted) {
+    const sessionCount = countSessions(sub);
+    // Hide empty groups entirely (e.g. a CLI version with no open sessions).
+    if (sessionCount === 0) continue;
     const isSubCollapsed = collapsed.has(sub.id);
     const subArrow = isSubCollapsed ? "▸" : "▾";
-    const sessionCount = countSessions(sub);
     const attentionCount = sub.sessions.filter(s => s.attention).length;
     const attentionBadge = attentionCount > 0 ? `<span class="attention-badge">${attentionCount}!</span>` : "";
 
@@ -300,9 +302,12 @@ function render(): void {
   html += `<div class="panel-groups panel-${panelMode}">`;
 
   for (const meta of groups) {
+    const count = countSessions(meta);
+    // Hide a whole source/meta group when it has no sessions (e.g. all CLI v2
+    // chats closed → no "kiro-cli-v2" header at all).
+    if (count === 0) continue;
     const isMetaCollapsed = collapsed.has(meta.id);
     const arrow = isMetaCollapsed ? "▸" : "▾";
-    const count = meta.sessions.length;
 
     // Meta header
     html += `<div class="meta-group ${isMetaCollapsed ? "meta-collapsed" : ""}" data-group="${meta.id}">

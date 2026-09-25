@@ -33,6 +33,21 @@ def log(msg: str) -> None:
     print(f"[kiro-cli-v2] {msg}", file=sys.stderr)
 
 
+def is_acp_agent(pid: int) -> bool:
+    """True if the process is a headless ACP agent (`acp --agent ...`) rather
+    than an interactive CLI chat. Best-effort via `ps`; on any error, treat as
+    NOT an agent (fail open — show it) so we never hide real chats."""
+    try:
+        import subprocess
+        out = subprocess.run(
+            ["ps", "-o", "command=", "-p", str(pid)],
+            capture_output=True, text=True, timeout=2,
+        ).stdout
+        return "acp --agent" in out
+    except Exception:
+        return False
+
+
 def discover() -> list[dict]:
     """Return active v2 CLI sessions from lock files."""
     sessions = []
@@ -55,6 +70,12 @@ def discover() -> list[dict]:
             # Check PID is alive
             os.kill(int(pid), 0)
         except (ProcessLookupError, PermissionError, OSError, json.JSONDecodeError, ValueError):
+            continue
+
+        # Skip headless ACP agents (e.g. `kiro-cli-chat acp --agent kirocrew-lite`).
+        # These are background agent processes Kiro Crew spawns — no interactive
+        # chat/window, so they're noise on the overlay. Keep only real CLI chats.
+        if is_acp_agent(pid):
             continue
 
         session_id = lock_file.stem
