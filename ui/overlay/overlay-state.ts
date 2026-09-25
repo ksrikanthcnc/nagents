@@ -33,8 +33,11 @@ export interface OverlayChar {
 
 // ─── Shared Mutable State ───────────────────────────────────────────────────
 
-export const cursor: CursorPosition = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-export const cursorTarget: CursorPosition = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+// Cursor is initialized to center of the window. In per-display mode this gets
+// overwritten immediately by the first /cursor poll (global coords); the init
+// value only matters for the brief moment before that first poll.
+export const cursor: CursorPosition = { x: 0, y: 0 };
+export const cursorTarget: CursorPosition = { x: 0, y: 0 };
 export const chars: Map<string, OverlayChar> = new Map();
 
 export let container: HTMLElement | null = null;
@@ -63,6 +66,91 @@ export function setFrameInterval(v: number): void { frameInterval = v; }
 
 export let CHAR_SIZE = 44;
 export function setCharSize(v: number): void { CHAR_SIZE = v; }
+
+// ─── Virtual desktop bounds (multi-monitor) ─────────────────────────────────
+// The overlay window's logical size. When spanning multiple displays this is
+// the virtual-desktop size; otherwise it matches the single display. Char
+// positions are clamped to this (falls back to window.innerWidth/Height until
+// the first /cursor response populates it). Origin subtraction is done in the
+// cursor poll, so these are window-LOCAL bounds (0,0 top-left of the window).
+export let vWidth = 0;
+export let vHeight = 0;
+export function setVirtualBounds(w: number, h: number): void { vWidth = w; vHeight = h; }
+/** Effective canvas width/height — virtual bounds if known, else window inner. */
+export function canvasW(): number { return vWidth > 0 ? vWidth : window.innerWidth; }
+export function canvasH(): number { return vHeight > 0 ? vHeight : window.innerHeight; }
+
+// ─── Deterministic PRNG (shared trajectory across per-display windows) ──────
+// All windows must compute identical positions for the same char. Math.random()
+// diverges across windows. This simple hash-based PRNG takes a session id + a
+// counter and returns a deterministic [0,1) float. Every window seeding the
+// same (id, counter) gets the same value → trajectories converge.
+
+/** Simple hash (djb2) of a string → 32-bit unsigned int. */
+function djb2(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+/** Deterministic random [0,1) for a session id + counter. */
+export function seededRandom(sessionId: string, counter: number): number {
+  const h = djb2(sessionId + ":" + counter);
+  return (h & 0x7fffffff) / 0x80000000;
+}
+
+// ─── Per-display bounds (per-display overlay mode) ──────────────────────────
+// In per-display mode, each overlay window covers one monitor. These fields
+// describe THIS window's display region in the global/virtual coordinate space.
+// In single-window mode (no query params), they default to (0,0, innerW, innerH).
+//
+// dx/dy = this display's logical origin in the virtual desktop.
+// dw/dh = this display's logical size.
+// vox/voy = the virtual desktop's origin (min x/y across all displays).
+// The virtual position of a char = (local x + dx, local y + dy) in global space.
+// A char is visible on this display if its virtual pos falls in [dx..dx+dw, dy..dy+dh].
+export let displayOriginX = 0;
+export let displayOriginY = 0;
+export let displayWidth = 0;
+export let displayHeight = 0;
+export let virtualOriginX = 0;
+export let virtualOriginY = 0;
+export let isPerDisplay = false;
+/** True on the primary overlay window that owns physics. False on follower
+ * windows that are pure renderers reading positions from localStorage. */
+export let isLeadWindow = true;
+export function setIsLeadWindow(v: boolean): void { isLeadWindow = v; }
+
+// Latest follower frame (set by BroadcastChannel onmessage in the follower renderer).
+// Read by the debug panel to build char lists on follower windows.
+export let latestFollowerFrame: Record<string, [number, number, string, string, string, string, string]> = {};
+export function setLatestFollowerFrame(f: typeof latestFollowerFrame): void { latestFollowerFrame = f; }
+
+export function setDisplayBounds(dx: number, dy: number, dw: number, dh: number, vox: number, voy: number): void {
+  displayOriginX = dx;
+  displayOriginY = dy;
+  displayWidth = dw;
+  displayHeight = dh;
+  virtualOriginX = vox;
+  virtualOriginY = voy;
+  isPerDisplay = true;
+}
+
+// Display rects (all monitors) — populated from /cursor response by the lead.
+// Used to determine which display the cursor is on (roamer sticking).
+export interface DisplayRectInfo { x: number; y: number; w: number; h: number }
+export let displayRects: DisplayRectInfo[] = [];
+export function setDisplayRects(rects: DisplayRectInfo[]): void { displayRects = rects; }
+
+/** Find which display rect contains a point (global coords). Returns the rect, or null. */
+export function displayContaining(gx: number, gy: number): DisplayRectInfo | null {
+  for (const r of displayRects) {
+    if (gx >= r.x && gx < r.x + r.w && gy >= r.y && gy < r.y + r.h) return r;
+  }
+  return null;
+}
 
 // ─── Config (overlay-specific) ──────────────────────────────────────────────
 

@@ -19,11 +19,16 @@ import {
   setAllCharsHidden, allCharsHidden,
   setFrameInterval, frameInterval, setAnimFrameId,
   cfg, setCfg, CHAR_SIZE, setCharSize,
+  setVirtualBounds, setDisplayBounds, isPerDisplay, isLeadWindow, setIsLeadWindow,
+  displayOriginX, displayOriginY, displayWidth, displayHeight,
+  virtualOriginX, virtualOriginY, canvasW, canvasH, setDisplayRects,
+  latestFollowerFrame, setLatestFollowerFrame,
 } from "./overlay-state";
 import type { OverlayChar } from "./overlay-state";
 import { updatePhysics } from "./physics";
 import { drawConnections } from "./connections";
 import { createCharElement, getToolIcon, getActionText, randomRoamTarget, randomEdgePosition, updateHiddenBadge } from "./dom";
+import { initDebugPanel, updateCharDistanceBadges } from "./debug-panel";
 
 // ─── Overlay Mode Presets ────────────────────────────────────────────────────
 
@@ -52,6 +57,38 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   setContainer(el);
   log("overlay", "initializing");
 
+  // Debug panel (draggable, shows on all displays, reads from lead's broadcast)
+  initDebugPanel();
+
+  // Per-display mode: each window discovers its display bounds via Tauri IPC
+  // command (not URL params — WebviewUrl::App encodes ? in the path, so query
+  // params are lost). If the command returns data, this is a per-display window.
+  // Primary display (is_lead=true) runs the full physics; others are followers
+  // that receive char positions via Tauri events and only render their slice.
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const info = await invoke<{
+      dx: number; dy: number; dw: number; dh: number;
+      vox: number; voy: number; vw: number; vh: number;
+      is_lead: boolean;
+      displays: Array<{ x: number; y: number; w: number; h: number }>;
+    } | null>("get_overlay_display_info");
+    if (info) {
+      setDisplayBounds(info.dx, info.dy, info.dw, info.dh, info.vox, info.voy);
+      setVirtualBounds(info.vw, info.vh);
+      setDisplayRects(info.displays);
+      log("overlay", `per-display: (${info.dx},${info.dy}) ${info.dw}x${info.dh} is_lead=${info.is_lead}`);
+      if (!info.is_lead) {
+        setIsLeadWindow(false);
+        log("overlay", `follower mode — starting renderer`);
+        startFollowerRenderer(el, info.dx, info.dy, info.dw, info.dh);
+        return;
+      }
+    }
+  } catch (e) {
+    log("overlay", `display info IPC failed (single-display mode): ${e}`);
+  }
+
   const badge = document.createElement("div");
   badge.className = "overlay-hidden-badge";
   badge.style.display = "none";
@@ -71,7 +108,10 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   let cursorInterval = Math.round(1000 / cfg.cursor_fps);
   (async () => {
     while (true) {
-      if (cursorReady && (chars.size === 0 || allCharsHidden)) {
+      // In per-display mode, every window must keep polling at full speed even
+      // when no chars are visible on this display — the cursor could arrive
+      // any frame. Only throttle in single-window mode when truly idle.
+      if (!isPerDisplay && cursorReady && (chars.size === 0 || allCharsHidden)) {
         await new Promise(r => setTimeout(r, 2000));
         continue;
       }
@@ -79,8 +119,17 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
         const resp = await fetch("http://127.0.0.1:3335/cursor");
         if (resp.ok) {
           const raw = await resp.json();
-          cursorTarget.x = raw.x;
-          cursorTarget.y = raw.y - 38;
+          // Per-display: cursor stays global. Each char's position is in
+          // virtual space; toDisplayLocal maps to this display's local coords
+          // at render time.
+          if (isPerDisplay) {
+            cursorTarget.x = raw.x;
+            cursorTarget.y = raw.y;
+          } else {
+            // Single display: legacy offset.
+            cursorTarget.x = raw.x;
+            cursorTarget.y = raw.y - 38;
+          }
           setCursorReady(true);
         }
       } catch {}
@@ -179,18 +228,18 @@ function syncChars(sessions: Session[]): void {
         char.el.classList.add("char-hiding");
         const cx = char.x + CHAR_SIZE / 2;
         const cy = char.y + CHAR_SIZE / 2;
-        const toLeft = cx, toRight = window.innerWidth - cx;
-        const toTop = cy, toBottom = window.innerHeight - cy;
+        const toLeft = cx, toRight = canvasW() - cx;
+        const toTop = cy, toBottom = canvasH() - cy;
         const min = Math.min(toLeft, toRight, toTop, toBottom);
         if (min === toLeft) char.roamTarget = { x: -CHAR_SIZE * 2, y: char.y };
-        else if (min === toRight) char.roamTarget = { x: window.innerWidth + CHAR_SIZE * 2, y: char.y };
+        else if (min === toRight) char.roamTarget = { x: canvasW() + CHAR_SIZE * 2, y: char.y };
         else if (min === toTop) char.roamTarget = { x: char.x, y: -CHAR_SIZE * 2 };
-        else char.roamTarget = { x: char.x, y: window.innerHeight + CHAR_SIZE * 2 };
+        else char.roamTarget = { x: char.x, y: canvasH() + CHAR_SIZE * 2 };
         char.mode = "roam";
         log("overlay", `${char.session.name}: leaving (walk-off)`);
       }
-      if (goneMs > 10000 || char.x < -CHAR_SIZE * 2 || char.x > window.innerWidth + CHAR_SIZE ||
-          char.y < -CHAR_SIZE * 2 || char.y > window.innerHeight + CHAR_SIZE) {
+      if (goneMs > 10000 || char.x < -CHAR_SIZE * 2 || char.x > canvasW() + CHAR_SIZE ||
+          char.y < -CHAR_SIZE * 2 || char.y > canvasH() + CHAR_SIZE) {
         char.el.remove();
         chars.delete(id);
       }
@@ -202,14 +251,14 @@ function syncChars(sessions: Session[]): void {
     if (!chars.has(session.id)) {
       const el = createCharElement(session);
       container.appendChild(el);
-      const edge = randomEdgePosition();
+      const edge = randomEdgePosition(session.id);
       chars.set(session.id, {
         session, el,
         x: edge.x, y: edge.y, vx: 0, vy: 0,
         mode: "follow",
-        roamTarget: randomRoamTarget(), roamTimer: 0,
-        spawnedAt: Date.now(),
-        modeSetAt: Date.now(),
+        roamTarget: randomRoamTarget(session.id, 0), roamTimer: 0,
+        spawnedAt: session.mtime ? session.mtime * 1000 : Date.now(),
+        modeSetAt: session.mtime ? session.mtime * 1000 : Date.now(),
         clusteredTo: null,
       });
       el.classList.add("char-appearing");
@@ -334,7 +383,7 @@ function applyModes(): void {
         char.spawnedAt = Date.now();
         char.vx = 0;
         char.vy = 0;
-        char.roamTarget = randomRoamTarget();
+        char.roamTarget = randomRoamTarget(char.session.id, char.roamTimer);
         char.roamTimer = 0;
       }
       if (newMode === "follow" && prevMode !== "follow") {
@@ -421,4 +470,105 @@ function startRenderLoop(): void {
     }
   }
   setAnimFrameId(requestAnimationFrame(tick));
+}
+
+
+// ─── Follower Renderer (per-display, non-lead windows) ──────────────────────
+// Pure renderer: receives char positions from the lead window via Tauri events
+// (emit/listen — the only cross-window mechanism that works across separate
+// WKWebView processes in Tauri). No physics, no cursor polling, no mode
+// assignment — one source of truth from the lead.
+
+function startFollowerRenderer(
+  container: HTMLElement,
+  dx: number, dy: number, dw: number, dh: number,
+): void {
+  const MARGIN = 500;
+  const elMap = new Map<string, HTMLElement>();
+
+  import("@tauri-apps/api/event").then(({ listen }) => {
+    listen<{
+      chars: Record<string, [number, number, string, string, string, string, string]>;
+      cx: number;
+      cy: number;
+    }>("nagents:charPositions", (event) => {
+      const { chars: frame, cx, cy } = event.payload;
+      if (!frame) return;
+
+      cursor.x = cx;
+      cursor.y = cy;
+      setLatestFollowerFrame(frame);
+
+      const activeIds = new Set(Object.keys(frame));
+
+      // Remove chars no longer in the frame (walked off on lead, session ended).
+      for (const [id, el] of elMap) {
+        if (!activeIds.has(id)) {
+          el.remove();
+          elMap.delete(id);
+        }
+      }
+
+      // Update / create chars on this display.
+      for (const [id, data] of Object.entries(frame)) {
+        const [vx, vy, mode, charId, name, group, ev] = data;
+
+        // Map virtual → this display's local. Only render chars on this display.
+        const lx = vx - dx;
+        const ly = vy - dy;
+        if (lx < -MARGIN || lx > dw + MARGIN || ly < -MARGIN || ly > dh + MARGIN) {
+          // Off this display — remove to prevent artifacts.
+          const el = elMap.get(id);
+          if (el) { el.remove(); elMap.delete(id); }
+          continue;
+        }
+
+        let el = elMap.get(id);
+        if (!el) {
+          el = document.createElement("div");
+          el.className = "overlay-char";
+          el.dataset.sessionId = id;
+          const charDef = getCharacter(charId);
+          el.innerHTML = `
+            <div class="overlay-char-group" style="font-size:${cfg.font_size_group || 9}px">${group}</div>
+            <div class="overlay-char-title" style="font-size:${cfg.font_size_title || 10}px">${name}</div>
+            <div class="overlay-char-svg char-slot-idle" data-char="${charId}">${charDef.svg}</div>
+            <div class="overlay-char-action" style="font-size:${cfg.font_size_action || 10}px">${ev || ""}</div>
+          `;
+          el.style.position = "absolute";
+          el.style.width = `${cfg.char_size || 44}px`;
+          el.style.pointerEvents = "none";
+          container.appendChild(el);
+          elMap.set(id, el);
+        }
+
+        el.style.left = `${Math.round(lx)}px`;
+        el.style.top = `${Math.round(ly)}px`;
+
+        // Update character SVG if changed.
+        if (el.dataset.char !== charId) {
+          const charDef = getCharacter(charId);
+          const svgWrap = el.querySelector(".overlay-char-svg");
+          if (svgWrap) {
+            svgWrap.innerHTML = charDef.svg;
+            svgWrap.setAttribute("data-char", charId);
+          }
+          el.dataset.char = charId;
+        }
+
+        // Update text labels.
+        const titleEl = el.querySelector(".overlay-char-title");
+        if (titleEl && titleEl.textContent !== name) titleEl.textContent = name;
+        const groupEl = el.querySelector(".overlay-char-group");
+        if (groupEl && groupEl.textContent !== group) groupEl.textContent = group;
+      }
+    });
+    log("overlay", `follower listening for Tauri charPositions events`);
+  }).catch((e) => {
+    log("overlay", `follower Tauri listen failed: ${e}`);
+  });
+
+  // Debug panel on followers too.
+  initDebugPanel();
+  log("overlay", `follower renderer started (Tauri events, display ${dx},${dy} ${dw}x${dh})`);
 }

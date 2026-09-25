@@ -70,6 +70,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_nspanel::init())
         .on_window_event(|window, event| {
             // Only exit app when the main panel window is closed
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -265,6 +266,8 @@ pub fn run() {
                 } else {
                     info!("[nagents] overlay window created");
                 }
+                // Watch for display add/remove → re-span the overlay dynamically.
+                overlay::start_display_watch(app_handle.clone());
                 // Start power monitoring (detects AC/battery, sets runtime overrides)
                 power::start_monitoring(app_handle, config_for_power);
             });
@@ -287,6 +290,7 @@ pub fn run() {
             overlay::hide_bsb_window,
             overlay::show_settings_window,
             overlay::show_logs_window,
+            overlay::get_overlay_display_info,
             power::get_power,
         ])
         .run(tauri::generate_context!())

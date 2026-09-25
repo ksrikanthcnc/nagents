@@ -10,12 +10,39 @@ import {
   cursor, cursorTarget, chars, container,
   globalRevolveAngle, advanceRevolveAngle,
   hiddenBadgeEl, lastSummaryLog, setLastSummaryLog,
-  cfg, CHAR_SIZE, DAMPING,
+  cfg, CHAR_SIZE, DAMPING, canvasW, canvasH,
+  isPerDisplay, displayOriginX, displayOriginY, displayWidth, displayHeight,
+  virtualOriginX, virtualOriginY, seededRandom, isLeadWindow,
+  displayContaining,
 } from "./overlay-state";
 import type { OverlayChar } from "./overlay-state";
 import { applyCharAnim, applyFacing, trackEyes } from "./rendering";
 import { renderSatellites, satellites } from "./satellites";
-import { randomRoamTarget, distTo, getActionText, updateCharTimer } from "./dom";
+import { randomRoamTarget, roamTargetNearCursor, distTo, getActionText, updateCharTimer } from "./dom";
+
+// ─── Per-display rendering helpers ───────────────────────────────────────────
+
+/** Margin (px) around the display edges where chars are still rendered (allows
+ * smooth entry/exit at seams rather than popping). Large enough that a char
+ * following the cursor across displays is visible while still approaching — the
+ * user sees it "fly in" from the side rather than pop into existence. */
+const DISPLAY_MARGIN = 500;
+
+/**
+ * In per-display mode, convert a virtual-space position to this display's
+ * local coordinates and check visibility. Returns null if the char is not on
+ * (or near) this display and should be hidden on this window.
+ */
+function toDisplayLocal(vx: number, vy: number): { lx: number; ly: number } | null {
+  if (!isPerDisplay) return { lx: vx, ly: vy }; // single-window: no mapping
+  const lx = vx - displayOriginX;
+  const ly = vy - displayOriginY;
+  if (lx < -DISPLAY_MARGIN || lx > displayWidth + DISPLAY_MARGIN ||
+      ly < -DISPLAY_MARGIN || ly > displayHeight + DISPLAY_MARGIN) {
+    return null; // off this display
+  }
+  return { lx, ly };
+}
 
 // ─── Cluster placement helpers (solar system) ───────────────────────────────
 
@@ -39,8 +66,11 @@ function placeClusterCenter(char: OverlayChar, cx: number, cy: number): void {
   char.el.style.opacity = "";
   char.el.style.zIndex = "2";
   char.el.classList.remove("char-clustered");
-  const left = Math.round(char.x);
-  const top = Math.round(char.y);
+  const cPos = toDisplayLocal(char.x, char.y);
+  if (!cPos) { char.el.style.display = "none"; return; }
+  if (char.el.style.display === "none") char.el.style.display = "";
+  const left = Math.round(cPos.lx);
+  const top = Math.round(cPos.ly);
   if (left !== (char as any)._lastLeft || top !== (char as any)._lastTop) {
     char.el.style.left = `${left}px`;
     char.el.style.top = `${top}px`;
@@ -88,8 +118,11 @@ function placeClusterPlanet(
   char.el.style.opacity = "";
   char.el.style.zIndex = "0";
   char.el.classList.add("char-clustered");
-  const left = Math.round(px);
-  const top = Math.round(py);
+  const pPos = toDisplayLocal(px, py);
+  if (!pPos) { char.el.style.display = "none"; return; }
+  if (char.el.style.display === "none") char.el.style.display = "";
+  const left = Math.round(pPos.lx);
+  const top = Math.round(pPos.ly);
   if (left !== (char as any)._lastLeft || top !== (char as any)._lastTop) {
     char.el.style.left = `${left}px`;
     char.el.style.top = `${top}px`;
@@ -129,6 +162,8 @@ function renderBsbBox(charArray: OverlayChar[]): void {
 
   for (const c of charArray) {
     const s = c.session;
+    // Muted sessions are excluded from BSB (user chose to ignore them).
+    if (s.muted) continue;
     if (s.event === "approval" || s.event === "stuck" || s.attention) needsYou.push(c);
     else if (s.event === "running" || s.event === "tool") working.push(c);
     else if (s.event === "idle") done.push(c);
@@ -264,7 +299,10 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
   }
 
   const visibleChars = charArray.filter(c => c.el.style.display !== "none");
-  if (visibleChars.length === 0) return;
+  // In per-display mode, physics must keep running even when no chars are
+  // visible on THIS display — chars' virtual positions need to update so they
+  // can cross onto this display. Only skip in single-window mode.
+  if (!isPerDisplay && visibleChars.length === 0) return;
 
   // Periodic summary
   if (now - lastSummaryLog > 10000 && charArray.length > 0) {
@@ -314,8 +352,11 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
       char.el.classList.add("char-dot");
       char.el.classList.remove("char-following", "char-roaming", "char-working", "char-stuck");
       // Render position and skip physics
-      const newLeft = Math.round(char.x);
-      const newTop = Math.round(char.y);
+      const dotPos = toDisplayLocal(char.x, char.y);
+      if (!dotPos) { char.el.style.display = "none"; continue; }
+      if (char.el.style.display === "none") char.el.style.display = "";
+      const newLeft = Math.round(dotPos.lx);
+      const newTop = Math.round(dotPos.ly);
       if (newLeft !== (char as any)._lastLeft || newTop !== (char as any)._lastTop) {
         char.el.style.left = `${newLeft}px`;
         char.el.style.top = `${newTop}px`;
@@ -354,7 +395,26 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
       // Roam
       char.roamTimer++;
       if (char.roamTimer > 240 || distTo(char, char.roamTarget) < 30) {
-        char.roamTarget = randomRoamTarget();
+        // Roamers stick to whichever display the cursor is on: pick roam
+        // targets within that display's rect. When the cursor moves to a
+        // different display, the next roam-target pick will be on the new
+        // display → roamers drift there and keep roaming there.
+        const cursorDisplay = displayContaining(cursor.x, cursor.y);
+        if (cursorDisplay) {
+          const r1 = seededRandom(char.session.id, char.roamTimer * 2 + 100);
+          const r2 = seededRandom(char.session.id, char.roamTimer * 2 + 101);
+          char.roamTarget = {
+            x: cursorDisplay.x + 50 + r1 * (cursorDisplay.w - 100),
+            y: cursorDisplay.y + 50 + r2 * (cursorDisplay.h - 100),
+          };
+        } else {
+          const r1 = seededRandom(char.session.id, char.roamTimer * 2 + 100);
+          const r2 = seededRandom(char.session.id, char.roamTimer * 2 + 101);
+          char.roamTarget = {
+            x: 50 + r1 * (window.innerWidth - 100),
+            y: 50 + r2 * (window.innerHeight - 100),
+          };
+        }
         char.roamTimer = 0;
       }
       targetX = char.roamTarget.x;
@@ -454,8 +514,13 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
 
     char.x += char.vx;
     char.y += char.vy;
-    char.x = Math.max(-50, Math.min(window.innerWidth + 50, char.x));
-    char.y = Math.max(-50, Math.min(window.innerHeight + 50, char.y));
+    // Clamp to the virtual desktop bounds (which may start at negative coords
+    // when a display sits left of / above the primary). `canvasW/H` is the total
+    // extent; the origin comes from the per-display or single-window setup.
+    const vox = isPerDisplay ? virtualOriginX : 0;
+    const voy = isPerDisplay ? virtualOriginY : 0;
+    char.x = Math.max(vox - 50, Math.min(vox + canvasW() + 50, char.x));
+    char.y = Math.max(voy - 50, Math.min(voy + canvasH() + 50, char.y));
 
     // ─── Carousel: anchor off-seat → render on orbit, keep true center ──
     // char.x/char.y stay at the system center (planets orbit it); only the
@@ -476,8 +541,15 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     }
 
     // ─── Render position (skip DOM write if unchanged) ─────────────
-    const newLeft = Math.round(char.x);
-    const newTop = Math.round(char.y);
+    // Per-display: map virtual→local; hide char if it's on another display.
+    const displayPos = toDisplayLocal(char.x, char.y);
+    if (!displayPos) {
+      if (char.el.style.display !== "none") char.el.style.display = "none";
+      continue;
+    }
+    if (char.el.style.display === "none") char.el.style.display = "";
+    const newLeft = Math.round(displayPos.lx);
+    const newTop = Math.round(displayPos.ly);
     if (newLeft !== (char as any)._lastLeft || newTop !== (char as any)._lastTop) {
       char.el.style.left = `${newLeft}px`;
       char.el.style.top = `${newTop}px`;
@@ -510,7 +582,52 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
 
   // Hidden badge follows cursor
   if (hiddenBadgeEl && hiddenBadgeEl.style.display !== "none") {
-    hiddenBadgeEl.style.left = `${Math.round(cursor.x - 12)}px`;
-    hiddenBadgeEl.style.top = `${Math.round(cursor.y - 24)}px`;
+    const badgePos = toDisplayLocal(cursor.x - 12, cursor.y - 24);
+    if (badgePos) {
+      hiddenBadgeEl.style.left = `${Math.round(badgePos.lx)}px`;
+      hiddenBadgeEl.style.top = `${Math.round(badgePos.ly)}px`;
+      hiddenBadgeEl.style.display = "";
+    } else {
+      hiddenBadgeEl.style.display = "none";
+    }
   }
+
+  // Broadcast positions to follower windows (per-display multi-monitor).
+  broadcastCharPositions(charArray);
+}
+
+
+// ─── Lead → Follower broadcast via Tauri events ─────────────────────────────
+
+let broadcastCounter = 0;
+
+/** Broadcast char positions from the lead to all follower windows via Tauri
+ *  events (emit). Called at the end of updatePhysics, throttled to ~15fps.
+ *  Sends ALL chars — no filtering, so followers always have the complete set
+ *  for clean creation/removal. */
+export function broadcastCharPositions(charArray: OverlayChar[]): void {
+  if (!isPerDisplay || !isLeadWindow) return;
+  broadcastCounter++;
+  if (broadcastCounter < 4) return; // ~15fps at 60fps physics
+  broadcastCounter = 0;
+
+  const chars: Record<string, [number, number, string, string, string, string, string]> = {};
+  for (const c of charArray) {
+    chars[c.session.id] = [
+      Math.round(c.x), Math.round(c.y),
+      c.mode,
+      c.el.dataset.char || "ghost",
+      c.session.name,
+      c.session.group || c.session.source,
+      c.session.event || "",
+    ];
+  }
+
+  import("@tauri-apps/api/event").then(({ emit }) => {
+    emit("nagents:charPositions", {
+      chars,
+      cx: Math.round(cursor.x),
+      cy: Math.round(cursor.y),
+    });
+  }).catch(() => {});
 }

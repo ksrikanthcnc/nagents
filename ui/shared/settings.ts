@@ -40,6 +40,8 @@ const SETTING_TYPES: Record<string, SettingType> = {
   working_mode: "string",
   attention_follows: "boolean",
   cluster_carousel: "boolean",
+  multi_screen: "boolean",
+  attention_cross_screen: "boolean",
 };
 
 /**

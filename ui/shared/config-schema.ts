@@ -88,6 +88,18 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     default: "true",
     options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }],
   },
+  {
+    key: "multi_screen", label: "Multi-Screen", type: "select", section: "overlay",
+    description: "Let all chars use every display. Roamers drift toward the screen your cursor is on. Off: chars stay on the primary display.",
+    default: "false",
+    options: [{ value: "false", label: "Off (primary only)" }, { value: "true", label: "On (all screens)" }],
+  },
+  {
+    key: "attention_cross_screen", label: "Attention Crosses Screens", type: "select", section: "overlay",
+    description: "Attention sessions follow your cursor onto any display, even when Multi-Screen is off.",
+    default: "true",
+    options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }],
+  },
 
   // ─── Physics ──────────────────────────────────────────────────────────
   {

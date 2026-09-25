@@ -4,7 +4,7 @@
 
 import type { Session } from "../shared/types";
 import { getCharacter } from "../characters/registry";
-import { cfg, CHAR_SIZE } from "./overlay-state";
+import { cfg, CHAR_SIZE, canvasW, canvasH, virtualOriginX, virtualOriginY, isPerDisplay, seededRandom } from "./overlay-state";
 import type { OverlayChar } from "./overlay-state";
 
 // ─── Character Element Creation ─────────────────────────────────────────────
@@ -142,18 +142,60 @@ export function updateCharTimer(el: HTMLElement, session: Session, nowSec: numbe
 
 // ─── Geometry Helpers ───────────────────────────────────────────────────────
 
-export function randomRoamTarget(): { x: number; y: number } {
-  return { x: 50 + Math.random() * (window.innerWidth - 100), y: 50 + Math.random() * (window.innerHeight - 100) };
+export function randomRoamTarget(sessionId = "", counter = 0): { x: number; y: number } {
+  const ox = isPerDisplay ? virtualOriginX : 0;
+  const oy = isPerDisplay ? virtualOriginY : 0;
+  const r1 = sessionId ? seededRandom(sessionId, counter * 2) : Math.random();
+  const r2 = sessionId ? seededRandom(sessionId, counter * 2 + 1) : Math.random();
+  return {
+    x: ox + 50 + r1 * (canvasW() - 100),
+    y: oy + 50 + r2 * (canvasH() - 100),
+  };
 }
 
-export function randomEdgePosition(): { x: number; y: number } {
-  const edge = Math.floor(Math.random() * 4);
+/**
+ * A roam target biased toward the display the cursor is currently on.
+ * Used when multi_screen is on: a roamer drifts to the cursor's screen, then
+ * keeps roaming within it. `cursorPos` is window-local; `displaySize` is the
+ * approximate per-display extent (so we roam within one screen, not the span).
+ */
+export function roamTargetNearCursor(
+  cursorPos: { x: number; y: number },
+  displayW: number,
+  displayH: number,
+  sessionId = "",
+  counter = 0,
+): { x: number; y: number } {
+  const vox = isPerDisplay ? virtualOriginX : 0;
+  const voy = isPerDisplay ? virtualOriginY : 0;
+  const cx = cursorPos.x;
+  const cy = cursorPos.y;
+  const halfW = Math.min(displayW, canvasW()) / 2;
+  const halfH = Math.min(displayH, canvasH()) / 2;
+  const r1 = sessionId ? seededRandom(sessionId, counter * 2 + 200) : Math.random();
+  const r2 = sessionId ? seededRandom(sessionId, counter * 2 + 201) : Math.random();
+  const x = cx - halfW + r1 * (halfW * 2);
+  const y = cy - halfH + r2 * (halfH * 2);
+  return {
+    x: Math.max(vox + 50, Math.min(vox + canvasW() - 50, x)),
+    y: Math.max(voy + 50, Math.min(voy + canvasH() - 50, y)),
+  };
+}
+
+export function randomEdgePosition(sessionId = ""): { x: number; y: number } {
+  const ox = isPerDisplay ? virtualOriginX : 0;
+  const oy = isPerDisplay ? virtualOriginY : 0;
+  const w = canvasW();
+  const h = canvasH();
+  const r1 = sessionId ? seededRandom(sessionId, 9999) : Math.random();
+  const r2 = sessionId ? seededRandom(sessionId, 9998) : Math.random();
+  const edge = Math.floor(r1 * 4);
   switch (edge) {
-    case 0: return { x: Math.random() * window.innerWidth, y: -CHAR_SIZE };
-    case 1: return { x: window.innerWidth + CHAR_SIZE, y: Math.random() * window.innerHeight };
-    case 2: return { x: Math.random() * window.innerWidth, y: window.innerHeight + CHAR_SIZE };
-    case 3: return { x: -CHAR_SIZE, y: Math.random() * window.innerHeight };
-    default: return { x: -CHAR_SIZE, y: window.innerHeight / 2 };
+    case 0: return { x: ox + r2 * w, y: oy - CHAR_SIZE };
+    case 1: return { x: ox + w + CHAR_SIZE, y: oy + r2 * h };
+    case 2: return { x: ox + r2 * w, y: oy + h + CHAR_SIZE };
+    case 3: return { x: ox - CHAR_SIZE, y: oy + r2 * h };
+    default: return { x: ox - CHAR_SIZE, y: oy + h / 2 };
   }
 }
 

@@ -84,6 +84,9 @@ overlay:
   max_dots: 5                  # Max dots orbiting cursor
   pin_counts_toward_max: false # Pinned chars are extra (critical tasks), don't consume follower slots
   attention_follows: true      # Attention sessions always follow (exempt from max_followers, like pinned)
+  # Multi-monitor: overlay spans all displays when either is on.
+  multi_screen: false          # All chars use every display (roamers drift to cursor's screen). Off = primary only.
+  attention_cross_screen: true # Attention sessions follow cursor onto any display, even if multi_screen is off.
   show_over_fullscreen: true   # Show overlay on top of fullscreen apps (macOS)
   hide_from_capture: true      # Hide overlay from screen share/screenshots (macOS)
   startup_delay_sec: 5         # Seconds to wait after wake/start before showing overlay
