@@ -99,7 +99,7 @@ pub struct Session {
 
 /// Event update from hooks (partial update).
 /// Fields set to Some("") mean "clear to None". Fields set to None mean "don't touch".
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct EventUpdate {
     pub session_id: String,
     #[serde(default)]

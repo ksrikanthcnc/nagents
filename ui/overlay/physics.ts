@@ -317,7 +317,20 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
   advanceRevolveAngle(cfg.revolve_speed);
 
   for (const char of charArray) {
-    if (char.el.style.display === "none") continue; // Skip hidden
+    // In per-display mode the lead must keep running physics for chars that are
+    // off THIS display but visible on a follower — their broadcast positions must
+    // keep updating. Only skip chars that are genuinely mode-hidden (waterfall
+    // assigned "hidden") or hidden by battery/overlay-hide. In single-window mode
+    // display=none always means mode-hidden, so the old fast-path is fine.
+    if (char.el.style.display === "none") {
+      if (!isPerDisplay || char.mode === "hidden") continue;
+    }
+
+    // In per-display mode, chars off the lead's display still need physics
+    // (position updates for broadcast) but NOT any DOM operations — they're
+    // display:none on this window, so classList/style/querySelector work is
+    // wasted and causes forced reflows (offsetWidth on hidden elements).
+    const isOffDisplay = isPerDisplay && char.el.style.display === "none";
 
     // ─── Determine target based on mode ──────────────────────────────
     let targetX: number, targetY: number, strength: number;
@@ -333,6 +346,7 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
       char.y += (orbitY - char.y) * lerpFactor;
       char.vx = 0;
       char.vy = 0;
+      if (isOffDisplay) continue; // position updated, skip DOM
       // Apply dot visual — scale and center on orbit point
       const dotScale = cfg.dot_scale || 0.4;
       if (!(char as any)._svgCenterX) {
@@ -365,8 +379,10 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
       }
       continue;
     } else if (char.mode === "follow") {
-      const hw = (char.el.offsetWidth || CHAR_SIZE) / 2;
-      const hh = (char.el.offsetHeight || CHAR_SIZE) / 2;
+      // Use CHAR_SIZE constant — avoids forced reflow from offsetWidth on
+      // display:none elements (the #1 perf bottleneck for off-display chars).
+      const hw = CHAR_SIZE / 2;
+      const hh = CHAR_SIZE / 2;
       // When dots exist, followers target outside the ring (not on cursor)
       if (dotCount > 0) {
         const ringOuter = cfg.revolve_radius + CHAR_SIZE;
@@ -387,10 +403,12 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
         targetY = cursor.y - hh;
       }
       strength = cfg.follow_strength || 0.04;
-      char.el.classList.remove("char-dot");
-      char.el.style.transform = "";
-      char.el.style.width = `${CHAR_SIZE}px`;
-      char.el.style.fontSize = "";
+      if (!isOffDisplay) {
+        char.el.classList.remove("char-dot");
+        char.el.style.transform = "";
+        char.el.style.width = `${CHAR_SIZE}px`;
+        char.el.style.fontSize = "";
+      }
     } else {
       // Roam
       char.roamTimer++;
@@ -420,10 +438,12 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
       targetX = char.roamTarget.x;
       targetY = char.roamTarget.y;
       strength = Math.max(cfg.roam_strength, 0.02);
-      char.el.classList.remove("char-dot");
-      char.el.style.transform = "";
-      char.el.style.width = `${CHAR_SIZE}px`;
-      char.el.style.fontSize = "";
+      if (!isOffDisplay) {
+        char.el.classList.remove("char-dot");
+        char.el.style.transform = "";
+        char.el.style.width = `${CHAR_SIZE}px`;
+        char.el.style.fontSize = "";
+      }
     }
 
     // ─── Cluster override: planets orbit the anchor (the fixed sun) ──────
@@ -435,21 +455,25 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     // position, so rotating the seat never moves the system.
     if (char.clusteredTo) {
       const rep = chars.get(char.clusteredTo);
-      if (rep && rep.el.style.display !== "none") {
+      if (rep && (isOffDisplay || rep.el.style.display !== "none")) {
         if (rep.mode === "revolve") {
           char.el.style.display = "none";
           continue;
         }
+        if (isOffDisplay) {
+          // Off-display: just snap position to anchor (physics only, no DOM).
+          char.x = rep.x;
+          char.y = rep.y;
+          continue;
+        }
         if (char.clusterCenter) {
-          // This planet is the current center seat → sit at the anchor's spot,
-          // full size. (Anchor will detect it's off-seat and orbit instead.)
           placeClusterCenter(char, rep.x, rep.y);
         } else {
           placeClusterPlanet(char, rep, charArray);
         }
         continue;
       }
-    } else if (!char.el.classList.contains("char-dot")) {
+    } else if (!isOffDisplay && !char.el.classList.contains("char-dot")) {
       char.el.classList.remove("char-clustered");
       if ((char.mode as string) !== "revolve") {
         char.el.style.transform = "";
@@ -482,7 +506,10 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     // ─── Collision ───────────────────────────────────────────────────
     if ((char.mode as string) !== "revolve" && !batterySaver) {
       for (const other of charArray) {
-        if (other === char || other.el.style.display === "none") continue;
+        if (other === char) continue;
+        // In per-display mode, off-display chars have display=none but still need
+        // collision (followers render them). Only skip truly mode-hidden chars.
+        if (other.el.style.display === "none" && (!isPerDisplay || other.mode === "hidden")) continue;
         if (other.mode === "revolve" && char.mode === "roam") continue;
         if (char.clusteredTo && (other.clusteredTo === char.clusteredTo || other.session.id === char.clusteredTo)) continue;
         if (other.clusteredTo && (char.clusteredTo === other.clusteredTo || char.session.id === other.clusteredTo)) continue;
@@ -521,6 +548,11 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     const voy = isPerDisplay ? virtualOriginY : 0;
     char.x = Math.max(vox - 50, Math.min(vox + canvasW() + 50, char.x));
     char.y = Math.max(voy - 50, Math.min(voy + canvasH() + 50, char.y));
+
+    // Off-display chars: physics is done (x/y updated for broadcast). Skip all
+    // DOM rendering — classList, style writes, querySelector, animation helpers.
+    // This eliminates ~14K wasted DOM ops/sec for off-display chars.
+    if (isOffDisplay) continue;
 
     // ─── Carousel: anchor off-seat → render on orbit, keep true center ──
     // char.x/char.y stay at the system center (planets orbit it); only the
@@ -601,6 +633,11 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
 
 let broadcastCounter = 0;
 
+// Cache the Tauri emit function — resolve the dynamic import once at first use,
+// then call the function directly on subsequent broadcasts. Eliminates per-call
+// promise overhead that caused jitter at ~15fps broadcast rate.
+let _emitFn: ((event: string, payload: unknown) => Promise<void>) | null = null;
+
 /** Broadcast char positions from the lead to all follower windows via Tauri
  *  events (emit). Called at the end of updatePhysics, throttled to ~15fps.
  *  Sends ALL chars — no filtering, so followers always have the complete set
@@ -612,7 +649,13 @@ export function broadcastCharPositions(charArray: OverlayChar[]): void {
   broadcastCounter = 0;
 
   const chars: Record<string, [number, number, string, string, string, string, string]> = {};
+  let hiddenCount = 0;
   for (const c of charArray) {
+    // Don't broadcast chars that shouldn't render on any display: mode-hidden
+    // (waterfall overflow) and walk-off leaving chars. Without this filter,
+    // followers create frozen artifacts for chars they can't hide or animate.
+    if (c.mode === "hidden") { hiddenCount++; continue; }
+    if (c.el.dataset.leaving) continue;
     chars[c.session.id] = [
       Math.round(c.x), Math.round(c.y),
       c.mode,
@@ -623,11 +666,20 @@ export function broadcastCharPositions(charArray: OverlayChar[]): void {
     ];
   }
 
-  import("@tauri-apps/api/event").then(({ emit }) => {
-    emit("nagents:charPositions", {
-      chars,
-      cx: Math.round(cursor.x),
-      cy: Math.round(cursor.y),
-    });
-  }).catch(() => {});
+  const payload = {
+    chars,
+    cx: Math.round(cursor.x),
+    cy: Math.round(cursor.y),
+    hiddenCount,
+  };
+
+  if (_emitFn) {
+    _emitFn("nagents:charPositions", payload).catch(() => {});
+  } else {
+    // First call: resolve and cache.
+    import("@tauri-apps/api/event").then(({ emit }) => {
+      _emitFn = emit;
+      emit("nagents:charPositions", payload);
+    }).catch(() => {});
+  }
 }

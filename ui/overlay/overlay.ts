@@ -53,7 +53,20 @@ function applyOverlayMode(): void {
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
+// ─── Follower lifecycle (cancel on re-init / HMR) ───────────────────────────
+// startFollowerRenderer creates a rAF loop + Tauri event listener, both captured
+// in closures. On HMR re-init, initOverlay runs again — without cleanup, old
+// loops survive and create duplicate DOM elements (artifact source). These hooks
+// let initOverlay tear down the previous follower before starting a new one.
+let _followerCleanup: (() => void) | null = null;
+
 export async function initOverlay(el: HTMLElement): Promise<void> {
+  // Cancel any previous follower renderer (HMR re-init safety).
+  if (_followerCleanup) {
+    _followerCleanup();
+    _followerCleanup = null;
+  }
+
   setContainer(el);
   log("overlay", "initializing");
 
@@ -478,95 +491,178 @@ function startRenderLoop(): void {
 // (emit/listen — the only cross-window mechanism that works across separate
 // WKWebView processes in Tauri). No physics, no cursor polling, no mode
 // assignment — one source of truth from the lead.
+//
+// Returns a cleanup function that cancels the rAF loop, removes the Tauri
+// listener, and clears all follower DOM elements. Called by initOverlay on
+// re-init (HMR) to prevent duplicate renderers.
 
 function startFollowerRenderer(
   container: HTMLElement,
   dx: number, dy: number, dw: number, dh: number,
 ): void {
   const MARGIN = 500;
+  /** If no broadcast arrives for this long, remove all chars (lead likely
+   *  crashed or HMR-reloaded). Long enough to ride out brief Tauri IPC
+   *  hiccups, short enough that frozen artifacts don't linger visibly. */
+  const STALE_MS = 3000;
   const elMap = new Map<string, HTMLElement>();
+  let cancelled = false;
+  let unlistenFn: (() => void) | null = null;
+  let lastBroadcastTs = Date.now();
+  let staleCheckId: ReturnType<typeof setInterval> | null = null;
 
+  // +N hidden badge (same class as lead's badge, positioned near cursor).
+  const badgeEl = document.createElement("div");
+  badgeEl.className = "overlay-hidden-badge";
+  badgeEl.style.display = "none";
+  container.appendChild(badgeEl);
+
+  // ─── Buffered frame (event writes, rAF reads) ───────────────────────
+  // Tauri events arrive off the rAF cadence. Doing DOM work directly in the
+  // callback causes layout thrash (many style writes between paints). Instead
+  // we buffer the latest frame and apply it in a rAF loop — one paint per
+  // frame, no matter how many events arrive between paints.
+  let pendingFrame: {
+    chars: Record<string, [number, number, string, string, string, string, string]>;
+    cx: number; cy: number; hiddenCount: number;
+  } | null = null;
+
+  // ─── Subscribe to lead broadcasts ───────────────────────────────────
   import("@tauri-apps/api/event").then(({ listen }) => {
+    if (cancelled) return;
     listen<{
       chars: Record<string, [number, number, string, string, string, string, string]>;
       cx: number;
       cy: number;
+      hiddenCount?: number;
     }>("nagents:charPositions", (event) => {
-      const { chars: frame, cx, cy } = event.payload;
-      if (!frame) return;
-
-      cursor.x = cx;
-      cursor.y = cy;
-      setLatestFollowerFrame(frame);
-
-      const activeIds = new Set(Object.keys(frame));
-
-      // Remove chars no longer in the frame (walked off on lead, session ended).
-      for (const [id, el] of elMap) {
-        if (!activeIds.has(id)) {
-          el.remove();
-          elMap.delete(id);
-        }
-      }
-
-      // Update / create chars on this display.
-      for (const [id, data] of Object.entries(frame)) {
-        const [vx, vy, mode, charId, name, group, ev] = data;
-
-        // Map virtual → this display's local. Only render chars on this display.
-        const lx = vx - dx;
-        const ly = vy - dy;
-        if (lx < -MARGIN || lx > dw + MARGIN || ly < -MARGIN || ly > dh + MARGIN) {
-          // Off this display — remove to prevent artifacts.
-          const el = elMap.get(id);
-          if (el) { el.remove(); elMap.delete(id); }
-          continue;
-        }
-
-        let el = elMap.get(id);
-        if (!el) {
-          el = document.createElement("div");
-          el.className = "overlay-char";
-          el.dataset.sessionId = id;
-          const charDef = getCharacter(charId);
-          el.innerHTML = `
-            <div class="overlay-char-group" style="font-size:${cfg.font_size_group || 9}px">${group}</div>
-            <div class="overlay-char-title" style="font-size:${cfg.font_size_title || 10}px">${name}</div>
-            <div class="overlay-char-svg char-slot-idle" data-char="${charId}">${charDef.svg}</div>
-            <div class="overlay-char-action" style="font-size:${cfg.font_size_action || 10}px">${ev || ""}</div>
-          `;
-          el.style.position = "absolute";
-          el.style.width = `${cfg.char_size || 44}px`;
-          el.style.pointerEvents = "none";
-          container.appendChild(el);
-          elMap.set(id, el);
-        }
-
-        el.style.left = `${Math.round(lx)}px`;
-        el.style.top = `${Math.round(ly)}px`;
-
-        // Update character SVG if changed.
-        if (el.dataset.char !== charId) {
-          const charDef = getCharacter(charId);
-          const svgWrap = el.querySelector(".overlay-char-svg");
-          if (svgWrap) {
-            svgWrap.innerHTML = charDef.svg;
-            svgWrap.setAttribute("data-char", charId);
-          }
-          el.dataset.char = charId;
-        }
-
-        // Update text labels.
-        const titleEl = el.querySelector(".overlay-char-title");
-        if (titleEl && titleEl.textContent !== name) titleEl.textContent = name;
-        const groupEl = el.querySelector(".overlay-char-group");
-        if (groupEl && groupEl.textContent !== group) groupEl.textContent = group;
-      }
-    });
+      if (cancelled) return;
+      const p = event.payload;
+      if (!p || !p.chars) return;
+      lastBroadcastTs = Date.now();
+      // Just buffer — DOM work happens in the rAF loop below.
+      pendingFrame = { chars: p.chars, cx: p.cx, cy: p.cy, hiddenCount: p.hiddenCount || 0 };
+    }).then((fn) => { unlistenFn = fn; });
     log("overlay", `follower listening for Tauri charPositions events`);
   }).catch((e) => {
     log("overlay", `follower Tauri listen failed: ${e}`);
   });
+
+  // ─── rAF render loop ───────────────────────────────────────────────
+  function renderTick() {
+    if (cancelled) return;
+    requestAnimationFrame(renderTick);
+
+    const frame = pendingFrame;
+    if (!frame) return;
+    pendingFrame = null; // consumed
+
+    const { chars: charData, cx, cy, hiddenCount } = frame;
+    cursor.x = cx;
+    cursor.y = cy;
+    setLatestFollowerFrame(charData);
+
+    const activeIds = new Set(Object.keys(charData));
+
+    // Remove chars no longer in the frame.
+    for (const [id, el] of elMap) {
+      if (!activeIds.has(id)) {
+        el.remove();
+        elMap.delete(id);
+      }
+    }
+
+    // Update / create chars on this display.
+    for (const [id, data] of Object.entries(charData)) {
+      const [vx, vy, mode, charId, name, group, ev] = data;
+
+      const lx = vx - dx;
+      const ly = vy - dy;
+      if (lx < -MARGIN || lx > dw + MARGIN || ly < -MARGIN || ly > dh + MARGIN) {
+        const existing = elMap.get(id);
+        if (existing) { existing.remove(); elMap.delete(id); }
+        continue;
+      }
+
+      let el = elMap.get(id);
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "overlay-char";
+        el.dataset.sessionId = id;
+        const charDef = getCharacter(charId);
+        el.innerHTML = `
+          <div class="overlay-char-group" style="font-size:${cfg.font_size_group || 9}px">${group}</div>
+          <div class="overlay-char-title" style="font-size:${cfg.font_size_title || 10}px">${name}</div>
+          <div class="overlay-char-svg char-slot-idle" data-char="${charId}">${charDef.svg}</div>
+          <div class="overlay-char-action" style="font-size:${cfg.font_size_action || 10}px">${ev || ""}</div>
+        `;
+        el.style.position = "absolute";
+        el.style.width = `${cfg.char_size || 44}px`;
+        el.style.pointerEvents = "none";
+        container.appendChild(el);
+        elMap.set(id, el);
+      }
+
+      el.style.left = `${Math.round(lx)}px`;
+      el.style.top = `${Math.round(ly)}px`;
+
+      if (el.dataset.char !== charId) {
+        const charDef = getCharacter(charId);
+        const svgWrap = el.querySelector(".overlay-char-svg");
+        if (svgWrap) {
+          svgWrap.innerHTML = charDef.svg;
+          svgWrap.setAttribute("data-char", charId);
+        }
+        el.dataset.char = charId;
+      }
+
+      const titleEl = el.querySelector(".overlay-char-title");
+      if (titleEl && titleEl.textContent !== name) titleEl.textContent = name;
+      const groupEl = el.querySelector(".overlay-char-group");
+      if (groupEl && groupEl.textContent !== group) groupEl.textContent = group;
+    }
+
+    // +N hidden badge near cursor.
+    if (hiddenCount > 0) {
+      const blx = cx - 12 - dx;
+      const bly = cy - 24 - dy;
+      if (blx > -MARGIN && blx < dw + MARGIN && bly > -MARGIN && bly < dh + MARGIN) {
+        badgeEl.textContent = `+${hiddenCount}`;
+        badgeEl.style.left = `${Math.round(blx)}px`;
+        badgeEl.style.top = `${Math.round(bly)}px`;
+        badgeEl.style.display = "";
+      } else {
+        badgeEl.style.display = "none";
+      }
+    } else {
+      badgeEl.style.display = "none";
+    }
+  }
+  requestAnimationFrame(renderTick);
+
+  // ─── Stale broadcast check (safety net for missed broadcasts) ────────
+  // If the lead stops broadcasting (crash, HMR, Tauri IPC failure), chars
+  // on this follower would freeze as permanent artifacts. This interval
+  // removes all chars if no broadcast has arrived within STALE_MS.
+  staleCheckId = setInterval(() => {
+    if (cancelled) return;
+    if (elMap.size > 0 && Date.now() - lastBroadcastTs > STALE_MS) {
+      for (const [, el] of elMap) el.remove();
+      elMap.clear();
+      log("overlay", `follower: cleared stale chars (no broadcast for ${STALE_MS}ms)`);
+    }
+  }, 1000);
+
+  // ─── Cleanup (called by initOverlay on re-init) ────────────────────
+  _followerCleanup = () => {
+    cancelled = true;
+    if (unlistenFn) unlistenFn();
+    if (staleCheckId) clearInterval(staleCheckId);
+    for (const [, el] of elMap) el.remove();
+    elMap.clear();
+    badgeEl.remove();
+    log("overlay", "follower renderer cleaned up (re-init)");
+  };
 
   // Debug panel on followers too.
   initDebugPanel();

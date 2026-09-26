@@ -74,6 +74,9 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                 ("POST", "/event") => {
                     handle_event(request, &store, &project_root);
                 }
+                ("POST", "/kiro-hook") => {
+                    handle_kiro_hook(request, &store, &project_root);
+                }
                 ("POST", "/title") => {
                     handle_title(request, &store, &project_root);
                 }
@@ -496,4 +499,42 @@ fn serve_pwa_file(path: &str, project_root: &std::path::Path) -> Option<Vec<u8>>
         return None;
     }
     std::fs::read(&file_path).ok()
+}
+
+
+/// POST /kiro-hook — accept raw Kiro hook payload, translate to EventUpdate, push.
+/// This replaces the Python hook-dispatch.py + kiro_translate.py pipeline.
+/// The Kiro hook config just needs: `curl -s -X POST -d @- http://127.0.0.1:3335/kiro-hook`
+fn handle_kiro_hook(mut request: Request, store: &SessionStore, project_root: &std::path::Path) {
+    let mut body = String::new();
+    if std::io::Read::read_to_string(request.as_reader(), &mut body).is_err() {
+        respond_json(request, 400, r#"{"error":"read failed"}"#);
+        return;
+    }
+
+    let payload: crate::hook::KiroHookPayload = match serde_json::from_str(&body) {
+        Ok(p) => p,
+        Err(e) => {
+            error!("[server] POST /kiro-hook: invalid JSON: {}", e);
+            respond_json(request, 400, r#"{"error":"invalid json"}"#);
+            return;
+        }
+    };
+
+    let trigger = payload.trigger.as_deref().unwrap_or("?");
+    let session = payload.session_id.as_deref().unwrap_or("?");
+
+    match crate::hook::translate(&payload, store) {
+        Some(update) => {
+            let event = update.event.clone().unwrap_or_else(|| "?".into());
+            let sid = update.session_id.clone();
+            store.push_event(update);
+            info!("[server] POST /kiro-hook: {} → {} (session={})", trigger, event, sid);
+            respond_json(request, 200, r#"{"ok":true}"#);
+        }
+        None => {
+            debug!("[server] POST /kiro-hook: ignored {} for {}", trigger, session);
+            respond_json(request, 200, r#"{"ok":true,"ignored":true}"#);
+        }
+    }
 }

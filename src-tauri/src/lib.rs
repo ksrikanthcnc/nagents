@@ -7,6 +7,7 @@ mod attention;
 mod backup;
 mod config;
 mod cursor;
+mod hook;
 mod logbuf;
 mod overlay;
 mod power;

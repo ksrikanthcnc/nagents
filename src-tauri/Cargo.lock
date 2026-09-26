@@ -2366,6 +2366,7 @@ name = "nagents"
 version = "0.1.0"
 dependencies = [
  "core-graphics 0.24.0",
+ "dirs",
  "env_logger",
  "log",
  "notify",
