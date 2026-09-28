@@ -155,3 +155,26 @@ overlay:
 - Artifact cleanup on secondary displays
 - Stable FPS on follower displays
 - App stability during dev (HMR-triggered crashes)
+
+
+## Latest Observation (2026-09-24, end of session)
+
+User reports: "left-right they are moving, but via main, main is not having them."
+This suggests the lead (primary) window is NOT rendering chars locally while followers
+ARE receiving and showing them from the Tauri event broadcast. Possible causes:
+
+1. **Lead's toDisplayLocal clips chars off its own display**: If the lead's
+   displayOriginX/Y is wrong (e.g. not 0,0), chars at virtual positions (0-1800,
+   0-1169) would map to incorrect local positions and get clipped.
+2. **Lead's physics computes virtual positions that are all on secondary displays**:
+   If cursor mapping puts chars at virtual positions outside the primary range.
+3. **Lead's rendering path has a bug**: The lead runs full physics AND renders — if
+   toDisplayLocal returns null for all chars, they all get display:none on the lead.
+
+Debug: check the debug panel on the primary display — what does it show for char
+positions and cursor? If chars show positions in the primary range (0-1800, 0-1169)
+but are still invisible, the rendering/clipping is broken. If char positions are all
+in negative/high ranges, the physics is putting them off the primary.
+
+Also: the hook translation is now in Rust (POST /kiro-hook). The hook config at
+~/.kiro/hooks/haive.json uses curl, no Python scripts.
