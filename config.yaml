@@ -74,7 +74,8 @@ overlay:
   dot_scale: 0.5               # How much to scale down dot chars (0.3-0.7)
   cursor_fps: 10              # Cursor poll rate (higher=smoother follow, costs one HTTP call per tick)
   cursor_smoothing: 0.12      # Lerp factor (tuned for 10fps cursor: 0.12 at 60fps ≈ 7 frames to target)
-  physics_fps: 60              # Physics/render loop (pure JS math, keep smooth)
+  physics_fps: 60              # Physics/render + broadcast rate. Set to max monitor Hz for smoothest
+                               # multi-monitor (e.g. 100 for 100Hz Dell). Higher = more CPU but smoother followers.
   font_size_group: 9           # Group label font size (px)
   font_size_title: 10          # Session title font size (px)
   font_size_action: 10         # Action line font size (px)

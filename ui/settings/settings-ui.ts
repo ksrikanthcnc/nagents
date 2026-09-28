@@ -78,6 +78,14 @@ function renderField(def: SettingDef, ov: any): string {
     return `<label title="${def.description}">${def.label}<select class="cfg-input" data-key="${def.key}">${opts}</select></label>`;
   }
 
+  if (def.type === "boolean") {
+    const checked = value === true || value === "true";
+    return `<label title="${def.description}">${def.label}<select class="cfg-input" data-key="${def.key}">
+      <option value="true" ${checked ? "selected" : ""}>On</option>
+      <option value="false" ${!checked ? "selected" : ""}>Off</option>
+    </select></label>`;
+  }
+
   if (def.type === "number") {
     const attrs = [
       `type="number"`,

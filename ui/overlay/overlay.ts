@@ -195,6 +195,30 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   startRenderLoop();
   log("overlay", "render loop started");
 
+  // ─── Auto-detect display refresh rate ──────────────────────────────
+  // If the display runs at a higher Hz than physics_fps (e.g. 100Hz Dell
+  // vs 60fps physics), bump physics_fps to match so broadcasts keep up.
+  // Measure actual rAF interval over 20 frames, then adjust once.
+  {
+    let detectCount = 0;
+    let detectStart = 0;
+    const detectHz = (ts: number) => {
+      if (detectCount === 0) { detectStart = ts; }
+      detectCount++;
+      if (detectCount < 21) { requestAnimationFrame(detectHz); return; }
+      const elapsed = ts - detectStart;
+      const measuredFps = Math.round(20000 / elapsed);
+      if (measuredFps > cfg.physics_fps + 10) {
+        log("overlay", `display refresh ${measuredFps}Hz > physics_fps ${cfg.physics_fps} → bumping to ${measuredFps}`);
+        cfg.physics_fps = measuredFps;
+        setFrameInterval(1000 / measuredFps);
+      } else {
+        log("overlay", `display refresh ~${measuredFps}Hz, physics_fps ${cfg.physics_fps} OK`);
+      }
+    };
+    requestAnimationFrame(detectHz);
+  }
+
   // ─── Auto Battery Mode ──────────────────────────────────────────────
   // Power state is managed by Rust backend as runtime config overrides.
   // When on battery → Rust sets battery_saver=true in runtime config.
@@ -269,7 +293,7 @@ function syncChars(sessions: Session[]): void {
         session, el,
         x: edge.x, y: edge.y, vx: 0, vy: 0,
         mode: "follow",
-        roamTarget: randomRoamTarget(session.id, 0), roamTimer: 0,
+        roamTarget: randomRoamTarget(session.id, 0), roamTimer: 0, roamPickCount: 0,
         spawnedAt: session.mtime ? session.mtime * 1000 : Date.now(),
         modeSetAt: session.mtime ? session.mtime * 1000 : Date.now(),
         clusteredTo: null,
@@ -501,46 +525,49 @@ function startFollowerRenderer(
   dx: number, dy: number, dw: number, dh: number,
 ): void {
   const MARGIN = 500;
-  /** If no broadcast arrives for this long, remove all chars (lead likely
-   *  crashed or HMR-reloaded). Long enough to ride out brief Tauri IPC
-   *  hiccups, short enough that frozen artifacts don't linger visibly. */
   const STALE_MS = 3000;
-  const elMap = new Map<string, HTMLElement>();
   let cancelled = false;
   let unlistenFn: (() => void) | null = null;
   let lastBroadcastTs = Date.now();
   let staleCheckId: ReturnType<typeof setInterval> | null = null;
 
-  // +N hidden badge (same class as lead's badge, positioned near cursor).
+  // ─── Per-char state ──────────────────────────────────────────────
+  // At 30fps broadcast rate, direct position assignment is smooth enough.
+  // No lerp needed — it was causing a sluggish ease-in/ease-out effect
+  // that didn't match the lead's constant-velocity physics.
+  interface FollowerChar {
+    el: HTMLElement;
+  }
+  const charState = new Map<string, FollowerChar>();
+
+  // +N hidden badge.
   const badgeEl = document.createElement("div");
   badgeEl.className = "overlay-hidden-badge";
   badgeEl.style.display = "none";
+  badgeEl.style.position = "absolute";
+  badgeEl.style.left = "0px";
+  badgeEl.style.top = "0px";
+  badgeEl.style.willChange = "transform";
   container.appendChild(badgeEl);
 
-  // ─── Buffered frame (event writes, rAF reads) ───────────────────────
-  // Tauri events arrive off the rAF cadence. Doing DOM work directly in the
-  // callback causes layout thrash (many style writes between paints). Instead
-  // we buffer the latest frame and apply it in a rAF loop — one paint per
-  // frame, no matter how many events arrive between paints.
+  // ─── Buffered frame ─────────────────────────────────────────────────
   let pendingFrame: {
     chars: Record<string, [number, number, string, string, string, string, string]>;
     cx: number; cy: number; hiddenCount: number;
   } | null = null;
+  let lastHiddenCount = 0;
 
   // ─── Subscribe to lead broadcasts ───────────────────────────────────
   import("@tauri-apps/api/event").then(({ listen }) => {
     if (cancelled) return;
     listen<{
       chars: Record<string, [number, number, string, string, string, string, string]>;
-      cx: number;
-      cy: number;
-      hiddenCount?: number;
+      cx: number; cy: number; hiddenCount?: number;
     }>("nagents:charPositions", (event) => {
       if (cancelled) return;
       const p = event.payload;
       if (!p || !p.chars) return;
       lastBroadcastTs = Date.now();
-      // Just buffer — DOM work happens in the rAF loop below.
       pendingFrame = { chars: p.chars, cx: p.cx, cy: p.cy, hiddenCount: p.hiddenCount || 0 };
     }).then((fn) => { unlistenFn = fn; });
     log("overlay", `follower listening for Tauri charPositions events`);
@@ -548,88 +575,104 @@ function startFollowerRenderer(
     log("overlay", `follower Tauri listen failed: ${e}`);
   });
 
-  // ─── rAF render loop ───────────────────────────────────────────────
+  // ─── rAF render loop (runs EVERY frame, not just on broadcast) ─────
   function renderTick() {
     if (cancelled) return;
     requestAnimationFrame(renderTick);
 
-    const frame = pendingFrame;
-    if (!frame) return;
-    pendingFrame = null; // consumed
+    // ── Process new broadcast (if any) ──
+    if (pendingFrame) {
+      const { chars: charData, cx, cy, hiddenCount } = pendingFrame;
+      pendingFrame = null;
+      lastHiddenCount = hiddenCount;
+      setLatestFollowerFrame(charData);
+      cursor.x = cx;
+      cursor.y = cy;
 
-    const { chars: charData, cx, cy, hiddenCount } = frame;
-    cursor.x = cx;
-    cursor.y = cy;
-    setLatestFollowerFrame(charData);
+      const activeIds = new Set(Object.keys(charData));
 
-    const activeIds = new Set(Object.keys(charData));
-
-    // Remove chars no longer in the frame.
-    for (const [id, el] of elMap) {
-      if (!activeIds.has(id)) {
-        el.remove();
-        elMap.delete(id);
-      }
-    }
-
-    // Update / create chars on this display.
-    for (const [id, data] of Object.entries(charData)) {
-      const [vx, vy, mode, charId, name, group, ev] = data;
-
-      const lx = vx - dx;
-      const ly = vy - dy;
-      if (lx < -MARGIN || lx > dw + MARGIN || ly < -MARGIN || ly > dh + MARGIN) {
-        const existing = elMap.get(id);
-        if (existing) { existing.remove(); elMap.delete(id); }
-        continue;
-      }
-
-      let el = elMap.get(id);
-      if (!el) {
-        el = document.createElement("div");
-        el.className = "overlay-char";
-        el.dataset.sessionId = id;
-        const charDef = getCharacter(charId);
-        el.innerHTML = `
-          <div class="overlay-char-group" style="font-size:${cfg.font_size_group || 9}px">${group}</div>
-          <div class="overlay-char-title" style="font-size:${cfg.font_size_title || 10}px">${name}</div>
-          <div class="overlay-char-svg char-slot-idle" data-char="${charId}">${charDef.svg}</div>
-          <div class="overlay-char-action" style="font-size:${cfg.font_size_action || 10}px">${ev || ""}</div>
-        `;
-        el.style.position = "absolute";
-        el.style.width = `${cfg.char_size || 44}px`;
-        el.style.pointerEvents = "none";
-        container.appendChild(el);
-        elMap.set(id, el);
-      }
-
-      el.style.left = `${Math.round(lx)}px`;
-      el.style.top = `${Math.round(ly)}px`;
-
-      if (el.dataset.char !== charId) {
-        const charDef = getCharacter(charId);
-        const svgWrap = el.querySelector(".overlay-char-svg");
-        if (svgWrap) {
-          svgWrap.innerHTML = charDef.svg;
-          svgWrap.setAttribute("data-char", charId);
+      // Remove departed chars.
+      for (const [id, fc] of charState) {
+        if (!activeIds.has(id)) {
+          fc.el.remove();
+          charState.delete(id);
         }
-        el.dataset.char = charId;
       }
 
-      const titleEl = el.querySelector(".overlay-char-title");
-      if (titleEl && titleEl.textContent !== name) titleEl.textContent = name;
-      const groupEl = el.querySelector(".overlay-char-group");
-      if (groupEl && groupEl.textContent !== group) groupEl.textContent = group;
+      // Update / create chars.
+      for (const [id, data] of Object.entries(charData)) {
+        const [vx, vy, mode, charId, name, group, ev] = data;
+        const lx = vx - dx;
+        const ly = vy - dy;
+
+        // Off this display — remove.
+        if (lx < -MARGIN || lx > dw + MARGIN || ly < -MARGIN || ly > dh + MARGIN) {
+          const fc = charState.get(id);
+          if (fc) { fc.el.remove(); charState.delete(id); }
+          continue;
+        }
+
+        let fc = charState.get(id);
+        if (!fc) {
+          // New char: create element, start at target (no lerp on first frame).
+          const el = document.createElement("div");
+          el.className = "overlay-char";
+          el.dataset.sessionId = id;
+          el.dataset.char = charId;
+          const charDef = getCharacter(charId);
+          el.innerHTML = `
+            <div class="overlay-char-group" style="font-size:${cfg.font_size_group || 9}px">${group}</div>
+            <div class="overlay-char-title" style="font-size:${cfg.font_size_title || 10}px">${name}</div>
+            <div class="overlay-char-svg char-slot-idle" data-char="${charId}">${charDef.svg}</div>
+            <div class="overlay-char-action" style="font-size:${cfg.font_size_action || 10}px">${ev || ""}</div>
+          `;
+          el.style.position = "absolute";
+          el.style.left = "0px";
+          el.style.top = "0px";
+          el.style.width = `${cfg.char_size || 44}px`;
+          el.style.pointerEvents = "none";
+          el.style.willChange = "transform"; // GPU compositing — prevents ghost trails
+          container.appendChild(el);
+          fc = { el };
+          charState.set(id, fc);
+        } else {
+          // Update SVG if char changed.
+          if (fc.el.dataset.char !== charId) {
+            const charDef = getCharacter(charId);
+            const svgWrap = fc.el.querySelector(".overlay-char-svg");
+            if (svgWrap) {
+              svgWrap.innerHTML = charDef.svg;
+              svgWrap.setAttribute("data-char", charId);
+            }
+            fc.el.dataset.char = charId;
+          }
+          // Update text labels (only if changed — avoids DOM write).
+          const titleEl = fc.el.querySelector(".overlay-char-title");
+          if (titleEl && titleEl.textContent !== name) titleEl.textContent = name;
+          const groupEl = fc.el.querySelector(".overlay-char-group");
+          if (groupEl && groupEl.textContent !== group) groupEl.textContent = group;
+        }
+
+        // GPU-composited position — translate() avoids CPU layout recalc and
+        // prevents ghost trail artifacts on transparent WKWebView windows.
+        fc.el.style.transform = `translate(${Math.round(lx)}px, ${Math.round(ly)}px)`;
+
+        // Apply mode-based CSS classes so chars look the same as on the lead
+        // (without these, roamers appear at full opacity/size on follower but
+        // dimmed/scaled on lead — visual mismatch).
+        fc.el.classList.toggle("char-following", mode === "follow");
+        fc.el.classList.toggle("char-roaming", mode === "roam");
+        fc.el.classList.toggle("char-dot", mode === "revolve");
+      }
     }
 
-    // +N hidden badge near cursor.
-    if (hiddenCount > 0) {
-      const blx = cx - 12 - dx;
-      const bly = cy - 24 - dy;
+    // +N badge near cursor (convert global → local for CSS positioning).
+    if (lastHiddenCount > 0) {
+      const blx = cursor.x - dx - 12;
+      const bly = cursor.y - dy - 24;
       if (blx > -MARGIN && blx < dw + MARGIN && bly > -MARGIN && bly < dh + MARGIN) {
-        badgeEl.textContent = `+${hiddenCount}`;
-        badgeEl.style.left = `${Math.round(blx)}px`;
-        badgeEl.style.top = `${Math.round(bly)}px`;
+        badgeEl.textContent = `+${lastHiddenCount}`;
+        badgeEl.style.transform = `translate(${Math.round(blx)}px, ${Math.round(bly)}px)`;
         badgeEl.style.display = "";
       } else {
         badgeEl.style.display = "none";
@@ -646,9 +689,9 @@ function startFollowerRenderer(
   // removes all chars if no broadcast has arrived within STALE_MS.
   staleCheckId = setInterval(() => {
     if (cancelled) return;
-    if (elMap.size > 0 && Date.now() - lastBroadcastTs > STALE_MS) {
-      for (const [, el] of elMap) el.remove();
-      elMap.clear();
+    if (charState.size > 0 && Date.now() - lastBroadcastTs > STALE_MS) {
+      for (const [, fc] of charState) fc.el.remove();
+      charState.clear();
       log("overlay", `follower: cleared stale chars (no broadcast for ${STALE_MS}ms)`);
     }
   }, 1000);
@@ -658,8 +701,8 @@ function startFollowerRenderer(
     cancelled = true;
     if (unlistenFn) unlistenFn();
     if (staleCheckId) clearInterval(staleCheckId);
-    for (const [, el] of elMap) el.remove();
-    elMap.clear();
+    for (const [, fc] of charState) fc.el.remove();
+    charState.clear();
     badgeEl.remove();
     log("overlay", "follower renderer cleaned up (re-init)");
   };

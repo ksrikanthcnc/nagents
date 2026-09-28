@@ -42,6 +42,7 @@ const SETTING_TYPES: Record<string, SettingType> = {
   cluster_carousel: "boolean",
   multi_screen: "boolean",
   attention_cross_screen: "boolean",
+  debug_panel: "boolean",
 };
 
 /**

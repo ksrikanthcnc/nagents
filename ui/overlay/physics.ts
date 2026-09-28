@@ -298,11 +298,10 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     for (const [, el] of satellites) el.style.display = "";
   }
 
-  const visibleChars = charArray.filter(c => c.el.style.display !== "none");
   // In per-display mode, physics must keep running even when no chars are
   // visible on THIS display — chars' virtual positions need to update so they
   // can cross onto this display. Only skip in single-window mode.
-  if (!isPerDisplay && visibleChars.length === 0) return;
+  if (!isPerDisplay && charArray.every(c => c.el.style.display === "none")) return;
 
   // Periodic summary
   if (now - lastSummaryLog > 10000 && charArray.length > 0) {
@@ -410,24 +409,36 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
         char.el.style.fontSize = "";
       }
     } else {
-      // Roam
+      // Roam — pick targets on the cursor's display so roamers drift to
+      // whichever screen the cursor is on.
       char.roamTimer++;
-      if (char.roamTimer > 240 || distTo(char, char.roamTarget) < 30) {
-        // Roamers stick to whichever display the cursor is on: pick roam
-        // targets within that display's rect. When the cursor moves to a
-        // different display, the next roam-target pick will be on the new
-        // display → roamers drift there and keep roaming there.
-        const cursorDisplay = displayContaining(cursor.x, cursor.y);
+      const cursorDisplay = displayContaining(cursor.x, cursor.y);
+
+      // Detect cursor display change → immediately redirect roamers to the
+      // new display. This cancels the "walk to old display" animation and
+      // makes roamers snap to pursuing the correct screen.
+      if (cursorDisplay && char.roamTarget) {
+        const onCursorDisplay =
+          char.roamTarget.x >= cursorDisplay.x &&
+          char.roamTarget.x < cursorDisplay.x + cursorDisplay.w;
+        if (!onCursorDisplay) {
+          // Target is on the old display — pick a new one immediately.
+          char.roamTimer = 121; // force pick below
+        }
+      }
+
+      if (char.roamTimer > 120 || distTo(char, char.roamTarget) < 80) {
+        char.roamPickCount = (char.roamPickCount || 0) + 1;
         if (cursorDisplay) {
-          const r1 = seededRandom(char.session.id, char.roamTimer * 2 + 100);
-          const r2 = seededRandom(char.session.id, char.roamTimer * 2 + 101);
+          const r1 = seededRandom(char.session.id, char.roamPickCount * 2);
+          const r2 = seededRandom(char.session.id, char.roamPickCount * 2 + 1);
           char.roamTarget = {
             x: cursorDisplay.x + 50 + r1 * (cursorDisplay.w - 100),
             y: cursorDisplay.y + 50 + r2 * (cursorDisplay.h - 100),
           };
         } else {
-          const r1 = seededRandom(char.session.id, char.roamTimer * 2 + 100);
-          const r2 = seededRandom(char.session.id, char.roamTimer * 2 + 101);
+          const r1 = seededRandom(char.session.id, char.roamPickCount * 2);
+          const r2 = seededRandom(char.session.id, char.roamPickCount * 2 + 1);
           char.roamTarget = {
             x: 50 + r1 * (window.innerWidth - 100),
             y: 50 + r2 * (window.innerHeight - 100),
@@ -506,10 +517,7 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     // ─── Collision ───────────────────────────────────────────────────
     if ((char.mode as string) !== "revolve" && !batterySaver) {
       for (const other of charArray) {
-        if (other === char) continue;
-        // In per-display mode, off-display chars have display=none but still need
-        // collision (followers render them). Only skip truly mode-hidden chars.
-        if (other.el.style.display === "none" && (!isPerDisplay || other.mode === "hidden")) continue;
+        if (other === char || other.mode === "hidden") continue;
         if (other.mode === "revolve" && char.mode === "roam") continue;
         if (char.clusteredTo && (other.clusteredTo === char.clusteredTo || other.session.id === char.clusteredTo)) continue;
         if (other.clusteredTo && (char.clusteredTo === other.clusteredTo || char.session.id === other.clusteredTo)) continue;
@@ -549,10 +557,15 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
     char.x = Math.max(vox - 50, Math.min(vox + canvasW() + 50, char.x));
     char.y = Math.max(voy - 50, Math.min(voy + canvasH() + 50, char.y));
 
-    // Off-display chars: physics is done (x/y updated for broadcast). Skip all
-    // DOM rendering — classList, style writes, querySelector, animation helpers.
-    // This eliminates ~14K wasted DOM ops/sec for off-display chars.
-    if (isOffDisplay) continue;
+    // Off-display chars: physics is done (x/y updated for broadcast). Check if
+    // the char has moved back onto this display before skipping DOM rendering.
+    if (isOffDisplay) {
+      const returnPos = toDisplayLocal(char.x, char.y);
+      if (!returnPos) continue; // still off-display, skip all DOM work
+      // Char has returned to this display — re-show it and fall through
+      // to the normal DOM rendering path below.
+      char.el.style.display = "";
+    }
 
     // ─── Carousel: anchor off-seat → render on orbit, keep true center ──
     // char.x/char.y stay at the system center (planets orbit it); only the
@@ -631,8 +644,6 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
 
 // ─── Lead → Follower broadcast via Tauri events ─────────────────────────────
 
-let broadcastCounter = 0;
-
 // Cache the Tauri emit function — resolve the dynamic import once at first use,
 // then call the function directly on subsequent broadcasts. Eliminates per-call
 // promise overhead that caused jitter at ~15fps broadcast rate.
@@ -644,9 +655,9 @@ let _emitFn: ((event: string, payload: unknown) => Promise<void>) | null = null;
  *  for clean creation/removal. */
 export function broadcastCharPositions(charArray: OverlayChar[]): void {
   if (!isPerDisplay || !isLeadWindow) return;
-  broadcastCounter++;
-  if (broadcastCounter < 4) return; // ~15fps at 60fps physics
-  broadcastCounter = 0;
+  // Broadcast every physics frame (~60fps). Higher rate = smoother followers,
+  // especially on high-refresh displays (Dell P2425HE is 100Hz). The payload
+  // is ~3KB — well within Tauri IPC capacity at 60 msg/sec.
 
   const chars: Record<string, [number, number, string, string, string, string, string]> = {};
   let hiddenCount = 0;

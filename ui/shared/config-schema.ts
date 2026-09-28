@@ -251,6 +251,12 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     description: "Font size for action/status text (px).",
     default: 10, min: 6, max: 16,
   },
+  // ─── Debug ────────────────────────────────────────────────────────────
+  {
+    key: "debug_panel", label: "Debug Panel", type: "boolean", section: "display",
+    description: "Show diagnostic overlay on each display (Lead/Follower, char positions, anomalies).",
+    default: false,
+  },
 ];
 
 /** Get schema entries for a section. */

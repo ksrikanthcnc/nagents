@@ -76,6 +76,9 @@ const MODE_COLOR: Record<string, string> = {
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 export function initDebugPanel(): void {
+  // Togglable via settings (localStorage). Default: off.
+  if (localStorage.getItem("nagents:setting:debug_panel") !== "true") return;
+
   panelEl = document.createElement("div");
   panelEl.id = "nagents-debug";
   panelEl.style.cssText = `

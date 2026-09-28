@@ -73,7 +73,9 @@ fn create_single_overlay(app: &AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     overlay.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
-    overlay.set_content_protected(true).map_err(|e| e.to_string())?;
+    if hide_from_capture_enabled(app) {
+        overlay.set_content_protected(true).map_err(|e| e.to_string())?;
+    }
 
     // Store bounds for /cursor (primary at origin 0,0 matches old behavior)
     if let Some(m) = overlay.primary_monitor().ok().flatten() {
@@ -173,7 +175,9 @@ fn create_per_display_overlays(app: &AppHandle) -> Result<(), String> {
         }
 
         overlay.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
-        if !cfg!(debug_assertions) {
+        // Hide from screenshots/screen share when config says so (default: true).
+        // In dev builds this was previously skipped, but it's safe and useful.
+        if hide_from_capture_enabled(app) {
             overlay.set_content_protected(true).map_err(|e| e.to_string())?;
         }
 
@@ -331,6 +335,18 @@ fn cross_screen_enabled(app: &AppHandle) -> bool {
     };
     // attention_cross_screen defaults ON; multi_screen defaults OFF.
     get_bool("multi_screen", false) || get_bool("attention_cross_screen", true)
+}
+
+/// Whether overlay windows should be hidden from screenshots/screen share.
+/// Reads `hide_from_capture` from overlay config (default: true).
+fn hide_from_capture_enabled(app: &AppHandle) -> bool {
+    let Some(cfg) = app.try_state::<crate::config::ConfigHandle>() else { return true };
+    let overlay = cfg.get_effective().overlay;
+    overlay.extra.get("hide_from_capture").map(|v| match v {
+        serde_json::Value::Bool(b) => *b,
+        serde_json::Value::String(s) => s == "true",
+        _ => true,
+    }).unwrap_or(true)
 }
 
 /// macOS: convert a window to an NSPanel and apply overlay window traits.

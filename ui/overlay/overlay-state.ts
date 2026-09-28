@@ -20,6 +20,9 @@ export interface OverlayChar {
   mode: CharMode;
   roamTarget: { x: number; y: number };
   roamTimer: number;
+  /** Monotonic counter incremented on each roam target pick. Used as the
+   *  seededRandom counter so each pick produces a different position. */
+  roamPickCount: number;
   spawnedAt: number;
   /** Timestamp when mode was last changed */
   modeSetAt: number;
@@ -95,9 +98,22 @@ function djb2(s: string): number {
   return h;
 }
 
-/** Deterministic random [0,1) for a session id + counter. */
+/** Deterministic random [0,1) for a session id + counter.
+ *  Uses djb2 of the session id as a base, then mixes the counter in with
+ *  a murmur-style finalizer so consecutive counters produce well-distributed
+ *  values (the old approach of appending `:counter` as a string only changed
+ *  the last byte of the hash → same float for counters 0-9). */
 export function seededRandom(sessionId: string, counter: number): number {
-  const h = djb2(sessionId + ":" + counter);
+  let h = djb2(sessionId);
+  // Mix counter with murmur3 finalizer for good distribution.
+  let k = counter >>> 0;
+  k = Math.imul(k ^ (k >>> 16), 0x45d9f3b) >>> 0;
+  k = Math.imul(k ^ (k >>> 13), 0x45d9f3b) >>> 0;
+  k = (k ^ (k >>> 16)) >>> 0;
+  h = (h ^ k) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
   return (h & 0x7fffffff) / 0x80000000;
 }
 
