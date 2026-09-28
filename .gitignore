@@ -38,6 +38,9 @@ logs/
 
 # Local config override (user-specific, not committed)
 config.local.yaml
+# Internal dev docs (not for public repo)
+docs/MULTI_MONITOR_DEBUG.md
+docs/MULTI_MONITOR_HANDOFF.md
 .haive.pid
 .haive.log
 .nagents.pid
