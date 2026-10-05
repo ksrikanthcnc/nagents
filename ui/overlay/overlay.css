@@ -527,3 +527,37 @@ html, body {
   z-index: 1;
 }
 .overlay-char-badge:empty { display: none; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Reduce Motion — disables ALL keyframe animations and transitions.          */
+/* Dramatically reduces macOS WindowServer compositor repaints (the #1 CPU    */
+/* cost of transparent always-on-top overlay windows). Chars still move via   */
+/* transform:translate (position changes), but visual effects are frozen.     */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* Also respect OS-level reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .overlay-char *,
+  .overlay-char *::before,
+  .overlay-char *::after,
+  .overlay-satellite *,
+  .overlay-satellite *::before,
+  .overlay-satellite *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}

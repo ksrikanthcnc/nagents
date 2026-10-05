@@ -90,6 +90,7 @@ overlay:
   attention_cross_screen: true # Attention sessions follow cursor onto any display, even if multi_screen is off.
   show_over_fullscreen: true   # Show overlay on top of fullscreen apps (macOS)
   hide_from_capture: true      # Hide overlay from screen share/screenshots (macOS)
+  reduce_motion: true          # Disable all animations (blink, pulse, shake, orbit, poof). Reduces GPU/WindowServer load.
   startup_delay_sec: 5         # Seconds to wait after wake/start before showing overlay
   group_as_one: false          # Merge same-group sessions into one visual unit
   # group_display: cluster (all visible, close), single (one rep)

@@ -146,6 +146,7 @@ export interface OverlayConfig {
   bsb_opacity?: number;
   show_over_fullscreen?: boolean;
   hide_from_capture?: boolean;
+  reduce_motion?: boolean | string;
   startup_delay_sec?: number;
   group_display?: string;
   auto_battery_mode?: boolean | string;

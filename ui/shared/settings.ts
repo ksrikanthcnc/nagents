@@ -43,6 +43,7 @@ const SETTING_TYPES: Record<string, SettingType> = {
   multi_screen: "boolean",
   attention_cross_screen: "boolean",
   debug_panel: "boolean",
+  reduce_motion: "boolean",
 };
 
 /**

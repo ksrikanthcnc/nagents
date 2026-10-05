@@ -179,11 +179,8 @@ fn apply_power_runtime(config: &crate::config::ConfigHandle, state: &PowerState,
         .unwrap_or(true);
 
     if !auto_mode {
-        // Auto battery disabled by user: clear any runtime override so the
-        // user's manual overlay_mode takes effect. Without this, a previously-
-        // set battery_saver=true lingers in runtime even after the user toggles
-        // auto_battery_mode off.
-        config.set_runtime("battery_saver", serde_json::Value::Bool(false), app);
+        // Auto battery disabled: don't touch battery_saver. The user's manual
+        // setting (via tray/settings/runtime API) should persist.
         return;
     }
 

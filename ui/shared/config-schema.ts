@@ -257,6 +257,11 @@ export const CONFIG_SCHEMA: SettingDef[] = [
     description: "Show diagnostic overlay on each display (Lead/Follower, char positions, anomalies).",
     default: false,
   },
+  {
+    key: "reduce_motion", label: "Reduce Motion", type: "boolean", section: "display",
+    description: "Disable all animations (blink, pulse, shake, orbit). Reduces CPU/GPU load significantly.",
+    default: false,
+  },
 ];
 
 /** Get schema entries for a section. */

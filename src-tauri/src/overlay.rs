@@ -181,12 +181,11 @@ fn create_per_display_overlays(app: &AppHandle) -> Result<(), String> {
             overlay.set_content_protected(true).map_err(|e| e.to_string())?;
         }
 
-        // macOS window exclusion: skip entirely in dev (vite HMR triggers ObjC
-        // exceptions when reloading modified windows). Release builds apply it.
+        // macOS window exclusion: apply_light_exclusion uses collectionBehavior
+        // + setLevel (safe in dev, no class swizzle). NSPanel swizzle (make_overlay_panel)
+        // is still release-only to avoid HMR crashes.
         #[cfg(target_os = "macos")]
-        if !cfg!(debug_assertions) {
-            apply_light_exclusion(app, &label);
-        }
+        apply_light_exclusion(app, &label);
 
         overlay.show().map_err(|e| e.to_string())?;
 

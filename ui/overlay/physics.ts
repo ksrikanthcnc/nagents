@@ -256,11 +256,19 @@ async function hideBsbWindow(): Promise<void> {
 
 // ─── Main Physics Update ────────────────────────────────────────────────────
 
-export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void {
-  // Lerp cursor toward target (smooths jumps from slow poll rate)
+export function updatePhysics(batterySaver: boolean, hiddenUntil: number, cursorIdleMs: number): void {
+  // Lerp cursor toward target (smooths jumps from slow poll rate).
+  // Snap when close to prevent asymptotic floating-point drift that causes
+  // endless sub-pixel position changes → continuous WindowServer recomposites.
   const smoothing = cfg.cursor_smoothing || 0.12;
-  cursor.x += (cursorTarget.x - cursor.x) * smoothing;
-  cursor.y += (cursorTarget.y - cursor.y) * smoothing;
+  const cdx = cursorTarget.x - cursor.x, cdy = cursorTarget.y - cursor.y;
+  if (Math.abs(cdx) < 0.5 && Math.abs(cdy) < 0.5) {
+    cursor.x = cursorTarget.x;
+    cursor.y = cursorTarget.y;
+  } else {
+    cursor.x += cdx * smoothing;
+    cursor.y += cdy * smoothing;
+  }
 
   const charArray = Array.from(chars.values());
   const now = Date.now();
@@ -409,46 +417,18 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
         char.el.style.fontSize = "";
       }
     } else {
-      // Roam — pick targets on the cursor's display so roamers drift to
-      // whichever screen the cursor is on.
-      char.roamTimer++;
-      const cursorDisplay = displayContaining(cursor.x, cursor.y);
-
-      // Detect cursor display change → immediately redirect roamers to the
-      // new display. This cancels the "walk to old display" animation and
-      // makes roamers snap to pursuing the correct screen.
-      if (cursorDisplay && char.roamTarget) {
-        const onCursorDisplay =
-          char.roamTarget.x >= cursorDisplay.x &&
-          char.roamTarget.x < cursorDisplay.x + cursorDisplay.w;
-        if (!onCursorDisplay) {
-          // Target is on the old display — pick a new one immediately.
-          char.roamTimer = 121; // force pick below
-        }
-      }
-
-      if (char.roamTimer > 120 || distTo(char, char.roamTarget) < 80) {
-        char.roamPickCount = (char.roamPickCount || 0) + 1;
-        if (cursorDisplay) {
-          const r1 = seededRandom(char.session.id, char.roamPickCount * 2);
-          const r2 = seededRandom(char.session.id, char.roamPickCount * 2 + 1);
-          char.roamTarget = {
-            x: cursorDisplay.x + 50 + r1 * (cursorDisplay.w - 100),
-            y: cursorDisplay.y + 50 + r2 * (cursorDisplay.h - 100),
-          };
-        } else {
-          const r1 = seededRandom(char.session.id, char.roamPickCount * 2);
-          const r2 = seededRandom(char.session.id, char.roamPickCount * 2 + 1);
-          char.roamTarget = {
-            x: 50 + r1 * (window.innerWidth - 100),
-            y: 50 + r2 * (window.innerHeight - 100),
-          };
-        }
-        char.roamTimer = 0;
-      }
-      targetX = char.roamTarget.x;
-      targetY = char.roamTarget.y;
-      strength = Math.max(cfg.roam_strength, 0.02);
+      // Roam = "dim follow at distance". Roamers orbit the cursor at a wider
+      // radius than followers (2× min_cursor_distance), each at a unique angle
+      // based on session ID. They follow the cursor like followers but further
+      // away and dimmed. When cursor stops, they stop — zero independent movement.
+      const hw = CHAR_SIZE / 2;
+      const hh = CHAR_SIZE / 2;
+      // Each roamer gets a stable angle offset from its session ID hash.
+      const angleOffset = seededRandom(char.session.id, 999) * Math.PI * 2;
+      const roamRadius = (cfg.min_cursor_distance || 80) * 2.5;
+      targetX = cursor.x + Math.cos(angleOffset) * roamRadius - hw;
+      targetY = cursor.y + Math.sin(angleOffset) * roamRadius - hh;
+      strength = (cfg.follow_strength || 0.04) * 0.6; // slightly weaker than followers
       if (!isOffDisplay) {
         char.el.classList.remove("char-dot");
         char.el.style.transform = "";
@@ -546,6 +526,11 @@ export function updatePhysics(batterySaver: boolean, hiddenUntil: number): void 
         char.vy = (char.vy / speed) * maxSpeed;
       }
     }
+
+    // Snap velocity to zero when tiny (prevents asymptotic sub-pixel drift
+    // that keeps WindowServer recompositing).
+    if (Math.abs(char.vx) < 0.01) char.vx = 0;
+    if (Math.abs(char.vy) < 0.01) char.vy = 0;
 
     char.x += char.vx;
     char.y += char.vy;

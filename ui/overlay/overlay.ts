@@ -51,6 +51,17 @@ function applyOverlayMode(): void {
   }
 }
 
+/** Toggle .reduce-motion class on the overlay container. When active, CSS
+ *  disables all keyframe animations (blink, pulse, shake, orbit, poof, bob),
+ *  drastically reducing WindowServer compositor repaints. */
+function applyReduceMotion(): void {
+  if (!container) return;
+  const reduce = cfg.reduce_motion === true || cfg.reduce_motion === "true"
+    || localStorage.getItem("nagents:setting:reduce_motion") === "true";
+  container.classList.toggle("reduce-motion", reduce);
+  document.documentElement.classList.toggle("reduce-motion", reduce);
+}
+
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 // ─── Follower lifecycle (cancel on re-init / HMR) ───────────────────────────
@@ -59,6 +70,9 @@ function applyOverlayMode(): void {
 // loops survive and create duplicate DOM elements (artifact source). These hooks
 // let initOverlay tear down the previous follower before starting a new one.
 let _followerCleanup: (() => void) | null = null;
+/** Timestamp of last state change (new session, attention change). Used by the
+ *  render loop to prevent idle freeze when chars haven't settled yet. */
+let _lastStateChangeAt = Date.now();
 
 export async function initOverlay(el: HTMLElement): Promise<void> {
   // Cancel any previous follower renderer (HMR re-init safety).
@@ -94,6 +108,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
       if (!info.is_lead) {
         setIsLeadWindow(false);
         log("overlay", `follower mode — starting renderer`);
+        applyReduceMotion();
         startFollowerRenderer(el, info.dx, info.dy, info.dw, info.dh);
         return;
       }
@@ -113,12 +128,14 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
     if (appConfig.overlay) setCfg(appConfig.overlay);
     applyOverlayMode();
     if (cfg.char_size) setCharSize(cfg.char_size);
+    applyReduceMotion();
     log("overlay", `config loaded: mode=${cfg.overlay_mode || "full"} followers=${cfg.max_followers} roamers=${cfg.max_roamers} dots=${cfg.max_dots} charSize=${CHAR_SIZE}`);
   } catch {
     log("overlay", "config load failed, using defaults");
   }
 
   let cursorInterval = Math.round(1000 / cfg.cursor_fps);
+  let lastPollX = 0, lastPollY = 0, cursorPollIdleCount = 0;
   (async () => {
     while (true) {
       // In per-display mode, every window must keep polling at full speed even
@@ -144,9 +161,19 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
             cursorTarget.y = raw.y - 38;
           }
           setCursorReady(true);
+          // Adaptive poll rate: slow down when cursor is idle (same position).
+          const px = Math.round(raw.x), py = Math.round(raw.y);
+          if (px === lastPollX && py === lastPollY) {
+            cursorPollIdleCount++;
+          } else {
+            lastPollX = px; lastPollY = py; cursorPollIdleCount = 0;
+          }
         }
       } catch {}
-      await new Promise(r => setTimeout(r, cursorInterval));
+      // When cursor idle for 20+ polls, slow to 1/sec (was 10/sec).
+      // Detects movement within 1s and resumes full speed.
+      const pollDelay = cursorPollIdleCount > 20 ? 1000 : cursorInterval;
+      await new Promise(r => setTimeout(r, pollDelay));
     }
   })();
 
@@ -157,6 +184,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
       setCfg(fresh.overlay);
       applyOverlayMode();
       if (cfg.char_size) setCharSize(cfg.char_size);
+      applyReduceMotion();
       cursorInterval = Math.round(1000 / cfg.cursor_fps);
       setFrameInterval(1000 / cfg.physics_fps);
       // Poof all working chars when working_mode changes (visual cue)
@@ -181,6 +209,7 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
         setCfg(fresh.overlay);
         applyOverlayMode();
         if (cfg.char_size) setCharSize(cfg.char_size);
+        applyReduceMotion();
         cursorInterval = Math.round(1000 / cfg.cursor_fps);
         setFrameInterval(1000 / cfg.physics_fps);
       }
@@ -190,6 +219,9 @@ export async function initOverlay(el: HTMLElement): Promise<void> {
   onStateChanged(async (state) => {
     if (!cursorReady) return;
     syncChars(state.sessions.filter(s => s.active));
+    // Wake render loop: reset the cursor idle timer so new chars get full
+    // physics to reach cursor (otherwise they'd freeze at spawn edge).
+    _lastStateChangeAt = Date.now();
   });
 
   startRenderLoop();
@@ -478,9 +510,12 @@ function startRenderLoop(): void {
   let cachedBatterySaver = cfg.battery_saver === true || cfg.battery_saver === "true";
   let cachedHiddenUntil = Number(cfg.overlay_hidden_until || 0);
   let cacheRefreshCounter = 0;
+  // Idle cursor detection: when cursor hasn't moved for 2s, drop to 15fps.
+  // Chars are at rest → fewer DOM writes → WindowServer idles.
+  let lastCursorX = 0, lastCursorY = 0, cursorIdleSince = 0;
+  let wasFrozen = false;
 
   function tick(now: number) {
-    setAnimFrameId(requestAnimationFrame(tick));
 
     cacheRefreshCounter++;
     if (cacheRefreshCounter >= 60) {
@@ -493,11 +528,47 @@ function startRenderLoop(): void {
       cachedHiddenUntil = Number(cfg.overlay_hidden_until || 0);
     }
 
-    const effectiveInterval = cachedBatterySaver ? 66 : frameInterval;
+    // Detect cursor idle: if cursor position hasn't changed, track idle time.
+    const cx = Math.round(cursorTarget.x), cy = Math.round(cursorTarget.y);
+    if (cx !== lastCursorX || cy !== lastCursorY) {
+      lastCursorX = cx; lastCursorY = cy; cursorIdleSince = now;
+    }
+    const cursorIdleMs = now - cursorIdleSince;
+
+    // Hard freeze: when cursor idle 5s+, reduce to 0.5fps (2s interval).
+    // Nearly zero compositor work while keeping rAF alive for wake detection.
+    // EXCEPTION: attention chars keep physics at normal rate.
+    // On first freeze frame: run one final physics pass so chars settle to
+    // their target positions (followers near cursor, roamers in their ring).
+    let frozen = false;
+    if (!cachedBatterySaver && cursorIdleMs > 5000) {
+      const recentStateChange = (now - _lastStateChangeAt) < 5000;
+      const hasUrgent = Array.from(chars.values()).some(c =>
+        c.session.attention || c.session.event === "approval" || c.session.event === "stuck"
+      );
+      if (!hasUrgent && !recentStateChange) frozen = true;
+    }
+
+    // Schedule next frame.
+    setAnimFrameId(requestAnimationFrame(tick));
+
+    const effectiveInterval = cachedBatterySaver ? 66 : frozen ? 2000 : frameInterval;
     if (now - lastFrame < effectiveInterval) return;
     lastFrame = now;
     frameCount++;
-    updatePhysics(cachedBatterySaver, cachedHiddenUntil);
+
+    // On transition TO freeze: snap all chars to final positions.
+    // Run physics with high strength so they arrive in one frame.
+    if (frozen && !wasFrozen) {
+      // Snap: set all velocities to zero, teleport to target.
+      for (const c of chars.values()) {
+        c.vx = 0;
+        c.vy = 0;
+      }
+    }
+    wasFrozen = frozen;
+
+    updatePhysics(cachedBatterySaver, cachedHiddenUntil, now - cursorIdleSince);
     // Draw connections (skip in battery saver or when disabled)
     const connectorsEnabled = cfg.connectors !== false;
     if (!cachedBatterySaver && connectorsEnabled && frameCount % 3 === 0) {
@@ -537,6 +608,8 @@ function startFollowerRenderer(
   // that didn't match the lead's constant-velocity physics.
   interface FollowerChar {
     el: HTMLElement;
+    lastLx: number; // last rendered local X (for skip-if-unchanged)
+    lastLy: number;
   }
   const charState = new Map<string, FollowerChar>();
 
@@ -633,7 +706,7 @@ function startFollowerRenderer(
           el.style.pointerEvents = "none";
           el.style.willChange = "transform"; // GPU compositing — prevents ghost trails
           container.appendChild(el);
-          fc = { el };
+          fc = { el, lastLx: Math.round(lx), lastLy: Math.round(ly) };
           charState.set(id, fc);
         } else {
           // Update SVG if char changed.
@@ -653,9 +726,14 @@ function startFollowerRenderer(
           if (groupEl && groupEl.textContent !== group) groupEl.textContent = group;
         }
 
-        // GPU-composited position — translate() avoids CPU layout recalc and
-        // prevents ghost trail artifacts on transparent WKWebView windows.
-        fc.el.style.transform = `translate(${Math.round(lx)}px, ${Math.round(ly)}px)`;
+        // GPU-composited position — skip write if position unchanged (avoids
+        // unnecessary WindowServer recomposite when chars are stationary).
+        const rlx = Math.round(lx), rly = Math.round(ly);
+        if (rlx !== fc.lastLx || rly !== fc.lastLy) {
+          fc.el.style.transform = `translate(${rlx}px, ${rly}px)`;
+          fc.lastLx = rlx;
+          fc.lastLy = rly;
+        }
 
         // Apply mode-based CSS classes so chars look the same as on the lead
         // (without these, roamers appear at full opacity/size on follower but
