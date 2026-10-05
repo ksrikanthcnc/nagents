@@ -46,3 +46,6 @@ docs/MULTI_MONITOR_HANDOFF.md
 .nagents.pid
 .nagents.log
 logs/
+
+# Secrets
+token

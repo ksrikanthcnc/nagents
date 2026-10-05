@@ -196,6 +196,11 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                         workers: Vec::new(),
                         last_user_ts: None,
                         interaction_count: 0,
+                        workflow_id: None,
+                        workflow_name: None,
+                        workflow_step_id: None,
+                        workflow_step_agent: None,
+                        workflow_parent_id: None,
                     };
                     store.insert_test(test);
                     info!("[server] TEST: created test session");

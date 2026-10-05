@@ -63,6 +63,18 @@ export interface Session {
   workers?: string[];
   /** Pre-formatted action display text. */
   action_text?: string;
+
+  // ─── Workflow metadata (set by scanner for workflow step sessions) ───
+  /** Workflow run ID. Null = not a workflow step. */
+  workflow_id?: string | null;
+  /** Workflow display label. */
+  workflow_name?: string | null;
+  /** Step node ID within the workflow. */
+  workflow_step_id?: string | null;
+  /** Agent running this step. */
+  workflow_step_agent?: string | null;
+  /** nagents ID of the parent session that launched this workflow. */
+  workflow_parent_id?: string | null;
 }
 
 // ─── State Snapshot ─────────────────────────────────────────────────────────

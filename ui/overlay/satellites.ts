@@ -31,10 +31,14 @@ const WORKER_CHAR_MAP: Record<string, string> = {
   "lite": "blob",
   "kirocrew-lite": "blob",
   "introspect": "crystal",
+  // Workflow workers (wf: prefix stripped before lookup)
+  "wf": "spark",
 };
 
-/** Extract worker type from name (e.g. "cg: Exploring auth" -> "cg") */
+/** Extract worker type from name (e.g. "cg: Exploring auth" -> "cg", "wf:investigate" -> "wf") */
 function getWorkerType(name: string): string {
+  // Workflow workers use "wf:" prefix
+  if (name.startsWith("wf:")) return "wf";
   const colonIdx = name.indexOf(":");
   if (colonIdx > 0) return name.slice(0, colonIdx).trim();
   return name.trim();
@@ -50,6 +54,9 @@ let satelliteAngle = 0;
 
 /** Satellite size scales with main char size (~40% of CHAR_SIZE) */
 export function getSatSize(): number { return Math.round(CHAR_SIZE * 0.4); }
+
+/** Workflow satellite size — larger than sub-agent satellites (~60% of CHAR_SIZE) */
+function getWfSatSize(): number { return Math.round(CHAR_SIZE * 0.6); }
 
 export function renderSatellites(charArray: OverlayChar[]): void {
   if (!container) return;
@@ -74,22 +81,25 @@ export function renderSatellites(charArray: OverlayChar[]): void {
       const workerType = getWorkerType(name);
       const satCharId = WORKER_CHAR_MAP[workerType] || "ghost";
 
+      const isWorkflow = workerType === "wf";
+      const satSize = isWorkflow ? getWfSatSize() : getSatSize();
+
       if (!el) {
         el = document.createElement("div");
-        el.className = "overlay-satellite";
+        el.className = isWorkflow ? "overlay-satellite overlay-satellite-wf" : "overlay-satellite";
         el.style.position = "absolute";
         el.style.pointerEvents = "none";
-        el.style.width = `${getSatSize()}px`;
-        el.style.height = `${getSatSize()}px`;
+        el.style.width = `${satSize}px`;
+        el.style.height = `${satSize}px`;
         container.appendChild(el);
         satellites.set(key, el);
       }
 
-      // Position: orbit around parent
+      // Position: orbit around parent (workflow satellites orbit slightly wider)
       const angle = satelliteAngle + (2 * Math.PI * i) / count;
-      const satSize = getSatSize();
-      const sx = char.x + CHAR_SIZE / 2 + Math.cos(angle) * orbitRadius - satSize / 2;
-      const sy = char.y + CHAR_SIZE / 2 + Math.sin(angle) * orbitRadius - satSize / 2;
+      const radius = isWorkflow ? CHAR_SIZE * 0.8 : orbitRadius;
+      const sx = char.x + CHAR_SIZE / 2 + Math.cos(angle) * radius - satSize / 2;
+      const sy = char.y + CHAR_SIZE / 2 + Math.sin(angle) * radius - satSize / 2;
       el.style.left = `${Math.round(sx)}px`;
       el.style.top = `${Math.round(sy)}px`;
 

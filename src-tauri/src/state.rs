@@ -95,6 +95,23 @@ pub struct Session {
     /// Names of active workers/sub-agents.
     #[serde(default)]
     pub workers: Vec<String>,
+
+    // ─── Workflow metadata (set by scanner for workflow step sessions) ───
+    /// Workflow run ID (e.g. "wf_f3d426dea10bc42f"). None = not a workflow step.
+    #[serde(default)]
+    pub workflow_id: Option<String>,
+    /// Workflow display label (e.g. "test-sleep-loop").
+    #[serde(default)]
+    pub workflow_name: Option<String>,
+    /// Step node ID within the workflow (e.g. "setup", "plan", "feat-001").
+    #[serde(default)]
+    pub workflow_step_id: Option<String>,
+    /// Agent running this step (e.g. "wf-coder", "wf-planner", "semantic_reviewer").
+    #[serde(default)]
+    pub workflow_step_agent: Option<String>,
+    /// nagents ID of the parent session that launched this workflow (e.g. "ide-5b770339").
+    #[serde(default)]
+    pub workflow_parent_id: Option<String>,
 }
 
 /// Event update from hooks (partial update).
@@ -169,6 +186,118 @@ fn infer_source_from_id(session_id: &str) -> String {
     } else {
         String::new()
     }
+}
+
+/// Info extracted from a Kiro session.json file on disk.
+struct KiroSessionInfo {
+    title: String,
+    workflow_id: Option<String>,
+    workflow_name: Option<String>,
+    workflow_step_id: Option<String>,
+    workflow_step_agent: Option<String>,
+    workflow_parent_id: Option<String>,
+}
+
+/// Read Kiro session.json from ~/.kiro/sessions/<hash>/sess_<uuid>/session.json.
+/// Extracts title and workflow metadata (if the session is a workflow step).
+/// Returns None if the file can't be found or read.
+fn read_kiro_session_info(nagents_id: &str) -> Option<KiroSessionInfo> {
+    // nagents_id is like "ide-5e49dae4" — extract the short UUID
+    let short = nagents_id.split('-').skip(1).next().unwrap_or("");
+    if short.len() < 8 { return None; }
+
+    let sessions_dir = dirs::home_dir()?.join(".kiro/sessions");
+    if !sessions_dir.exists() { return None; }
+
+    // Find the session.json by scanning hash dirs for matching sess_ prefix
+    let mut session_json_path = None;
+    let mut hash_dir_path = None;
+    for hash_dir in std::fs::read_dir(&sessions_dir).ok()? {
+        let hash_dir = hash_dir.ok()?;
+        if !hash_dir.file_type().ok()?.is_dir() { continue; }
+        let name = hash_dir.file_name().to_string_lossy().to_string();
+        if name == "cli" { continue; }
+
+        for entry in std::fs::read_dir(hash_dir.path()).ok()?.flatten() {
+            let entry_name = entry.file_name().to_string_lossy().to_string();
+            if entry_name.starts_with("sess_") && entry_name[5..].starts_with(short) {
+                let sj = entry.path().join("session.json");
+                if sj.exists() {
+                    session_json_path = Some(sj);
+                    hash_dir_path = Some(hash_dir.path());
+                    break;
+                }
+            }
+        }
+        if session_json_path.is_some() { break; }
+    }
+
+    let sj_path = session_json_path?;
+    let data: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(&sj_path).ok()?
+    ).ok()?;
+
+    let title = data.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let agent_mode = data.get("agentMode").and_then(|v| v.as_str()).unwrap_or("");
+
+    // Detect workflow step: agentMode starts with "wf-" and title contains " · "
+    if !agent_mode.starts_with("wf-") {
+        return Some(KiroSessionInfo {
+            title,
+            workflow_id: None, workflow_name: None, workflow_step_id: None,
+            workflow_step_agent: None, workflow_parent_id: None,
+        });
+    }
+
+    // Parse title: "workflow-label · step-id"
+    let (wf_name, step_id) = if let Some(dot_pos) = title.find(" · ") {
+        (title[..dot_pos].to_string(), title[dot_pos + 5..].to_string())
+    } else {
+        (title.clone(), "step".to_string())
+    };
+
+    // Find the workflow and parent by scanning workflow-state.json files in this hash dir
+    let raw_sess_id = data.get("id").and_then(|v| v.as_str()).unwrap_or("");
+    let hash_dir = hash_dir_path?;
+    let wf_dir = hash_dir.join("workflows");
+    let mut wf_id = None;
+    let mut parent_id = None;
+
+    if wf_dir.exists() {
+        for run_entry in std::fs::read_dir(&wf_dir).ok()?.flatten() {
+            let state_file = run_entry.path().join("workflow-state.json");
+            if !state_file.exists() { continue; }
+            if let Ok(wf_data) = std::fs::read_to_string(&state_file) {
+                if let Ok(wf_json) = serde_json::from_str::<serde_json::Value>(&wf_data) {
+                    // Check if this workflow references our session
+                    let sessions_file = run_entry.path().join("sessions.json");
+                    if sessions_file.exists() {
+                        if let Ok(sess_data) = std::fs::read_to_string(&sessions_file) {
+                            if sess_data.contains(raw_sess_id) {
+                                wf_id = wf_json.get("workflowId").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                let parent_raw = wf_json.get("parentSessionId").and_then(|v| v.as_str()).unwrap_or("");
+                                if !parent_raw.is_empty() {
+                                    let parent_short = parent_raw.replace("sess_", "");
+                                    let parent_short = &parent_short[..8.min(parent_short.len())];
+                                    parent_id = Some(format!("ide-{}", parent_short));
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Some(KiroSessionInfo {
+        title,
+        workflow_id: wf_id,
+        workflow_name: Some(wf_name),
+        workflow_step_id: Some(step_id),
+        workflow_step_agent: Some(agent_mode.to_string()),
+        workflow_parent_id: parent_id,
+    })
 }
 
 /// Available character pool for random assignment.
@@ -267,6 +396,12 @@ impl SessionStore {
                 entry.active = session.active;
                 entry.tokens = session.tokens;
                 entry.max_tokens = session.max_tokens;
+                // Workflow metadata (scanner-owned, refreshed each scan)
+                entry.workflow_id = session.workflow_id.clone();
+                entry.workflow_name = session.workflow_name.clone();
+                entry.workflow_step_id = session.workflow_step_id.clone();
+                entry.workflow_step_agent = session.workflow_step_agent.clone();
+                entry.workflow_parent_id = session.workflow_parent_id.clone();
                 if session.mtime > 0.0 && session.mtime > entry.mtime {
                     entry.mtime = session.mtime;
                 }
@@ -344,12 +479,14 @@ impl SessionStore {
         let session = if let Some(id) = matching_id {
             store.get_mut(&id).unwrap()
         } else {
-            // Unknown session — create minimal entry (hook arrives before scanner)
+            // Unknown session — create minimal entry (hook arrives before scanner).
+            // Try to enrich with Kiro session.json if available (gets title, workflow info).
             let source = infer_source_from_id(&update.session_id);
+            let kiro_info = read_kiro_session_info(&update.session_id);
             let minimal = Session {
                 id: update.session_id.clone(),
                 source,
-                name: update.session_id.clone(),
+                name: kiro_info.as_ref().map(|i| i.title.clone()).unwrap_or_else(|| update.session_id.clone()),
                 workspace: String::new(),
                 group: String::new(),
                 active: true,
@@ -378,6 +515,11 @@ impl SessionStore {
                 workers: Vec::new(),
                 last_user_ts: None,
                 interaction_count: 0,
+                workflow_id: kiro_info.as_ref().and_then(|i| i.workflow_id.clone()),
+                workflow_name: kiro_info.as_ref().and_then(|i| i.workflow_name.clone()),
+                workflow_step_id: kiro_info.as_ref().and_then(|i| i.workflow_step_id.clone()),
+                workflow_step_agent: kiro_info.as_ref().and_then(|i| i.workflow_step_agent.clone()),
+                workflow_parent_id: kiro_info.as_ref().and_then(|i| i.workflow_parent_id.clone()),
             };
             info!(
                 "[state] hook created minimal session: {} (source={})",
@@ -393,8 +535,8 @@ impl SessionStore {
         // sub-agents when the main turn ends, so a turn boundary means any
         // in-flight workers are done: clear them on Stop (event=idle) or on a
         // fresh user turn (non-empty prompt = UserPromptSubmit).
-        // NOTE: revisit if Kiro ever supports sub-agents that outlive the turn
-        // (continuous background) — then we'd need per-worker liveness instead.
+        // Guard 1: clear stale sub-agent workers on turn boundaries.
+        // Sub-agents (invoke_sub_agent) are short-lived and end within a turn.
         let is_stop = update.event.as_deref() == Some("idle");
         let is_new_turn = update.prompt.as_deref().map(|p| !p.is_empty()).unwrap_or(false);
         if (is_stop || is_new_turn) && (!session.workers.is_empty() || session.sub_agents > 0) {

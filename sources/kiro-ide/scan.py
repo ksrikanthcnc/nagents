@@ -55,11 +55,41 @@ def discover() -> list[dict]:
             sid = tab.get("id", "")
             if not sid or sid in seen_ids:
                 continue
-            seen_ids.add(sid)
             title = tab.get("title", "New Session")
+            # Skip workflow step sessions — they're managed by discover_workflow_steps()
+            # and should only appear when their workflow is running. Completed step
+            # sessions linger as tabs but shouldn't clutter the overlay.
+            if " · " in title and is_workflow_step_session(sid):
+                continue
+            seen_ids.add(sid)
             sessions.append(make_session(sid, title, ws_path))
 
     log(f"discovered {len(sessions)} sessions")
+
+    # Discover running workflow step sessions. These appear as additional sessions
+    # grouped with their parent (the session that launched the workflow).
+    known_sids = set()
+    for s in sessions:
+        # Reconstruct full session ID for matching against parentSessionId.
+        short = s["id"].replace("ide-", "")
+        for hash_dir in KIRO_SESSIONS_DIR.iterdir():
+            if not hash_dir.is_dir() or hash_dir.name == "cli":
+                continue
+            for sess_dir in hash_dir.iterdir():
+                if sess_dir.name.startswith("sess_") and sess_dir.name[5:13] == short:
+                    known_sids.add(sess_dir.name)
+                    break
+
+    wf_steps = discover_workflow_steps(known_sids)
+    # Merge: skip workflow steps whose ID already exists in sessions (avoid dupes).
+    existing_ids = {s["id"] for s in sessions}
+    for step in wf_steps:
+        if step["id"] not in existing_ids:
+            sessions.append(step)
+
+    if wf_steps:
+        log(f"total after workflow steps: {len(sessions)}")
+
     return sessions
 
 
@@ -244,6 +274,136 @@ def path_to_group(ws_path: str) -> str:
     if not name:
         return "ide"
     return name
+
+
+def is_workflow_step_session(session_id: str) -> bool:
+    """Check if a session is a workflow step by reading its session.json agentMode.
+    Returns True if agentMode starts with 'wf-' (workflow step agents like wf-coder,
+    wf-planner, semantic_reviewer running as a workflow step)."""
+    for hash_dir in KIRO_SESSIONS_DIR.iterdir():
+        if not hash_dir.is_dir() or hash_dir.name == "cli":
+            continue
+        sj = hash_dir / session_id / "session.json"
+        if sj.exists():
+            try:
+                data = json.loads(sj.read_text())
+                mode = data.get("agentMode", "")
+                return mode.startswith("wf-") or mode == "semantic_reviewer"
+            except Exception:
+                return False
+    return False
+
+
+# ─── Workflow Discovery ──────────────────────────────────────────────────────
+
+def discover_workflow_steps(known_session_ids: set[str]) -> list[dict]:
+    """Discover running workflow step sessions from ~/.kiro/sessions/<hash>/workflows/.
+
+    For each running workflow, checks if the parent session is already known
+    (in the scanner's discovered sessions). If so, emits the step sessions
+    with workflow metadata so nagents can group them with the parent.
+
+    Args:
+        known_session_ids: Set of full session IDs (e.g. "sess_2d2ea641-...")
+            already discovered by the main scanner. Used to verify the parent
+            is an active session in an open workspace.
+    """
+    steps: list[dict] = []
+
+    for hash_dir in KIRO_SESSIONS_DIR.iterdir():
+        if not hash_dir.is_dir() or hash_dir.name == "cli":
+            continue
+        wf_dir = hash_dir / "workflows"
+        if not wf_dir.exists():
+            continue
+
+        for run_dir in wf_dir.iterdir():
+            if not run_dir.is_dir() or not run_dir.name.startswith("wf_"):
+                continue
+            state_file = run_dir / "workflow-state.json"
+            if not state_file.exists():
+                continue
+
+            try:
+                state = json.loads(state_file.read_text())
+            except Exception:
+                continue
+
+            if state.get("status") != "running":
+                continue
+
+            wf_id = state.get("workflowId", "")
+            wf_name = state.get("workflowName", "workflow")
+            wf_label = state.get("runLabel", wf_name)
+            parent_sid = state.get("parentSessionId", "")
+            workspace_path = state.get("workspacePath", "")
+
+            # Only track workflows whose parent is a known active session.
+            if parent_sid and parent_sid not in known_session_ids:
+                continue
+
+            parent_short = parent_sid.replace("sess_", "")[:8] if parent_sid else ""
+
+            # Walk the node tree to find running step sessions.
+            def walk_steps(node: dict) -> None:
+                if node.get("type") == "step":
+                    step_status = node.get("status", "pending")
+                    step_sid = node.get("sessionId", "")
+                    # Only emit steps that have a session (running). Pending steps
+                    # don't have a session yet — they'll appear when they start.
+                    if step_status == "running" and step_sid:
+                        step_id = node.get("nodeId", "step")
+                        agent = node.get("agentName", "wf-agent")
+
+                        # Read step session.json for title
+                        title = f"{wf_label} · {step_id}"
+                        if step_sid:
+                            sj = hash_dir / step_sid / "session.json"
+                            if sj.exists():
+                                try:
+                                    sd = json.loads(sj.read_text())
+                                    title = sd.get("title", title)
+                                except Exception:
+                                    pass
+
+                        short_id = step_sid.replace("sess_", "")[:8] if step_sid else step_id[:8]
+                        group = path_to_group(workspace_path) if workspace_path else "ide"
+
+                        steps.append({
+                            "id": f"ide-{short_id}",
+                            "source": "kiro-ide",
+                            "name": title[:50],
+                            "workspace": workspace_path.replace(str(HOME), "~") if workspace_path else "",
+                            "group": group,
+                            "active": True,
+                            "event": "running" if step_status == "running" else None,
+                            "attention_source": None,
+                            "attention": False,
+                            "attention_reason": None,
+                            "tool": None,
+                            "file": None,
+                            "tokens": 0,
+                            "maxTokens": 200000,
+                            "mtime": time.time(),  # Use current time so it's always "fresh"
+                            "character": None,
+                            "attention_since": None,
+                            "on_overlay": False,
+                            # Workflow metadata (consumed by nagents backend)
+                            "workflow_id": wf_id,
+                            "workflow_name": wf_label,
+                            "workflow_step_id": step_id,
+                            "workflow_step_agent": agent,
+                            "workflow_parent_id": f"ide-{parent_short}" if parent_short else None,
+                        })
+
+                for child in node.get("children", []):
+                    walk_steps(child)
+
+            walk_steps(state.get("root", {}))
+
+    if steps:
+        log(f"discovered {len(steps)} running workflow step(s)")
+    return steps
 
 
 def main():

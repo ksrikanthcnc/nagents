@@ -82,6 +82,9 @@ pub fn translate(payload: &KiroHookPayload, store: &crate::state::SessionStore) 
                     update.worker = Some(if desc.is_empty() { format!("+{}", short) } else { format!("+{}:{}", short, desc) });
                 }
             }
+            // Workflow launches: step sessions appear via hooks with workflow metadata
+            // (read from session.json on disk). No worker push needed — the step
+            // sessions cluster around the parent in modes.ts via workflow_parent_id.
             Some(update)
         }
         "PostToolUse" => {
@@ -224,6 +227,12 @@ fn extract_file(tool_name: &str, tool_input: Option<&Value>) -> Option<String> {
             let prompt_text = input.get("prompt").and_then(|v| v.as_str()).unwrap_or("");
             let desc: String = prompt_text.lines().next().unwrap_or("").chars().take(50).collect();
             if desc.is_empty() { Some(format!("→ {}", short)) } else { Some(format!("{}: {}", short, desc)) }
+        }
+        "run_workflow" => {
+            let label = input.get("runLabel").and_then(|v| v.as_str())
+                .or_else(|| input.get("workflowPath").and_then(|v| v.as_str()))
+                .unwrap_or("workflow");
+            Some(format!("⚙ {}", label))
         }
         _ => input.get("path").or_else(|| input.get("query")).and_then(|v| v.as_str()).map(|s| s.into()),
     }

@@ -144,6 +144,41 @@ export function computeModes(chars: CharState[], cfg: ModeConfig): Map<string, M
   }
 
   // ─── Sort normal chars by priority ────────────────────────────────
+  // Workflow steps: auto-cluster around their parent session. This is
+  // independent of group_as_one — workflows always cluster. The parent
+  // keeps its waterfall slot (follow/roam/dot); steps orbit it as planets.
+  {
+    const workflowSteps: CharState[] = [];
+    const nonWorkflow: CharState[] = [];
+    for (const c of normal) {
+      if (c.session.workflow_parent_id) {
+        workflowSteps.push(c);
+      } else {
+        nonWorkflow.push(c);
+      }
+    }
+    // Also check pinned — parent might be pinned/attention
+    const allIds = new Set([
+      ...normal.map(c => c.sessionId),
+      ...pinned.map(c => c.sessionId),
+    ]);
+    for (const step of workflowSteps) {
+      const parentId = step.session.workflow_parent_id!;
+      if (allIds.has(parentId)) {
+        // Cluster this step around the parent
+        result.set(step.sessionId, {
+          sessionId: step.sessionId,
+          mode: "follow", // placeholder, overridden to parent's mode
+          clusteredTo: parentId,
+        });
+      } else {
+        // Parent not found (maybe closed) — treat as normal session
+        nonWorkflow.push(step);
+      }
+    }
+    normal = nonWorkflow;
+  }
+
   // If group_as_one: merge same-group sessions based on group_display mode
   if (cfg.group_as_one) {
     const groupMembers = new Map<string, CharState[]>();

@@ -729,6 +729,7 @@ function renderSession(session: Session): string {
     ${healthBar}
     ${status ? `<div class="session-status">${status}</div>` : ""}
     ${(session.sub_agents || 0) > 0 ? `<div class="session-sub-agents">⑂${session.sub_agents}${session.workers?.length ? `<div class="sub-agent-list">${session.workers.map((n: string) => `<span class="sub-agent-name">${n}</span>`).join("")}</div>` : ""}</div>` : ""}
+    ${session.workflow_step_id ? `<div class="session-workflow-step">⚙ ${session.workflow_name || "workflow"} · ${session.workflow_step_id}</div>` : ""}
     <div class="session-tooltip">${tooltipParts.join("")}</div>
   </div>`;
 }
