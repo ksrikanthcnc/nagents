@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Lightning bolt body -->
+  <polygon class="body" points="36,2 18,30 28,30 22,62 48,26 36,26 44,2" fill="#FFEE58" fill-opacity="0.9" stroke="#FDD835" stroke-width="1"/>
+  <!-- Inner glow -->
+  <polygon class="glow" points="34,10 24,30 30,30 26,52 42,28 35,28 40,10" fill="white" opacity="0.2"/>
+  <!-- Eyes -->
+  <circle class="eye eye-left" cx="27" cy="34" r="2.5" fill="#F57F17"/>
+  <circle class="eye eye-right" cx="37" cy="28" r="2.5" fill="#F57F17"/>
+  <!-- Grin -->
+  <path class="mouth" d="M28 40 Q33 43 36 36" fill="none" stroke="#F57F17" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

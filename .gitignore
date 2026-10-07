@@ -49,3 +49,4 @@ logs/
 
 # Secrets
 token
+.agents/

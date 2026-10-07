@@ -1,0 +1,83 @@
+/* Shield — sturdy, protective, solid */
+
+@keyframes shield-stand {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-1px) scaleY(1.02); }
+}
+
+@keyframes shield-brace {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes shield-flash {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(66,165,245,0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 10px rgba(66,165,245,0.9)); transform: scale(1.08); }
+}
+
+@keyframes shield-sleep {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-4deg); }
+}
+
+@keyframes shield-march {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(2deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-3px) rotate(-2deg); }
+}
+
+@keyframes shield-celebrate {
+  0% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.12) rotate(5deg); }
+  60% { transform: scale(1.12) rotate(-5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes shield-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.7); }
+}
+
+/* ─── idle ─── */
+
+[data-char="shield"].char-slot-idle svg {
+  animation: shield-stand 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+
+[data-char="shield"].char-slot-active svg {
+  animation: shield-brace 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+
+[data-char="shield"].char-slot-alert svg {
+  animation: shield-flash 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+
+[data-char="shield"].char-slot-sleep svg {
+  animation: shield-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+
+[data-char="shield"].char-slot-celebrate svg {
+  animation: shield-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ─── */
+
+[data-char="shield"].char-slot-walk svg {
+  animation: shield-march 0.8s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+
+[data-char="shield"].char-slot-fading svg {
+  animation: shield-fade 5s ease-out forwards;
+}

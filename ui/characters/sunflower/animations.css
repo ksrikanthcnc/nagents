@@ -1,0 +1,104 @@
+/* Sunflower — cheerful, sways in breeze, petals flutter */
+
+@keyframes sunflower-idle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(2deg); }
+  75% { transform: rotate(-2deg); }
+}
+
+@keyframes sunflower-petal-flutter {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05) rotate(3deg); }
+}
+
+@keyframes sunflower-think {
+  0%, 100% { transform: rotate(0deg) translateX(0); }
+  30% { transform: rotate(-3deg) translateX(-1px); }
+  70% { transform: rotate(3deg) translateX(1px); }
+}
+
+@keyframes sunflower-alert {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(255,213,79,0.4)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(255,213,79,0.9)); }
+}
+
+@keyframes sunflower-sleep {
+  0%, 100% { transform: rotate(-8deg) translateY(0); }
+  50% { transform: rotate(-12deg) translateY(2px); }
+}
+
+@keyframes sunflower-celebrate {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(10deg) scale(1.1); }
+  50% { transform: rotate(-10deg) scale(1.1); }
+  75% { transform: rotate(5deg) scale(1.05); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes sunflower-walk {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(-2px) rotate(3deg); }
+  40% { transform: translateY(0) rotate(0deg); }
+  60% { transform: translateY(-2px) rotate(-3deg); }
+  80% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes sunflower-fade {
+  0% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.6) rotate(-15deg); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="sunflower"].char-slot-idle svg {
+  animation: sunflower-idle 4s ease-in-out infinite;
+}
+
+[data-char="sunflower"].char-slot-idle svg .petal {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sunflower-petal-flutter 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="sunflower"].char-slot-active svg {
+  animation: sunflower-think 2s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="sunflower"].char-slot-alert svg {
+  animation: sunflower-alert 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="sunflower"].char-slot-sleep svg {
+  animation: sunflower-sleep 6s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+[data-char="sunflower"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="sunflower"].char-slot-celebrate svg {
+  animation: sunflower-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="sunflower"].char-slot-walk svg {
+  animation: sunflower-walk 1s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="sunflower"].char-slot-fading svg {
+  animation: sunflower-fade 5s ease-out forwards;
+}

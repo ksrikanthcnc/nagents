@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <ellipse class="wing wing-left" cx="18" cy="22" rx="9" ry="6" fill="#B3E5FC" fill-opacity="0.5" transform="rotate(-20 18 22)"/>
+  <ellipse class="wing wing-right" cx="46" cy="22" rx="9" ry="6" fill="#B3E5FC" fill-opacity="0.5" transform="rotate(20 46 22)"/>
+  <ellipse class="body" cx="32" cy="36" rx="16" ry="20" fill="#FFD54F" fill-opacity="0.95" stroke="#F9A825" stroke-width="1"/>
+  <rect x="16" y="30" width="32" height="4" rx="2" fill="#1a1a1a" fill-opacity="0.7"/>
+  <rect x="18" y="40" width="28" height="4" rx="2" fill="#1a1a1a" fill-opacity="0.7"/>
+  <rect x="20" y="50" width="24" height="3" rx="1.5" fill="#1a1a1a" fill-opacity="0.7"/>
+  <circle class="eye eye-left" cx="26" cy="24" r="3" fill="#1a1a1a"/>
+  <circle class="eye eye-right" cx="38" cy="24" r="3" fill="#1a1a1a"/>
+  <circle cx="27" cy="23" r="1" fill="white"/><circle cx="39" cy="23" r="1" fill="white"/>
+  <path class="mouth" d="M28 28 Q32 32 36 28" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="28" y1="16" x2="22" y2="8" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="36" y1="16" x2="42" y2="8" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"/>
+  <circle cx="22" cy="8" r="2" fill="#1a1a1a"/><circle cx="42" cy="8" r="2" fill="#1a1a1a"/>
+</svg>

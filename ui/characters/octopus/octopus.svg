@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <path class="tentacle" d="M12 40 Q8 50 10 56" fill="none" stroke="#AB47BC" stroke-width="3" stroke-linecap="round"/>
+  <path class="tentacle" d="M18 44 Q14 52 16 58" fill="none" stroke="#AB47BC" stroke-width="3" stroke-linecap="round"/>
+  <path class="tentacle" d="M26 46 Q24 54 22 60" fill="none" stroke="#AB47BC" stroke-width="3" stroke-linecap="round"/>
+  <path class="tentacle" d="M34 46 Q36 54 34 60" fill="none" stroke="#AB47BC" stroke-width="3" stroke-linecap="round"/>
+  <path class="tentacle" d="M42 46 Q44 54 46 58" fill="none" stroke="#AB47BC" stroke-width="3" stroke-linecap="round"/>
+  <path class="tentacle" d="M48 44 Q52 52 50 58" fill="none" stroke="#AB47BC" stroke-width="3" stroke-linecap="round"/>
+  <ellipse class="body" cx="32" cy="30" rx="22" ry="20" fill="#CE93D8" fill-opacity="0.9" stroke="#AB47BC" stroke-width="1"/>
+  <circle class="eye eye-left" cx="24" cy="28" r="4" fill="white" stroke="#AB47BC" stroke-width="0.5"/>
+  <circle class="eye eye-right" cx="40" cy="28" r="4" fill="white" stroke="#AB47BC" stroke-width="0.5"/>
+  <circle cx="25" cy="28" r="2" fill="#1a1a1a"/><circle cx="41" cy="28" r="2" fill="#1a1a1a"/>
+  <path class="mouth" d="M26 36 Q32 40 38 36" fill="none" stroke="#6A1B9A" stroke-width="1.2" stroke-linecap="round"/>
+  <circle cx="18" cy="34" r="3" fill="#F48FB1" fill-opacity="0.4"/><circle cx="46" cy="34" r="3" fill="#F48FB1" fill-opacity="0.4"/>
+</svg>

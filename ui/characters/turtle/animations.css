@@ -1,0 +1,123 @@
+/* Turtle — slow, steady, head-peeking */
+
+@keyframes turtle-breathe {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50% { transform: scaleY(1.02) translateY(-0.5px); }
+}
+
+@keyframes turtle-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+@keyframes turtle-think {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  50% { transform: scaleX(1.03) scaleY(0.97); }
+}
+
+@keyframes turtle-alert {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(77,182,172,0.3)); }
+  50% { transform: scale(1.06); filter: drop-shadow(0 0 8px rgba(77,182,172,0.7)); }
+}
+
+@keyframes turtle-sleep {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(2px) scaleY(0.96); }
+}
+
+@keyframes turtle-celebrate {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-4px) rotate(3deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-3px) rotate(-2deg); }
+}
+
+@keyframes turtle-plod {
+  0%, 100% { transform: translateY(0) scaleX(1); }
+  25% { transform: translateY(-1px) scaleX(1.02); }
+  50% { transform: translateY(0) scaleX(0.99); }
+  75% { transform: translateY(-1px) scaleX(1.02); }
+}
+
+@keyframes turtle-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.8); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="turtle"].char-slot-idle svg {
+  animation: turtle-breathe 4s ease-in-out infinite;
+}
+
+[data-char="turtle"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: turtle-blink 5s ease-in-out infinite;
+}
+
+[data-char="turtle"].char-slot-idle svg .eye-right {
+  animation-delay: 0.1s;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="turtle"].char-slot-active svg {
+  animation: turtle-think 3s ease-in-out infinite;
+}
+
+[data-char="turtle"].char-slot-active svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: turtle-blink 3.5s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="turtle"].char-slot-alert svg {
+  animation: turtle-alert 1s ease-in-out infinite;
+}
+
+[data-char="turtle"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.2);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="turtle"].char-slot-sleep svg {
+  animation: turtle-sleep 6s ease-in-out infinite;
+  filter: grayscale(0.5);
+  opacity: 0.4;
+}
+
+[data-char="turtle"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="turtle"].char-slot-celebrate svg {
+  animation: turtle-celebrate 1.5s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="turtle"].char-slot-walk svg {
+  animation: turtle-plod 1.5s ease-in-out infinite;
+}
+
+[data-char="turtle"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: turtle-blink 5s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="turtle"].char-slot-fading svg {
+  animation: turtle-fade 5s ease-out forwards;
+}

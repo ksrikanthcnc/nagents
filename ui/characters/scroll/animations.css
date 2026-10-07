@@ -1,0 +1,83 @@
+/* Scroll — ancient, papery, floaty */
+
+@keyframes scroll-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(1deg); }
+}
+
+@keyframes scroll-unfurl {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.05); }
+}
+
+@keyframes scroll-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,236,179,0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 8px rgba(255,236,179,0.8)); transform: scale(1.05); }
+}
+
+@keyframes scroll-sleep {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(2px) rotate(-2deg); }
+}
+
+@keyframes scroll-waddle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(3deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-3px) rotate(-3deg); }
+}
+
+@keyframes scroll-celebrate {
+  0% { transform: rotate(0deg) scaleY(1); }
+  25% { transform: rotate(5deg) scaleY(1.08); }
+  50% { transform: rotate(-5deg) scaleY(1.08); }
+  100% { transform: rotate(0deg) scaleY(1); }
+}
+
+@keyframes scroll-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* ─── idle ─── */
+
+[data-char="scroll"].char-slot-idle svg {
+  animation: scroll-float 3.5s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+
+[data-char="scroll"].char-slot-active svg {
+  animation: scroll-unfurl 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+
+[data-char="scroll"].char-slot-alert svg {
+  animation: scroll-glow 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+
+[data-char="scroll"].char-slot-sleep svg {
+  animation: scroll-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+
+[data-char="scroll"].char-slot-celebrate svg {
+  animation: scroll-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ─── */
+
+[data-char="scroll"].char-slot-walk svg {
+  animation: scroll-waddle 0.8s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+
+[data-char="scroll"].char-slot-fading svg {
+  animation: scroll-fade 5s ease-out forwards;
+}

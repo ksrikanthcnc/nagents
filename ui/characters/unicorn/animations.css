@@ -1,0 +1,116 @@
+/* Unicorn — magical, prancy, sparkly */
+
+@keyframes unicorn-idle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(1deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(-1deg); }
+}
+
+@keyframes unicorn-horn-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,215,0,0.3)); }
+  50% { filter: drop-shadow(0 0 6px rgba(255,215,0,0.8)); }
+}
+
+@keyframes unicorn-prance {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  15% { transform: translateY(-6px) scaleY(1.06); }
+  30% { transform: translateY(0) scaleY(0.94); }
+  50% { transform: translateY(-4px) scaleY(1.04); }
+  70% { transform: translateY(0) scaleY(0.96); }
+}
+
+@keyframes unicorn-alert {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(200,168,232,0.4)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(200,168,232,0.9)); }
+}
+
+@keyframes unicorn-sleep {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(2px) rotate(3deg); }
+}
+
+@keyframes unicorn-celebrate {
+  0% { transform: rotate(0deg) translateY(0); }
+  20% { transform: rotate(8deg) translateY(-6px); }
+  40% { transform: rotate(-8deg) translateY(-4px); }
+  60% { transform: rotate(5deg) translateY(-8px); }
+  80% { transform: rotate(-3deg) translateY(-2px); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+
+@keyframes unicorn-walk {
+  0%, 100% { transform: translateY(0) scaleX(1); }
+  25% { transform: translateY(-3px) scaleX(1.03); }
+  50% { transform: translateY(0) scaleX(0.97); }
+  75% { transform: translateY(-2px) scaleX(1.02); }
+}
+
+@keyframes unicorn-fade {
+  0% { opacity: 1; transform: scale(1); filter: none; }
+  50% { opacity: 0.5; filter: drop-shadow(0 0 8px rgba(255,215,0,0.6)); }
+  100% { opacity: 0; transform: scale(0.7); filter: none; }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="unicorn"].char-slot-idle svg {
+  animation: unicorn-idle 3s ease-in-out infinite;
+}
+
+[data-char="unicorn"].char-slot-idle svg .horn {
+  animation: unicorn-horn-glow 4s ease-in-out infinite;
+}
+
+[data-char="unicorn"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ghost-blink 4s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="unicorn"].char-slot-active svg {
+  animation: unicorn-idle 2s ease-in-out infinite;
+}
+
+[data-char="unicorn"].char-slot-active svg .horn {
+  animation: unicorn-horn-glow 1.5s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="unicorn"].char-slot-alert svg {
+  animation: unicorn-alert 1s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="unicorn"].char-slot-sleep svg {
+  animation: unicorn-sleep 5s ease-in-out infinite;
+  opacity: 0.45;
+}
+
+[data-char="unicorn"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="unicorn"].char-slot-celebrate svg {
+  animation: unicorn-celebrate 1.2s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="unicorn"].char-slot-walk svg {
+  animation: unicorn-prance 1s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="unicorn"].char-slot-fading svg {
+  animation: unicorn-fade 5s ease-out forwards;
+}

@@ -121,7 +121,7 @@ overlay:
 # Per-session override via right-click in panel (persisted to localStorage).
 
 characters:
-  kiro-crew: ghost,flame,crystal
-  kiro-cli-v2: cat,skeleton,owl
-  kiro-cli-v3: cat,skeleton,owl
-  kiro-ide: ghost,robot,mushroom,cloud
+  kiro-crew: ghost,flame,crystal,fox,penguin,panda,bee,dragon,unicorn,alien,ufo,potion,scroll,crown
+  kiro-cli-v2: cat,skeleton,owl,frog,snail,turtle,fish,octopus,bat,hedgehog,dna,atom,shield,diamond
+  kiro-cli-v3: cat,skeleton,owl,hamster,raccoon,koala,cactus,sunflower,acorn,leaf,lightning,raindrop,snowflake
+  kiro-ide: ghost,robot,mushroom,cloud,cat,skeleton,owl,flame,crystal,blob,wisp,spark,orb,fox,penguin,panda,bee,frog,snail,turtle,fish,octopus,dragon,unicorn,bat,hedgehog,hamster,raccoon,koala,cactus,sunflower,acorn,leaf,planet,moon,star,comet,alien,ufo,dna,atom,potion,scroll,shield,diamond,crown,heart,lightning,raindrop,snowflake

@@ -83,6 +83,10 @@ pub fn start(store: SessionStore, config: crate::config::ConfigHandle, port: u16
                 ("POST", "/character") => {
                     handle_character(request, &store, &project_root);
                 }
+                ("POST", "/shuffle") => {
+                    store.shuffle_characters();
+                    request.respond(tiny_http::Response::from_string("{\"ok\":true}")).ok();
+                }
                 ("POST", "/config") => {
                     handle_config_patch(request, &project_root);
                 }

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Ears -->
+  <polygon class="ear ear-left" points="14,12 22,4 24,20" fill="#FF8C00" stroke="#E07000" stroke-width="0.8"/>
+  <polygon class="ear ear-right" points="50,12 42,4 40,20" fill="#FF8C00" stroke="#E07000" stroke-width="0.8"/>
+  <!-- Body -->
+  <ellipse class="body" cx="32" cy="36" rx="20" ry="22" fill="#FF8C00" fill-opacity="0.9" stroke="#E07000" stroke-width="1"/>
+  <!-- White belly/face patch -->
+  <ellipse cx="32" cy="40" rx="12" ry="14" fill="#FFF5E0" fill-opacity="0.9"/>
+  <!-- Eyes -->
+  <ellipse class="eye eye-left" cx="24" cy="28" rx="3" ry="3.5" fill="#1a1a1a"/>
+  <ellipse class="eye eye-right" cx="40" cy="28" rx="3" ry="3.5" fill="#1a1a1a"/>
+  <!-- Nose -->
+  <ellipse class="nose" cx="32" cy="36" rx="3" ry="2" fill="#1a1a1a"/>
+  <!-- Mouth -->
+  <path class="mouth" d="M28 40 Q32 44 36 40" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Tail -->
+  <path class="tail" d="M52 44 Q60 36 56 28 Q54 24 58 20" fill="none" stroke="#FF8C00" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="58" cy="20" r="3" fill="#FFF5E0"/>
+</svg>

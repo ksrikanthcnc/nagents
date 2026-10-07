@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Saucer body -->
+  <ellipse class="body" cx="32" cy="36" rx="24" ry="8" fill="#78909C" fill-opacity="0.85" stroke="#546E7A" stroke-width="1"/>
+  <!-- Dome -->
+  <ellipse cx="32" cy="30" rx="12" ry="10" fill="#B0BEC5" fill-opacity="0.7" stroke="#78909C" stroke-width="0.8"/>
+  <!-- Dome shine -->
+  <ellipse cx="30" cy="26" rx="5" ry="3" fill="white" opacity="0.2"/>
+  <!-- Bottom lights -->
+  <circle cx="20" cy="38" r="1.5" fill="#FFEB3B" opacity="0.7"/>
+  <circle cx="32" cy="40" r="1.5" fill="#FFEB3B" opacity="0.7"/>
+  <circle cx="44" cy="38" r="1.5" fill="#FFEB3B" opacity="0.7"/>
+  <!-- Eyes inside dome -->
+  <circle class="eye" cx="28" cy="30" r="2.5" fill="#263238"/>
+  <circle class="eye" cx="36" cy="30" r="2.5" fill="#263238"/>
+</svg>

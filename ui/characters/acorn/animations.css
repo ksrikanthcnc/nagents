@@ -1,0 +1,96 @@
+/* Acorn — woody, bouncy, rolls around */
+
+@keyframes acorn-idle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-1px) rotate(1deg); }
+  60% { transform: translateY(0) rotate(-1deg); }
+}
+
+@keyframes acorn-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(3deg); }
+  40% { transform: rotate(-3deg); }
+  60% { transform: rotate(2deg); }
+  80% { transform: rotate(-1deg); }
+}
+
+@keyframes acorn-alert {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-4px) scale(1.06); }
+  60% { transform: translateY(0) scale(0.96); }
+}
+
+@keyframes acorn-sleep {
+  0%, 100% { transform: rotate(-3deg) translateY(0); }
+  50% { transform: rotate(3deg) translateY(1px); }
+}
+
+@keyframes acorn-celebrate {
+  0% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(-8px) rotate(10deg); }
+  40% { transform: translateY(0) rotate(-5deg); }
+  60% { transform: translateY(-5px) rotate(5deg); }
+  80% { transform: translateY(0) rotate(-2deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes acorn-roll {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(8deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(-8deg); }
+}
+
+@keyframes acorn-fade {
+  0% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.5) rotate(30deg); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="acorn"].char-slot-idle svg {
+  animation: acorn-idle 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="acorn"].char-slot-active svg {
+  animation: acorn-wobble 2s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="acorn"].char-slot-alert svg {
+  animation: acorn-alert 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="acorn"].char-slot-sleep svg {
+  animation: acorn-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+[data-char="acorn"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="acorn"].char-slot-celebrate svg {
+  animation: acorn-celebrate 1.2s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="acorn"].char-slot-walk svg {
+  animation: acorn-roll 1s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="acorn"].char-slot-fading svg {
+  animation: acorn-fade 5s ease-out forwards;
+}

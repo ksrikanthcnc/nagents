@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Bottle neck -->
+  <rect class="neck" x="27" y="6" width="10" height="10" rx="1" fill="#C8E6C9" stroke="#81C784" stroke-width="0.8"/>
+  <!-- Cork -->
+  <rect class="cork" x="28" y="3" width="8" height="5" rx="1.5" fill="#A1887F" stroke="#795548" stroke-width="0.6"/>
+  <!-- Bottle body -->
+  <path class="body" d="M22 18 Q18 22 16 32 Q14 44 20 52 Q24 58 32 58 Q40 58 44 52 Q50 44 48 32 Q46 22 42 18Z" fill="#66BB6A" fill-opacity="0.8" stroke="#43A047" stroke-width="1"/>
+  <!-- Bubbles -->
+  <circle class="bubble" cx="26" cy="40" r="2.5" fill="white" opacity="0.35"/>
+  <circle class="bubble" cx="36" cy="34" r="2" fill="white" opacity="0.25"/>
+  <circle class="bubble" cx="30" cy="48" r="1.5" fill="white" opacity="0.3"/>
+  <!-- Eyes -->
+  <circle class="eye eye-left" cx="26" cy="32" r="2.5" fill="#1B5E20"/>
+  <circle class="eye eye-right" cx="38" cy="32" r="2.5" fill="#1B5E20"/>
+  <!-- Smile -->
+  <path class="mouth" d="M27 38 Q32 42 37 38" fill="none" stroke="#1B5E20" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,126 @@
+/* Octopus — wobbly, tentacle-wavy, squishy */
+
+@keyframes octopus-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-2px) rotate(1deg); }
+  70% { transform: translateY(-2px) rotate(-1deg); }
+}
+
+@keyframes octopus-blink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.1); }
+}
+
+@keyframes octopus-think {
+  0%, 100% { transform: scaleX(1) scaleY(1) rotate(0deg); }
+  25% { transform: scaleX(1.03) scaleY(0.97) rotate(1deg); }
+  75% { transform: scaleX(0.97) scaleY(1.03) rotate(-1deg); }
+}
+
+@keyframes octopus-alert {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(171,71,188,0.3)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(171,71,188,0.7)); }
+}
+
+@keyframes octopus-sleep {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(2px) scaleY(0.96); }
+}
+
+@keyframes octopus-celebrate {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(8deg) scale(1.08); }
+  40% { transform: rotate(-6deg) scale(1.05); }
+  60% { transform: rotate(5deg) scale(1.06); }
+  80% { transform: rotate(-3deg) scale(1.02); }
+}
+
+@keyframes octopus-swim {
+  0%, 100% { transform: translateY(0) scaleY(1) scaleX(1); }
+  25% { transform: translateY(-3px) scaleY(1.05) scaleX(0.95); }
+  50% { transform: translateY(0) scaleY(0.95) scaleX(1.05); }
+  75% { transform: translateY(-3px) scaleY(1.05) scaleX(0.95); }
+}
+
+@keyframes octopus-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="octopus"].char-slot-idle svg {
+  animation: octopus-bob 3s ease-in-out infinite;
+}
+
+[data-char="octopus"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: octopus-blink 4.5s ease-in-out infinite;
+}
+
+[data-char="octopus"].char-slot-idle svg .eye-right {
+  animation-delay: 0.12s;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="octopus"].char-slot-active svg {
+  animation: octopus-think 2s ease-in-out infinite;
+}
+
+[data-char="octopus"].char-slot-active svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: octopus-blink 3s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="octopus"].char-slot-alert svg {
+  animation: octopus-alert 0.8s ease-in-out infinite;
+}
+
+[data-char="octopus"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.25);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="octopus"].char-slot-sleep svg {
+  animation: octopus-sleep 6s ease-in-out infinite;
+  filter: grayscale(0.4);
+  opacity: 0.4;
+}
+
+[data-char="octopus"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="octopus"].char-slot-celebrate svg {
+  animation: octopus-celebrate 1.2s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="octopus"].char-slot-walk svg {
+  animation: octopus-swim 0.8s ease-in-out infinite;
+}
+
+[data-char="octopus"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: octopus-blink 4s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="octopus"].char-slot-fading svg {
+  animation: octopus-fade 5s ease-out forwards;
+}

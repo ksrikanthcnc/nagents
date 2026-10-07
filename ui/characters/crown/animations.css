@@ -1,0 +1,83 @@
+/* Crown — regal, majestic, shiny */
+
+@keyframes crown-sway {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(1.5deg); }
+}
+
+@keyframes crown-gleam {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@keyframes crown-flash {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(255,213,79,0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 12px rgba(255,213,79,0.9)); transform: scale(1.07); }
+}
+
+@keyframes crown-sleep {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(2px) rotate(-3deg); }
+}
+
+@keyframes crown-strut {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-4px) rotate(3deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-4px) rotate(-3deg); }
+}
+
+@keyframes crown-celebrate {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(10deg) scale(1.12); }
+  50% { transform: rotate(-10deg) scale(1.12); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes crown-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.7); }
+}
+
+/* ─── idle ─── */
+
+[data-char="crown"].char-slot-idle svg {
+  animation: crown-sway 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+
+[data-char="crown"].char-slot-active svg {
+  animation: crown-gleam 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+
+[data-char="crown"].char-slot-alert svg {
+  animation: crown-flash 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+
+[data-char="crown"].char-slot-sleep svg {
+  animation: crown-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+
+[data-char="crown"].char-slot-celebrate svg {
+  animation: crown-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ─── */
+
+[data-char="crown"].char-slot-walk svg {
+  animation: crown-strut 0.8s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+
+[data-char="crown"].char-slot-fading svg {
+  animation: crown-fade 5s ease-out forwards;
+}

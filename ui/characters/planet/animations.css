@@ -1,0 +1,70 @@
+/* Planet — slow majestic rotation */
+
+@keyframes planet-rotate {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(3deg); }
+}
+
+@keyframes planet-wobble {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(2deg) scale(1.02); }
+  75% { transform: rotate(-2deg) scale(0.98); }
+}
+
+@keyframes planet-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes planet-drift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(1deg); }
+}
+
+@keyframes planet-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.4); }
+}
+
+/* ─── idle ─── */
+[data-char="planet"].char-slot-idle svg {
+  animation: planet-rotate 4s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+[data-char="planet"].char-slot-active svg {
+  animation: planet-wobble 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+[data-char="planet"].char-slot-alert svg {
+  animation: planet-pulse 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+[data-char="planet"].char-slot-sleep svg {
+  animation: planet-drift 8s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+[data-char="planet"].char-slot-celebrate svg {
+  animation: planet-pulse 0.5s ease-in-out 4;
+}
+
+/* ─── walk ─── */
+@keyframes planet-roll {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(4deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(-4deg); }
+}
+
+[data-char="planet"].char-slot-walk svg {
+  animation: planet-roll 1.5s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+[data-char="planet"].char-slot-fading svg {
+  animation: planet-fade 5s ease-out forwards;
+}

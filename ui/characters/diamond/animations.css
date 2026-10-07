@@ -1,0 +1,83 @@
+/* Diamond — sparkling, faceted, brilliant */
+
+@keyframes diamond-shimmer {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(1deg); }
+}
+
+@keyframes diamond-facet {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(1.04); }
+}
+
+@keyframes diamond-flash {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(206,147,216,0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 12px rgba(206,147,216,0.9)); transform: scale(1.08); }
+}
+
+@keyframes diamond-sleep {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-3deg); }
+}
+
+@keyframes diamond-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-5px) rotate(2deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-5px) rotate(-2deg); }
+}
+
+@keyframes diamond-celebrate {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(8deg) scale(1.12); }
+  50% { transform: rotate(-8deg) scale(1.12); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes diamond-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* ─── idle ─── */
+
+[data-char="diamond"].char-slot-idle svg {
+  animation: diamond-shimmer 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+
+[data-char="diamond"].char-slot-active svg {
+  animation: diamond-facet 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+
+[data-char="diamond"].char-slot-alert svg {
+  animation: diamond-flash 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+
+[data-char="diamond"].char-slot-sleep svg {
+  animation: diamond-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+
+[data-char="diamond"].char-slot-celebrate svg {
+  animation: diamond-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ─── */
+
+[data-char="diamond"].char-slot-walk svg {
+  animation: diamond-bounce 0.8s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+
+[data-char="diamond"].char-slot-fading svg {
+  animation: diamond-fade 5s ease-out forwards;
+}

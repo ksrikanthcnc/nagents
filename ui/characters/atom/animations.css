@@ -1,0 +1,71 @@
+/* Atom — spinning orbits and electron buzz */
+
+@keyframes atom-orbit {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes atom-vibrate {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(1px, -1px); }
+  40% { transform: translate(-1px, 1px); }
+  60% { transform: translate(1px, 1px); }
+  80% { transform: translate(-1px, -1px); }
+}
+
+@keyframes atom-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes atom-slow {
+  0%, 100% { transform: scale(0.95) rotate(0deg); opacity: 0.35; }
+  50% { transform: scale(0.93) rotate(2deg); opacity: 0.3; }
+}
+
+@keyframes atom-fade {
+  0% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.3) rotate(180deg); }
+}
+
+/* ─── idle ─── */
+[data-char="atom"].char-slot-idle svg {
+  animation: atom-orbit 8s linear infinite;
+}
+
+/* ─── active (think) ─── */
+[data-char="atom"].char-slot-active svg {
+  animation: atom-vibrate 0.5s linear infinite;
+}
+
+/* ─── alert ─── */
+[data-char="atom"].char-slot-alert svg {
+  animation: atom-pulse 0.6s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+[data-char="atom"].char-slot-sleep svg {
+  animation: atom-slow 6s ease-in-out infinite;
+}
+
+/* ─── celebrate ─── */
+[data-char="atom"].char-slot-celebrate svg {
+  animation: atom-pulse 0.4s ease-in-out 5;
+}
+
+/* ─── walk ─── */
+@keyframes atom-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(5deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-2px) rotate(-5deg); }
+}
+
+[data-char="atom"].char-slot-walk svg {
+  animation: atom-bounce 1.3s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+[data-char="atom"].char-slot-fading svg {
+  animation: atom-fade 5s ease-out forwards;
+}

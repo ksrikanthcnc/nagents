@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Diamond body -->
+  <polygon class="body" points="32,4 54,24 32,60 10,24" fill="#CE93D8" fill-opacity="0.8" stroke="#AB47BC" stroke-width="1"/>
+  <!-- Top facet -->
+  <polygon class="facet-top" points="32,4 54,24 32,28 10,24" fill="#E1BEE7" fill-opacity="0.5"/>
+  <!-- Left facet -->
+  <polygon class="facet-left" points="10,24 32,28 32,60" fill="#BA68C8" fill-opacity="0.3"/>
+  <!-- Sparkle -->
+  <circle class="sparkle" cx="24" cy="20" r="1.5" fill="white" opacity="0.6"/>
+  <!-- Eyes -->
+  <circle class="eye eye-left" cx="24" cy="30" r="2.5" fill="#4A148C"/>
+  <circle class="eye eye-right" cx="40" cy="30" r="2.5" fill="#4A148C"/>
+  <!-- Smile -->
+  <path class="mouth" d="M27 37 Q32 41 37 37" fill="none" stroke="#4A148C" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

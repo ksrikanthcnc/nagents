@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <circle class="ear" cx="16" cy="20" r="10" fill="#7A8B99" stroke="#5D6E7E" stroke-width="0.8"/>
+  <circle class="ear" cx="48" cy="20" r="10" fill="#7A8B99" stroke="#5D6E7E" stroke-width="0.8"/>
+  <circle cx="16" cy="20" r="6" fill="#FFD5C2" opacity="0.5"/>
+  <circle cx="48" cy="20" r="6" fill="#FFD5C2" opacity="0.5"/>
+  <ellipse class="body" cx="32" cy="38" rx="16" ry="16" fill="#8FA4B2" stroke="#6E8494" stroke-width="1"/>
+  <ellipse class="belly" cx="32" cy="42" rx="10" ry="10" fill="#C8D8E4" opacity="0.5"/>
+  <circle class="eye eye-left" cx="26" cy="34" r="3" fill="#1a1a2e"/>
+  <circle class="eye eye-right" cx="38" cy="34" r="3" fill="#1a1a2e"/>
+  <circle cx="27.2" cy="33" r="1" fill="white"/>
+  <circle cx="39.2" cy="33" r="1" fill="white"/>
+  <ellipse class="nose" cx="32" cy="40" rx="4" ry="2.5" fill="#3D3D3D"/>
+  <path class="mouth" d="M30 44 Q32 46 34 44" fill="none" stroke="#4a4a4a" stroke-width="1" stroke-linecap="round"/>
+</svg>

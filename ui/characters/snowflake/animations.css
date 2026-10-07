@@ -1,0 +1,84 @@
+/* Snowflake — delicate, drifting, crystalline */
+
+@keyframes snowflake-drift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(5deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-2px) rotate(-5deg); }
+}
+
+@keyframes snowflake-spin {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(15deg); }
+}
+
+@keyframes snowflake-sparkle {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(144,202,249,0.3)); transform: scale(1) rotate(0deg); }
+  50% { filter: drop-shadow(0 0 12px rgba(144,202,249,0.9)); transform: scale(1.08) rotate(10deg); }
+}
+
+@keyframes snowflake-sleep {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-3deg); }
+}
+
+@keyframes snowflake-tumble {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-4px) rotate(8deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-4px) rotate(-8deg); }
+}
+
+@keyframes snowflake-celebrate {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes snowflake-fade {
+  0% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.4) rotate(90deg); }
+}
+
+/* ─── idle ─── */
+
+[data-char="snowflake"].char-slot-idle svg {
+  animation: snowflake-drift 4s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+
+[data-char="snowflake"].char-slot-active svg {
+  animation: snowflake-spin 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+
+[data-char="snowflake"].char-slot-alert svg {
+  animation: snowflake-sparkle 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+
+[data-char="snowflake"].char-slot-sleep svg {
+  animation: snowflake-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+
+[data-char="snowflake"].char-slot-celebrate svg {
+  animation: snowflake-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ─── */
+
+[data-char="snowflake"].char-slot-walk svg {
+  animation: snowflake-tumble 0.8s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+
+[data-char="snowflake"].char-slot-fading svg {
+  animation: snowflake-fade 5s ease-out forwards;
+}

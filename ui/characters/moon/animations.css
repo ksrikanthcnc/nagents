@@ -1,0 +1,69 @@
+/* Moon — gentle glow and orbital float */
+
+@keyframes moon-glow {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.03); filter: brightness(1.1); }
+}
+
+@keyframes moon-rock {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(3deg); }
+  75% { transform: rotate(-3deg); }
+}
+
+@keyframes moon-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.05); }
+}
+
+@keyframes moon-dim {
+  0%, 100% { transform: scale(0.95); opacity: 0.35; }
+  50% { transform: scale(0.93); opacity: 0.3; }
+}
+
+@keyframes moon-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.5) translateY(-10px); }
+}
+
+/* ─── idle ─── */
+[data-char="moon"].char-slot-idle svg {
+  animation: moon-glow 4s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+[data-char="moon"].char-slot-active svg {
+  animation: moon-rock 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+[data-char="moon"].char-slot-alert svg {
+  animation: moon-bounce 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+[data-char="moon"].char-slot-sleep svg {
+  animation: moon-dim 6s ease-in-out infinite;
+}
+
+/* ─── celebrate ─── */
+[data-char="moon"].char-slot-celebrate svg {
+  animation: moon-bounce 0.5s ease-in-out 4;
+}
+
+/* ─── walk ─── */
+@keyframes moon-orbit {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(3deg); }
+  50% { transform: translateY(1px) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(-3deg); }
+}
+
+[data-char="moon"].char-slot-walk svg {
+  animation: moon-orbit 1.5s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+[data-char="moon"].char-slot-fading svg {
+  animation: moon-fade 5s ease-out forwards;
+}

@@ -1,0 +1,123 @@
+/* Bat — nocturnal, flappy, swoopy */
+
+@keyframes bat-idle {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-3px); }
+  60% { transform: translateY(1px); }
+}
+
+@keyframes bat-flap {
+  0%, 100% { transform: scaleY(1) rotate(0deg); }
+  25% { transform: scaleY(0.9) rotate(5deg); }
+  50% { transform: scaleY(1.1) rotate(0deg); }
+  75% { transform: scaleY(0.9) rotate(-5deg); }
+}
+
+@keyframes bat-wing-flap {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  30% { transform: scaleX(1.15) scaleY(0.85); }
+  60% { transform: scaleX(0.9) scaleY(1.1); }
+}
+
+@keyframes bat-alert {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(75,59,107,0.4)); }
+  50% { transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(75,59,107,0.9)); }
+}
+
+@keyframes bat-sleep {
+  0%, 100% { transform: rotate(180deg) translateY(0); }
+  50% { transform: rotate(180deg) translateY(-2px); }
+}
+
+@keyframes bat-celebrate {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(15deg) scale(1.1); }
+  50% { transform: rotate(-15deg) scale(1.1); }
+  75% { transform: rotate(8deg) scale(1.05); }
+}
+
+@keyframes bat-walk {
+  0%, 100% { transform: translateY(0) scaleX(1); }
+  20% { transform: translateY(-5px) scaleX(1.05); }
+  40% { transform: translateY(0) scaleX(0.95); }
+  60% { transform: translateY(-3px) scaleX(1.03); }
+  80% { transform: translateY(1px) scaleX(0.97); }
+}
+
+@keyframes bat-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6) translateY(-20px); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="bat"].char-slot-idle svg {
+  animation: bat-idle 3s ease-in-out infinite;
+}
+
+[data-char="bat"].char-slot-idle svg .wing {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bat-wing-flap 2s ease-in-out infinite;
+}
+
+[data-char="bat"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ghost-blink 5s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="bat"].char-slot-active svg {
+  animation: bat-flap 1.5s ease-in-out infinite;
+}
+
+[data-char="bat"].char-slot-active svg .wing {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bat-wing-flap 1s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="bat"].char-slot-alert svg {
+  animation: bat-alert 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="bat"].char-slot-sleep svg {
+  animation: bat-sleep 6s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+[data-char="bat"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="bat"].char-slot-celebrate svg {
+  animation: bat-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="bat"].char-slot-walk svg {
+  animation: bat-walk 1.2s ease-in-out infinite;
+}
+
+[data-char="bat"].char-slot-walk svg .wing {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bat-wing-flap 0.6s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="bat"].char-slot-fading svg {
+  animation: bat-fade 5s ease-out forwards;
+}

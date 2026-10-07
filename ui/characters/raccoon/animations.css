@@ -1,0 +1,121 @@
+/* Raccoon — sneaky, masked bandit, rummages */
+
+@keyframes raccoon-idle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-1px) rotate(1deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(-1deg); }
+}
+
+@keyframes raccoon-sneak {
+  0%, 100% { transform: translateX(0) scaleY(1); }
+  25% { transform: translateX(2px) scaleY(0.95); }
+  50% { transform: translateX(0) scaleY(1); }
+  75% { transform: translateX(-2px) scaleY(0.95); }
+}
+
+@keyframes raccoon-alert {
+  0%, 100% { transform: scale(1) translateY(0); }
+  30% { transform: scale(1.08) translateY(-3px); }
+  60% { transform: scale(0.96) translateY(0); }
+}
+
+@keyframes raccoon-tail-swish {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(8deg); }
+  75% { transform: rotate(-8deg); }
+}
+
+@keyframes raccoon-sleep {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(1px) rotate(2deg); }
+}
+
+@keyframes raccoon-celebrate {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(12deg) scale(1.08); }
+  40% { transform: rotate(-12deg) scale(1.08); }
+  60% { transform: rotate(6deg) scale(1.04); }
+  80% { transform: rotate(-3deg) scale(1.02); }
+}
+
+@keyframes raccoon-walk {
+  0%, 100% { transform: translateY(0) rotate(0deg) scaleY(1); }
+  20% { transform: translateY(-2px) rotate(3deg) scaleY(0.96); }
+  40% { transform: translateY(0) rotate(0deg) scaleY(1.03); }
+  60% { transform: translateY(-2px) rotate(-3deg) scaleY(0.96); }
+  80% { transform: translateY(0) rotate(0deg) scaleY(1); }
+}
+
+@keyframes raccoon-fade {
+  0% { opacity: 1; transform: scale(1); }
+  60% { opacity: 0.3; transform: scale(0.9) translateX(10px); }
+  100% { opacity: 0; transform: scale(0.7) translateX(20px); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="raccoon"].char-slot-idle svg {
+  animation: raccoon-idle 3s ease-in-out infinite;
+}
+
+[data-char="raccoon"].char-slot-idle svg .tail {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: raccoon-tail-swish 4s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="raccoon"].char-slot-active svg {
+  animation: raccoon-sneak 2s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="raccoon"].char-slot-alert svg {
+  animation: raccoon-alert 0.8s ease-in-out infinite;
+}
+
+[data-char="raccoon"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.2);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="raccoon"].char-slot-sleep svg {
+  animation: raccoon-sleep 5s ease-in-out infinite;
+  opacity: 0.45;
+}
+
+[data-char="raccoon"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="raccoon"].char-slot-celebrate svg {
+  animation: raccoon-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="raccoon"].char-slot-walk svg {
+  animation: raccoon-walk 1s ease-in-out infinite;
+}
+
+[data-char="raccoon"].char-slot-walk svg .tail {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: raccoon-tail-swish 0.6s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="raccoon"].char-slot-fading svg {
+  animation: raccoon-fade 5s ease-out forwards;
+}

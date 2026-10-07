@@ -1,0 +1,128 @@
+/* Penguin — waddles, flaps flippers, roly-poly */
+
+@keyframes penguin-waddle {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25% { transform: rotate(3deg) translateY(-1px); }
+  75% { transform: rotate(-3deg) translateY(-1px); }
+}
+
+@keyframes penguin-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.1); }
+}
+
+@keyframes penguin-flap {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-15deg); }
+  75% { transform: rotate(15deg); }
+}
+
+@keyframes penguin-alert {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50% { transform: scale(1.06) translateY(-4px); }
+}
+
+@keyframes penguin-sleep {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(1px) rotate(-3deg); }
+}
+
+@keyframes penguin-celebrate {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(-8px) rotate(5deg); }
+  40% { transform: translateY(0) rotate(-3deg); }
+  60% { transform: translateY(-6px) rotate(3deg); }
+  80% { transform: translateY(0) rotate(-2deg); }
+}
+
+@keyframes penguin-walk {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  15% { transform: rotate(6deg) translateY(-2px); }
+  35% { transform: rotate(-2deg) translateY(0); }
+  50% { transform: rotate(0deg) translateY(0); }
+  65% { transform: rotate(-6deg) translateY(-2px); }
+  85% { transform: rotate(2deg) translateY(0); }
+}
+
+@keyframes penguin-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.7); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="penguin"].char-slot-idle svg {
+  animation: penguin-waddle 3s ease-in-out infinite;
+}
+
+[data-char="penguin"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: penguin-blink 4s ease-in-out infinite;
+}
+
+[data-char="penguin"].char-slot-idle svg .eye-right {
+  animation-delay: 0.08s;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="penguin"].char-slot-active svg {
+  animation: penguin-waddle 2s ease-in-out infinite;
+}
+
+[data-char="penguin"].char-slot-active svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: penguin-blink 3s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="penguin"].char-slot-alert svg {
+  animation: penguin-alert 0.8s ease-in-out infinite;
+}
+
+[data-char="penguin"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.2);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="penguin"].char-slot-sleep svg {
+  animation: penguin-sleep 5s ease-in-out infinite;
+  filter: grayscale(0.5);
+  opacity: 0.45;
+}
+
+[data-char="penguin"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="penguin"].char-slot-celebrate svg {
+  animation: penguin-celebrate 1.2s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="penguin"].char-slot-walk svg {
+  animation: penguin-walk 0.8s ease-in-out infinite;
+}
+
+[data-char="penguin"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: penguin-blink 4s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="penguin"].char-slot-fading svg {
+  animation: penguin-fade 5s ease-out forwards;
+}

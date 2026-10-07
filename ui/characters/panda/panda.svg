@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <circle cx="16" cy="14" r="7" fill="#1a1a1a"/>
+  <circle cx="48" cy="14" r="7" fill="#1a1a1a"/>
+  <ellipse class="body" cx="32" cy="38" rx="20" ry="22" fill="#F5F5F5" fill-opacity="0.95" stroke="#ddd" stroke-width="1"/>
+  <ellipse cx="23" cy="28" rx="7" ry="6" fill="#1a1a1a" transform="rotate(-10 23 28)"/>
+  <ellipse cx="41" cy="28" rx="7" ry="6" fill="#1a1a1a" transform="rotate(10 41 28)"/>
+  <circle class="eye eye-left" cx="23" cy="28" r="3" fill="#ffffff"/>
+  <circle class="eye eye-right" cx="41" cy="28" r="3" fill="#ffffff"/>
+  <circle cx="24" cy="28" r="1.5" fill="#1a1a1a"/>
+  <circle cx="42" cy="28" r="1.5" fill="#1a1a1a"/>
+  <ellipse cx="32" cy="36" rx="3" ry="2" fill="#1a1a1a"/>
+  <path class="mouth" d="M28 40 Q32 43 36 40" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round"/>
+  <circle cx="18" cy="36" r="3" fill="#FFB3B3" fill-opacity="0.5"/>
+  <circle cx="46" cy="36" r="3" fill="#FFB3B3" fill-opacity="0.5"/>
+</svg>

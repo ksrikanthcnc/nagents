@@ -1,0 +1,88 @@
+/* Heart — beating, warm, loving */
+
+@keyframes heart-beat {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.08); }
+  30% { transform: scale(1); }
+  45% { transform: scale(1.05); }
+  60% { transform: scale(1); }
+}
+
+@keyframes heart-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@keyframes heart-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(239,83,80,0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 14px rgba(239,83,80,0.9)); transform: scale(1.1); }
+}
+
+@keyframes heart-sleep {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(0.96) rotate(-3deg); }
+}
+
+@keyframes heart-hop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-5px) rotate(3deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-5px) rotate(-3deg); }
+}
+
+@keyframes heart-celebrate {
+  0% { transform: scale(1); }
+  20% { transform: scale(1.2); }
+  40% { transform: scale(1); }
+  60% { transform: scale(1.15); }
+  80% { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes heart-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.5); }
+}
+
+/* ─── idle ─── */
+
+[data-char="heart"].char-slot-idle svg {
+  animation: heart-beat 2s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+
+[data-char="heart"].char-slot-active svg {
+  animation: heart-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+
+[data-char="heart"].char-slot-alert svg {
+  animation: heart-glow 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+
+[data-char="heart"].char-slot-sleep svg {
+  animation: heart-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+
+[data-char="heart"].char-slot-celebrate svg {
+  animation: heart-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ─── */
+
+[data-char="heart"].char-slot-walk svg {
+  animation: heart-hop 0.8s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+
+[data-char="heart"].char-slot-fading svg {
+  animation: heart-fade 5s ease-out forwards;
+}

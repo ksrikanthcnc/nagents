@@ -1,0 +1,85 @@
+/* Potion — bubbling, fizzy, magical */
+
+@keyframes potion-bubble {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-2px) scaleY(1.03); }
+}
+
+@keyframes potion-fizz {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(2deg); }
+  75% { transform: rotate(-2deg); }
+}
+
+@keyframes potion-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(102,187,106,0.3)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 10px rgba(102,187,106,0.8)); transform: scale(1.06); }
+}
+
+@keyframes potion-sleep {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(2px) rotate(-3deg); }
+}
+
+@keyframes potion-hop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-4px) rotate(3deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-4px) rotate(-3deg); }
+}
+
+@keyframes potion-celebrate {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(10deg) scale(1.1); }
+  50% { transform: rotate(-10deg) scale(1.1); }
+  75% { transform: rotate(5deg) scale(1.05); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes potion-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* ─── idle ─── */
+
+[data-char="potion"].char-slot-idle svg {
+  animation: potion-bubble 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+
+[data-char="potion"].char-slot-active svg {
+  animation: potion-fizz 1.5s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+
+[data-char="potion"].char-slot-alert svg {
+  animation: potion-glow 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+
+[data-char="potion"].char-slot-sleep svg {
+  animation: potion-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+
+[data-char="potion"].char-slot-celebrate svg {
+  animation: potion-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ─── */
+
+[data-char="potion"].char-slot-walk svg {
+  animation: potion-hop 0.8s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+
+[data-char="potion"].char-slot-fading svg {
+  animation: potion-fade 5s ease-out forwards;
+}

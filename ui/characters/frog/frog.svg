@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Eye bumps (on top of head) -->
+  <circle cx="20" cy="14" r="8" fill="#4CAF50" stroke="#388E3C" stroke-width="0.8"/>
+  <circle cx="44" cy="14" r="8" fill="#4CAF50" stroke="#388E3C" stroke-width="0.8"/>
+  <!-- Body -->
+  <ellipse class="body" cx="32" cy="40" rx="22" ry="18" fill="#4CAF50" fill-opacity="0.9" stroke="#388E3C" stroke-width="1"/>
+  <!-- Belly -->
+  <ellipse cx="32" cy="44" rx="14" ry="12" fill="#A5D6A7" fill-opacity="0.7"/>
+  <!-- Eyes (big and round) -->
+  <circle class="eye eye-left" cx="20" cy="14" r="5" fill="white" stroke="#388E3C" stroke-width="0.5"/>
+  <circle class="eye eye-right" cx="44" cy="14" r="5" fill="white" stroke="#388E3C" stroke-width="0.5"/>
+  <!-- Pupils -->
+  <circle cx="21" cy="14" r="2.5" fill="#1a1a1a"/>
+  <circle cx="45" cy="14" r="2.5" fill="#1a1a1a"/>
+  <!-- Wide smile -->
+  <path class="mouth" d="M18 42 Q32 52 46 42" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Blush spots -->
+  <circle cx="14" cy="38" r="3" fill="#FF8A80" fill-opacity="0.4"/>
+  <circle cx="50" cy="38" r="3" fill="#FF8A80" fill-opacity="0.4"/>
+</svg>

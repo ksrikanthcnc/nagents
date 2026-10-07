@@ -1,0 +1,71 @@
+/* Star — twinkling bright character */
+
+@keyframes star-twinkle {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.06); filter: brightness(1.15); }
+}
+
+@keyframes star-spin {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(8deg); }
+  75% { transform: rotate(-8deg); }
+}
+
+@keyframes star-flash {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.15); }
+  50% { transform: scale(0.95); }
+  75% { transform: scale(1.1); }
+}
+
+@keyframes star-dim {
+  0%, 100% { transform: scale(0.9); opacity: 0.35; }
+  50% { transform: scale(0.88); opacity: 0.3; }
+}
+
+@keyframes star-fade {
+  0% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.3) rotate(90deg); }
+}
+
+/* ─── idle ─── */
+[data-char="star"].char-slot-idle svg {
+  animation: star-twinkle 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+[data-char="star"].char-slot-active svg {
+  animation: star-spin 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+[data-char="star"].char-slot-alert svg {
+  animation: star-flash 0.6s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+[data-char="star"].char-slot-sleep svg {
+  animation: star-dim 6s ease-in-out infinite;
+}
+
+/* ─── celebrate ─── */
+[data-char="star"].char-slot-celebrate svg {
+  animation: star-flash 0.4s ease-in-out 5;
+}
+
+/* ─── walk ─── */
+@keyframes star-hop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(5deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-2px) rotate(-5deg); }
+}
+
+[data-char="star"].char-slot-walk svg {
+  animation: star-hop 1.2s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+[data-char="star"].char-slot-fading svg {
+  animation: star-fade 5s ease-out forwards;
+}

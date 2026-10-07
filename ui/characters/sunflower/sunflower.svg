@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <rect class="stem" x="30" y="40" width="4" height="18" rx="2" fill="#558B2F"/>
+  <ellipse class="leaf" cx="24" cy="50" rx="6" ry="3" fill="#7CB342" transform="rotate(-30 24 50)"/>
+  <ellipse class="leaf" cx="40" cy="48" rx="6" ry="3" fill="#7CB342" transform="rotate(25 40 48)"/>
+  <ellipse class="petal" cx="32" cy="12" rx="4" ry="7" fill="#FFD54F"/>
+  <ellipse class="petal" cx="44" cy="18" rx="4" ry="7" fill="#FFC107" transform="rotate(45 44 18)"/>
+  <ellipse class="petal" cx="48" cy="30" rx="4" ry="7" fill="#FFD54F" transform="rotate(90 48 30)"/>
+  <ellipse class="petal" cx="44" cy="42" rx="4" ry="7" fill="#FFC107" transform="rotate(135 44 42)"/>
+  <ellipse class="petal" cx="20" cy="18" rx="4" ry="7" fill="#FFC107" transform="rotate(-45 20 18)"/>
+  <ellipse class="petal" cx="16" cy="30" rx="4" ry="7" fill="#FFD54F" transform="rotate(-90 16 30)"/>
+  <ellipse class="petal" cx="20" cy="42" rx="4" ry="7" fill="#FFC107" transform="rotate(-135 20 42)"/>
+  <ellipse class="petal" cx="32" cy="46" rx="4" ry="7" fill="#FFD54F" transform="rotate(180 32 46)"/>
+  <circle class="body" cx="32" cy="30" r="12" fill="#795548" stroke="#5D4037" stroke-width="1"/>
+  <circle class="eye eye-left" cx="27" cy="28" r="2" fill="#1a1a1a"/>
+  <circle class="eye eye-right" cx="37" cy="28" r="2" fill="#1a1a1a"/>
+  <circle cx="28" cy="27" r="0.7" fill="white"/>
+  <circle cx="38" cy="27" r="0.7" fill="white"/>
+  <path class="mouth" d="M28 34 Q32 38 36 34" fill="none" stroke="#3E2723" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

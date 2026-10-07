@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Shell -->
+  <circle class="shell" cx="36" cy="28" r="16" fill="#D4A574" stroke="#B8865C" stroke-width="1.2"/>
+  <path class="shell-spiral" d="M36 18 Q44 22 42 30 Q40 36 34 34 Q28 32 30 26 Q32 22 36 24" fill="none" stroke="#B8865C" stroke-width="1.5"/>
+  <!-- Body -->
+  <path class="body" d="M10 48 Q8 40 14 38 Q20 36 26 38 Q32 40 38 42 Q44 44 50 44 Q54 44 54 48 Q54 52 10 52 Z"
+    fill="#8BC34A" fill-opacity="0.9" stroke="#689F38" stroke-width="1"/>
+  <!-- Eye stalks -->
+  <line x1="18" y1="38" x2="14" y2="26" stroke="#8BC34A" stroke-width="2" stroke-linecap="round"/>
+  <line x1="26" y1="38" x2="28" y2="26" stroke="#8BC34A" stroke-width="2" stroke-linecap="round"/>
+  <!-- Eyes -->
+  <circle class="eye eye-left" cx="14" cy="24" r="3" fill="white" stroke="#689F38" stroke-width="0.5"/>
+  <circle class="eye eye-right" cx="28" cy="24" r="3" fill="white" stroke="#689F38" stroke-width="0.5"/>
+  <!-- Pupils -->
+  <circle cx="14" cy="24" r="1.5" fill="#1a1a1a"/>
+  <circle cx="28" cy="24" r="1.5" fill="#1a1a1a"/>
+  <!-- Smile -->
+  <path class="mouth" d="M16 44 Q21 48 26 44" fill="none" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round"/>
+</svg>

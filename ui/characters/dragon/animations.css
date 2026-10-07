@@ -1,0 +1,127 @@
+/* Dragon — fiery, wing-flappy, proud stance */
+
+@keyframes dragon-breathe {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50% { transform: scaleY(1.04) translateY(-1px); }
+}
+
+@keyframes dragon-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.15); }
+}
+
+@keyframes dragon-think {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  30% { transform: scaleX(1.04) scaleY(0.96); }
+  60% { transform: scaleX(0.97) scaleY(1.03); }
+}
+
+@keyframes dragon-alert {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(239,83,80,0.4)); }
+  50% { transform: scale(1.1); filter: drop-shadow(0 0 10px rgba(239,83,80,0.8)); }
+}
+
+@keyframes dragon-sleep {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(2px) rotate(-3deg); }
+}
+
+@keyframes dragon-celebrate {
+  0%, 100% { transform: rotate(0deg) scale(1) translateY(0); }
+  20% { transform: rotate(6deg) scale(1.1) translateY(-5px); }
+  40% { transform: rotate(-5deg) scale(1.08) translateY(-2px); }
+  60% { transform: rotate(4deg) scale(1.06) translateY(-4px); }
+  80% { transform: rotate(-2deg) scale(1.02) translateY(-1px); }
+}
+
+@keyframes dragon-stomp {
+  0%, 100% { transform: translateY(0) rotate(0deg) scaleY(1); }
+  20% { transform: translateY(-4px) rotate(2deg) scaleY(1.04); }
+  40% { transform: translateY(1px) rotate(0deg) scaleY(0.96); }
+  60% { transform: translateY(-3px) rotate(-2deg) scaleY(1.03); }
+  80% { transform: translateY(1px) rotate(0deg) scaleY(0.97); }
+}
+
+@keyframes dragon-fade {
+  0% { opacity: 1; transform: scale(1); }
+  60% { opacity: 0.5; transform: scale(1.05); filter: drop-shadow(0 0 6px rgba(239,83,80,0.6)); }
+  100% { opacity: 0; transform: scale(0.7); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="dragon"].char-slot-idle svg {
+  animation: dragon-breathe 3s ease-in-out infinite;
+}
+
+[data-char="dragon"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dragon-blink 4s ease-in-out infinite;
+}
+
+[data-char="dragon"].char-slot-idle svg .eye-right {
+  animation-delay: 0.08s;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="dragon"].char-slot-active svg {
+  animation: dragon-think 2s ease-in-out infinite;
+}
+
+[data-char="dragon"].char-slot-active svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dragon-blink 3s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="dragon"].char-slot-alert svg {
+  animation: dragon-alert 0.7s ease-in-out infinite;
+}
+
+[data-char="dragon"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.2);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="dragon"].char-slot-sleep svg {
+  animation: dragon-sleep 5s ease-in-out infinite;
+  filter: grayscale(0.4);
+  opacity: 0.45;
+}
+
+[data-char="dragon"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="dragon"].char-slot-celebrate svg {
+  animation: dragon-celebrate 1.2s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="dragon"].char-slot-walk svg {
+  animation: dragon-stomp 0.8s ease-in-out infinite;
+}
+
+[data-char="dragon"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dragon-blink 4s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="dragon"].char-slot-fading svg {
+  animation: dragon-fade 5s ease-out forwards;
+}

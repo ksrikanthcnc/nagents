@@ -1,0 +1,72 @@
+/* DNA — twisting helix motion */
+
+@keyframes dna-twist {
+  0%, 100% { transform: scaleX(1) rotate(0deg); }
+  25% { transform: scaleX(0.95) rotate(2deg); }
+  50% { transform: scaleX(1.05) rotate(0deg); }
+  75% { transform: scaleX(0.95) rotate(-2deg); }
+}
+
+@keyframes dna-unwind {
+  0%, 100% { transform: rotate(0deg) scaleX(1); }
+  25% { transform: rotate(5deg) scaleX(1.05); }
+  75% { transform: rotate(-5deg) scaleX(1.05); }
+}
+
+@keyframes dna-pulse {
+  0%, 100% { transform: scaleY(1) scale(1); }
+  30% { transform: scaleY(1.06) scale(1.04); }
+  60% { transform: scaleY(0.96) scale(0.98); }
+}
+
+@keyframes dna-coil {
+  0%, 100% { transform: scaleY(0.95) scaleX(0.95); opacity: 0.35; }
+  50% { transform: scaleY(0.93) scaleX(0.97); opacity: 0.3; }
+}
+
+@keyframes dna-fade {
+  0% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.4) rotate(20deg); }
+}
+
+/* ─── idle ─── */
+[data-char="dna"].char-slot-idle svg {
+  animation: dna-twist 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+[data-char="dna"].char-slot-active svg {
+  animation: dna-unwind 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+[data-char="dna"].char-slot-alert svg {
+  animation: dna-pulse 0.7s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+[data-char="dna"].char-slot-sleep svg {
+  animation: dna-coil 6s ease-in-out infinite;
+}
+
+/* ─── celebrate ─── */
+[data-char="dna"].char-slot-celebrate svg {
+  animation: dna-pulse 0.4s ease-in-out 5;
+}
+
+/* ─── walk ─── */
+@keyframes dna-slither {
+  0%, 100% { transform: translateX(0) scaleX(1) rotate(0deg); }
+  25% { transform: translateX(2px) scaleX(0.96) rotate(2deg); }
+  50% { transform: translateX(0) scaleX(1.03) rotate(0deg); }
+  75% { transform: translateX(-2px) scaleX(0.96) rotate(-2deg); }
+}
+
+[data-char="dna"].char-slot-walk svg {
+  animation: dna-slither 1.5s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+[data-char="dna"].char-slot-fading svg {
+  animation: dna-fade 5s ease-out forwards;
+}

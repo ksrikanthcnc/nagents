@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Crown body -->
+  <path class="body" d="M10 44 L10 22 L20 32 L32 14 L44 32 L54 22 L54 44 Q52 54 32 56 Q12 54 10 44Z" fill="#FFD54F" fill-opacity="0.9" stroke="#FFC107" stroke-width="1"/>
+  <!-- Band -->
+  <rect class="band" x="12" y="42" width="40" height="6" rx="2" fill="#FFB300" fill-opacity="0.6"/>
+  <!-- Jewels on points -->
+  <circle class="jewel" cx="10" cy="22" r="2.5" fill="#EF5350"/>
+  <circle class="jewel" cx="32" cy="14" r="2.5" fill="#42A5F5"/>
+  <circle class="jewel" cx="54" cy="22" r="2.5" fill="#66BB6A"/>
+  <!-- Eyes -->
+  <circle class="eye eye-left" cx="24" cy="36" r="2.5" fill="#E65100"/>
+  <circle class="eye eye-right" cx="40" cy="36" r="2.5" fill="#E65100"/>
+  <!-- Smile -->
+  <path class="mouth" d="M27 42 Q32 46 37 42" fill="none" stroke="#E65100" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

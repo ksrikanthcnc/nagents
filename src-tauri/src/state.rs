@@ -304,6 +304,15 @@ fn read_kiro_session_info(nagents_id: &str) -> Option<KiroSessionInfo> {
 const CHAR_POOL: &[&str] = &[
     "ghost", "cat", "skeleton", "robot", "owl",
     "mushroom", "flame", "crystal", "cloud", "blob",
+    "wisp", "spark", "orb",
+    "fox", "penguin", "panda", "bee", "frog",
+    "snail", "turtle", "fish", "octopus", "dragon",
+    "unicorn", "bat", "hedgehog", "hamster", "raccoon",
+    "koala", "cactus", "sunflower", "acorn", "leaf",
+    "planet", "moon", "star", "comet", "alien",
+    "ufo", "dna", "atom", "potion", "scroll",
+    "shield", "diamond", "crown", "heart", "lightning",
+    "raindrop", "snowflake",
 ];
 
 /// Thread-safe session store.
@@ -355,10 +364,11 @@ impl SessionStore {
 
     /// Pick a character for a session from its source's pool (falls back to
     /// global pool). DETERMINISTIC: seeded by the session id, so the same
-    /// session always gets the same character — stable across restarts and
-    /// reinstalls, with no persistence needed. (Clock-based seeding previously
-    /// re-randomized every char on every launch.)
-    fn pick_character(&self, source: &str, session_id: &str) -> String {
+    /// session always gets the same character — stable across restarts.
+    /// DEDUP-AWARE: avoids characters already assigned to other sessions,
+    /// cycling through the full pool before repeating. With 13+ chars and
+    /// typical session counts, most sessions get a unique character.
+    fn pick_character(&self, source: &str, session_id: &str, store: &HashMap<String, Session>) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
@@ -366,10 +376,24 @@ impl SessionStore {
         let h = hasher.finish() as usize;
 
         let pools = self.char_pools.lock().unwrap();
-        match pools.get(source).filter(|p| !p.is_empty()) {
-            Some(chars) => chars[h % chars.len()].clone(),
-            None => CHAR_POOL[h % CHAR_POOL.len()].to_string(),
+        let pool: Vec<&str> = match pools.get(source).filter(|p| !p.is_empty()) {
+            Some(chars) => chars.iter().map(|s| s.as_str()).collect(),
+            None => CHAR_POOL.to_vec(),
+        };
+        if pool.is_empty() {
+            return "ghost".to_string();
         }
+
+        // Prefer unassigned characters for visual variety.
+        let used: std::collections::HashSet<&str> = store.values()
+            .filter(|s| s.id != session_id)
+            .filter_map(|s| s.character.as_deref())
+            .collect();
+        let unused: Vec<&str> = pool.iter().copied().filter(|c| !used.contains(c)).collect();
+        if !unused.is_empty() {
+            return unused[h % unused.len()].to_string();
+        }
+        pool[h % pool.len()].to_string()
     }
 
     /// Scanner pushes a batch of sessions for one source.
@@ -431,7 +455,7 @@ impl SessionStore {
                 new_session.workers = Vec::new();
                 // Assign a deterministic character (by session id) if none set.
                 if new_session.character.is_none() {
-                    new_session.character = Some(self.pick_character(&new_session.source, &new_session.id));
+                    new_session.character = Some(self.pick_character(&new_session.source, &new_session.id, &store));
                 }
                 store.insert(session.id.clone(), new_session);
                 info!("[state] new session: {} ({})", session.name, session.id);
@@ -679,6 +703,34 @@ impl SessionStore {
                 info!("[state] character set: {} → {:?}", id, character);
             }
         }
+    }
+
+    /// Re-randomize all character assignments. Each session gets a fresh pick
+    /// from the pool, with dedup to maximize variety. Clears user overrides.
+    pub fn shuffle_characters(&self) {
+        let mut store = self.inner.lock().unwrap();
+        let ids: Vec<String> = store.keys().cloned().collect();
+        // Clear all existing assignments first (so dedup sees a clean slate).
+        for id in &ids {
+            if let Some(s) = store.get_mut(id) {
+                s.character = None;
+            }
+        }
+        // Re-assign with dedup awareness.
+        for id in &ids {
+            let (source, sid) = {
+                let s = &store[id];
+                (s.source.clone(), s.id.clone())
+            };
+            let char = self.pick_character(&source, &sid, &store);
+            if let Some(s) = store.get_mut(id) {
+                s.character = Some(char);
+            }
+        }
+        info!("[state] shuffled characters for {} sessions", ids.len());
+        // Emit state change so frontends re-sync with new characters.
+        drop(store); // release lock before emitting
+        self.emit_state_changed();
     }
 
     /// Remove test sessions.

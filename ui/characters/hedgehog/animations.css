@@ -1,0 +1,119 @@
+/* Hedgehog — spiky, waddles, curls up */
+
+@keyframes hedgehog-idle {
+  0%, 100% { transform: translateY(0) scaleX(1); }
+  30% { transform: translateY(-1px) scaleX(1.02); }
+  60% { transform: translateY(0) scaleX(0.98); }
+}
+
+@keyframes hedgehog-sniff {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(1px) rotate(2deg); }
+  40% { transform: translateX(-1px) rotate(-2deg); }
+  60% { transform: translateX(1px) rotate(1deg); }
+  80% { transform: translateX(0) rotate(0deg); }
+}
+
+@keyframes hedgehog-spike-bristle {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.15); }
+}
+
+@keyframes hedgehog-alert {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.1) scaleY(0.9); }
+  60% { transform: scale(0.95) scaleY(1.05); }
+}
+
+@keyframes hedgehog-curl {
+  0%, 100% { transform: scaleX(1.1) scaleY(0.9); }
+  50% { transform: scaleX(1.15) scaleY(0.85); }
+}
+
+@keyframes hedgehog-celebrate {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(8deg) scale(1.08); }
+  50% { transform: rotate(-8deg) scale(1.08); }
+  75% { transform: rotate(4deg) scale(1.04); }
+}
+
+@keyframes hedgehog-waddle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(-2px) rotate(3deg); }
+  40% { transform: translateY(0) rotate(0deg); }
+  60% { transform: translateY(-2px) rotate(-3deg); }
+  80% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes hedgehog-fade {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scaleX(1.2) scaleY(0.8); }
+  100% { opacity: 0; transform: scale(0.5); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="hedgehog"].char-slot-idle svg {
+  animation: hedgehog-idle 3s ease-in-out infinite;
+}
+
+[data-char="hedgehog"].char-slot-idle svg .nose {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hedgehog-sniff 2.5s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="hedgehog"].char-slot-active svg {
+  animation: hedgehog-sniff 2s ease-in-out infinite;
+}
+
+[data-char="hedgehog"].char-slot-active svg .spike {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: hedgehog-spike-bristle 1.5s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="hedgehog"].char-slot-alert svg {
+  animation: hedgehog-alert 0.8s ease-in-out infinite;
+}
+
+[data-char="hedgehog"].char-slot-alert svg .spike {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: hedgehog-spike-bristle 0.5s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="hedgehog"].char-slot-sleep svg {
+  animation: hedgehog-curl 5s ease-in-out infinite;
+  opacity: 0.45;
+}
+
+[data-char="hedgehog"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="hedgehog"].char-slot-celebrate svg {
+  animation: hedgehog-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="hedgehog"].char-slot-walk svg {
+  animation: hedgehog-waddle 1s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="hedgehog"].char-slot-fading svg {
+  animation: hedgehog-fade 5s ease-out forwards;
+}

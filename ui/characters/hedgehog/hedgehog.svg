@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <polygon class="spike" points="20,14 24,8 28,16" fill="#8B6914"/>
+  <polygon class="spike" points="28,10 32,2 36,12" fill="#A0782C"/>
+  <polygon class="spike" points="36,14 40,6 44,16" fill="#8B6914"/>
+  <polygon class="spike" points="14,22 10,14 20,20" fill="#A0782C"/>
+  <polygon class="spike" points="44,22 54,14 48,20" fill="#A0782C"/>
+  <ellipse class="body" cx="32" cy="38" rx="18" ry="14" fill="#D2A679" stroke="#B8895A" stroke-width="1"/>
+  <ellipse class="belly" cx="32" cy="40" rx="12" ry="10" fill="#F5DEB3" opacity="0.7"/>
+  <circle class="eye eye-left" cx="26" cy="36" r="2.5" fill="#2a1a0e"/>
+  <circle class="eye eye-right" cx="38" cy="36" r="2.5" fill="#2a1a0e"/>
+  <ellipse class="nose" cx="32" cy="40" rx="2" ry="1.5" fill="#5C3D1E"/>
+  <path class="mouth" d="M29 44 Q32 47 35 44" fill="none" stroke="#5C3D1E" stroke-width="1" stroke-linecap="round"/>
+  <ellipse cx="25" cy="51" rx="4" ry="2" fill="#B8895A"/>
+  <ellipse cx="39" cy="51" rx="4" ry="2" fill="#B8895A"/>
+</svg>

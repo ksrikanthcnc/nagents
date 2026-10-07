@@ -1,0 +1,124 @@
+/* Fish — glidy, swishy, tail flicks */
+
+@keyframes fish-swim {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(1deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(2px) rotate(-1deg); }
+}
+
+@keyframes fish-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.1); }
+}
+
+@keyframes fish-think {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(1px) translateY(-1px); }
+  75% { transform: translateX(-1px) translateY(1px); }
+}
+
+@keyframes fish-alert {
+  0%, 100% { transform: scale(1) translateX(0); filter: drop-shadow(0 0 3px rgba(255,112,67,0.3)); }
+  25% { transform: scale(1.05) translateX(2px); filter: drop-shadow(0 0 6px rgba(255,112,67,0.6)); }
+  75% { transform: scale(1.05) translateX(-2px); filter: drop-shadow(0 0 6px rgba(255,112,67,0.6)); }
+}
+
+@keyframes fish-sleep {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(2px) rotate(-2deg); }
+}
+
+@keyframes fish-celebrate {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  20% { transform: rotate(15deg) translateY(-4px); }
+  40% { transform: rotate(-10deg) translateY(0); }
+  60% { transform: rotate(8deg) translateY(-3px); }
+  80% { transform: rotate(-5deg) translateY(0); }
+}
+
+@keyframes fish-glide {
+  0%, 100% { transform: translateY(0) rotate(0deg) scaleX(1); }
+  25% { transform: translateY(-2px) rotate(2deg) scaleX(1.03); }
+  50% { transform: translateY(0) rotate(0deg) scaleX(0.98); }
+  75% { transform: translateY(2px) rotate(-2deg) scaleX(1.03); }
+}
+
+@keyframes fish-fade {
+  0% { opacity: 1; transform: scale(1) translateX(0); }
+  100% { opacity: 0; transform: scale(0.6) translateX(10px); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="fish"].char-slot-idle svg {
+  animation: fish-swim 3s ease-in-out infinite;
+}
+
+[data-char="fish"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fish-blink 4s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="fish"].char-slot-active svg {
+  animation: fish-think 2s ease-in-out infinite;
+}
+
+[data-char="fish"].char-slot-active svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fish-blink 3s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="fish"].char-slot-alert svg {
+  animation: fish-alert 0.7s ease-in-out infinite;
+}
+
+[data-char="fish"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.2);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="fish"].char-slot-sleep svg {
+  animation: fish-sleep 5s ease-in-out infinite;
+  filter: grayscale(0.5);
+  opacity: 0.4;
+}
+
+[data-char="fish"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="fish"].char-slot-celebrate svg {
+  animation: fish-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="fish"].char-slot-walk svg {
+  animation: fish-glide 0.8s ease-in-out infinite;
+}
+
+[data-char="fish"].char-slot-walk svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fish-blink 4s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="fish"].char-slot-fading svg {
+  animation: fish-fade 5s ease-out forwards;
+}

@@ -1,0 +1,110 @@
+/* Cactus — desert plant, sways gently, blooms */
+
+@keyframes cactus-idle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(1deg); }
+  75% { transform: rotate(-1deg); }
+}
+
+@keyframes cactus-bloom {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+@keyframes cactus-think {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  30% { transform: rotate(-2deg) scaleY(1.02); }
+  60% { transform: rotate(2deg) scaleY(0.98); }
+}
+
+@keyframes cactus-alert {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(107,175,107,0.3)); }
+  50% { transform: scale(1.06); filter: drop-shadow(0 0 8px rgba(107,175,107,0.8)); }
+}
+
+@keyframes cactus-sleep {
+  0%, 100% { transform: scaleY(0.97) translateY(1px); }
+  50% { transform: scaleY(0.95) translateY(2px); }
+}
+
+@keyframes cactus-celebrate {
+  0% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(5deg) scale(1.08); }
+  40% { transform: rotate(-5deg) scale(1.08); }
+  60% { transform: rotate(3deg) scale(1.04); }
+  80% { transform: rotate(-2deg) scale(1.02); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes cactus-walk {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(2deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(-2deg); }
+}
+
+@keyframes cactus-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.8) scaleY(0.6); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="cactus"].char-slot-idle svg {
+  animation: cactus-idle 4s ease-in-out infinite;
+}
+
+[data-char="cactus"].char-slot-idle svg .flower {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cactus-bloom 5s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="cactus"].char-slot-active svg {
+  animation: cactus-think 2s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="cactus"].char-slot-alert svg {
+  animation: cactus-alert 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="cactus"].char-slot-sleep svg {
+  animation: cactus-sleep 6s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+[data-char="cactus"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="cactus"].char-slot-celebrate svg {
+  animation: cactus-celebrate 1s ease-in-out;
+}
+
+[data-char="cactus"].char-slot-celebrate svg .flower {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cactus-bloom 0.5s ease-in-out 3;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="cactus"].char-slot-walk svg {
+  animation: cactus-walk 1.2s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="cactus"].char-slot-fading svg {
+  animation: cactus-fade 5s ease-out forwards;
+}

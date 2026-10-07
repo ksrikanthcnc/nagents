@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Top roll -->
+  <ellipse class="roll-top" cx="32" cy="10" rx="18" ry="5" fill="#D7CCC8" stroke="#A1887F" stroke-width="0.8"/>
+  <!-- Scroll body (parchment) -->
+  <rect class="body" x="14" y="10" width="36" height="40" rx="2" fill="#FFECB3" fill-opacity="0.9" stroke="#D7CCC8" stroke-width="1"/>
+  <!-- Bottom roll -->
+  <ellipse class="roll-bottom" cx="32" cy="50" rx="18" ry="5" fill="#D7CCC8" stroke="#A1887F" stroke-width="0.8"/>
+  <!-- Text lines decoration -->
+  <line x1="20" y1="22" x2="44" y2="22" stroke="#BCAAA4" stroke-width="1" opacity="0.5"/>
+  <line x1="20" y1="28" x2="40" y2="28" stroke="#BCAAA4" stroke-width="1" opacity="0.4"/>
+  <!-- Eyes -->
+  <circle class="eye eye-left" cx="26" cy="34" r="2.5" fill="#4E342E"/>
+  <circle class="eye eye-right" cx="38" cy="34" r="2.5" fill="#4E342E"/>
+  <!-- Smile -->
+  <path class="mouth" d="M28 40 Q32 43 36 40" fill="none" stroke="#4E342E" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,109 @@
+/* Koala — sleepy, slow, clings and dozes */
+
+@keyframes koala-idle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(1px) rotate(-1deg); }
+}
+
+@keyframes koala-blink {
+  0%, 85%, 100% { transform: scaleY(1); }
+  90% { transform: scaleY(0.1); }
+  95% { transform: scaleY(0.1); }
+}
+
+@keyframes koala-think {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-3deg); }
+  60% { transform: rotate(2deg); }
+}
+
+@keyframes koala-alert {
+  0%, 100% { transform: scale(1) translateY(0); }
+  40% { transform: scale(1.06) translateY(-3px); }
+  70% { transform: scale(0.97) translateY(0); }
+}
+
+@keyframes koala-sleep {
+  0%, 100% { transform: rotate(-5deg) translateY(0); }
+  50% { transform: rotate(5deg) translateY(2px); }
+}
+
+@keyframes koala-celebrate {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(6deg) scale(1.06); }
+  50% { transform: rotate(-6deg) scale(1.06); }
+  75% { transform: rotate(3deg) scale(1.03); }
+}
+
+@keyframes koala-walk {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(3deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(-3deg); }
+}
+
+@keyframes koala-fade {
+  0% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.7) rotate(-10deg); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="koala"].char-slot-idle svg {
+  animation: koala-idle 4s ease-in-out infinite;
+}
+
+[data-char="koala"].char-slot-idle svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: koala-blink 5s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="koala"].char-slot-active svg {
+  animation: koala-think 2.5s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="koala"].char-slot-alert svg {
+  animation: koala-alert 1s ease-in-out infinite;
+}
+
+[data-char="koala"].char-slot-alert svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.15);
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="koala"].char-slot-sleep svg {
+  animation: koala-sleep 6s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+[data-char="koala"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="koala"].char-slot-celebrate svg {
+  animation: koala-celebrate 1.2s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="koala"].char-slot-walk svg {
+  animation: koala-walk 1.2s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="koala"].char-slot-fading svg {
+  animation: koala-fade 5s ease-out forwards;
+}

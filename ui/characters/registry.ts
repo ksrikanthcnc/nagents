@@ -22,6 +22,43 @@ import { blob } from "./blob/manifest";
 import { wisp } from "./wisp/manifest";
 import { spark } from "./spark/manifest";
 import { orb } from "./orb/manifest";
+import { fox } from "./fox/manifest";
+import { penguin } from "./penguin/manifest";
+import { panda } from "./panda/manifest";
+import { bee } from "./bee/manifest";
+import { frog } from "./frog/manifest";
+import { snail } from "./snail/manifest";
+import { turtle } from "./turtle/manifest";
+import { fish } from "./fish/manifest";
+import { octopus } from "./octopus/manifest";
+import { dragon } from "./dragon/manifest";
+import { unicorn } from "./unicorn/manifest";
+import { bat } from "./bat/manifest";
+import { hedgehog } from "./hedgehog/manifest";
+import { hamster } from "./hamster/manifest";
+import { raccoon } from "./raccoon/manifest";
+import { koala } from "./koala/manifest";
+import { cactus } from "./cactus/manifest";
+import { sunflower } from "./sunflower/manifest";
+import { acorn } from "./acorn/manifest";
+import { leaf } from "./leaf/manifest";
+import { planet } from "./planet/manifest";
+import { moon } from "./moon/manifest";
+import { star } from "./star/manifest";
+import { comet } from "./comet/manifest";
+import { alien } from "./alien/manifest";
+import { ufo } from "./ufo/manifest";
+import { dna } from "./dna/manifest";
+import { atom } from "./atom/manifest";
+import { potion } from "./potion/manifest";
+import { scroll } from "./scroll/manifest";
+import { shield } from "./shield/manifest";
+import { diamond } from "./diamond/manifest";
+import { crown } from "./crown/manifest";
+import { heart } from "./heart/manifest";
+import { lightning } from "./lightning/manifest";
+import { raindrop } from "./raindrop/manifest";
+import { snowflake } from "./snowflake/manifest";
 
 // ─── Registry ───────────────────────────────────────────────────────────────
 
@@ -39,6 +76,43 @@ const CHARACTERS: CharacterDef[] = [
   wisp,
   spark,
   orb,
+  fox,
+  penguin,
+  panda,
+  bee,
+  frog,
+  snail,
+  turtle,
+  fish,
+  octopus,
+  dragon,
+  unicorn,
+  bat,
+  hedgehog,
+  hamster,
+  raccoon,
+  koala,
+  cactus,
+  sunflower,
+  acorn,
+  leaf,
+  planet,
+  moon,
+  star,
+  comet,
+  alien,
+  ufo,
+  dna,
+  atom,
+  potion,
+  scroll,
+  shield,
+  diamond,
+  crown,
+  heart,
+  lightning,
+  raindrop,
+  snowflake,
 ];
 
 const charMap = new Map<string, CharacterDef>(

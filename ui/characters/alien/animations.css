@@ -1,0 +1,71 @@
+/* Alien — floaty extraterrestrial vibes */
+
+@keyframes alien-hover {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes alien-scan {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(3deg) scale(1.02); }
+  75% { transform: rotate(-3deg) scale(1.02); }
+}
+
+@keyframes alien-zap {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  25% { transform: scale(1.1); filter: brightness(1.2); }
+  50% { transform: scale(0.95); filter: brightness(1); }
+  75% { transform: scale(1.08); filter: brightness(1.15); }
+}
+
+@keyframes alien-dormant {
+  0%, 100% { transform: translateY(0) scale(0.95); opacity: 0.35; }
+  50% { transform: translateY(1px) scale(0.93); opacity: 0.3; }
+}
+
+@keyframes alien-fade {
+  0% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.4) translateY(-15px); }
+}
+
+/* ─── idle ─── */
+[data-char="alien"].char-slot-idle svg {
+  animation: alien-hover 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+[data-char="alien"].char-slot-active svg {
+  animation: alien-scan 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+[data-char="alien"].char-slot-alert svg {
+  animation: alien-zap 0.6s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+[data-char="alien"].char-slot-sleep svg {
+  animation: alien-dormant 6s ease-in-out infinite;
+}
+
+/* ─── celebrate ─── */
+[data-char="alien"].char-slot-celebrate svg {
+  animation: alien-zap 0.4s ease-in-out 5;
+}
+
+/* ─── walk ─── */
+@keyframes alien-glide {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(2deg); }
+  50% { transform: translateY(-1px) rotate(0deg); }
+  75% { transform: translateY(-3px) rotate(-2deg); }
+}
+
+[data-char="alien"].char-slot-walk svg {
+  animation: alien-glide 1.5s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+[data-char="alien"].char-slot-fading svg {
+  animation: alien-fade 5s ease-out forwards;
+}

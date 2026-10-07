@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <ellipse class="body" cx="32" cy="34" rx="22" ry="16" fill="#4DB6AC" stroke="#00897B" stroke-width="1.2"/>
+  <path d="M22 28 L26 40" stroke="#00897B" stroke-width="1" opacity="0.5"/>
+  <path d="M32 26 L32 42" stroke="#00897B" stroke-width="1" opacity="0.5"/>
+  <path d="M42 28 L38 40" stroke="#00897B" stroke-width="1" opacity="0.5"/>
+  <path d="M18 34 L46 34" stroke="#00897B" stroke-width="1" opacity="0.5"/>
+  <ellipse class="head" cx="32" cy="16" rx="10" ry="8" fill="#81C784" stroke="#66BB6A" stroke-width="0.8"/>
+  <circle class="eye eye-left" cx="28" cy="14" r="2.5" fill="#1a1a1a"/>
+  <circle class="eye eye-right" cx="36" cy="14" r="2.5" fill="#1a1a1a"/>
+  <circle cx="29" cy="13" r="0.8" fill="white"/><circle cx="37" cy="13" r="0.8" fill="white"/>
+  <path class="mouth" d="M28 20 Q32 23 36 20" fill="none" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round"/>
+  <ellipse cx="14" cy="44" rx="5" ry="3" fill="#81C784" stroke="#66BB6A" stroke-width="0.5"/>
+  <ellipse cx="50" cy="44" rx="5" ry="3" fill="#81C784" stroke="#66BB6A" stroke-width="0.5"/>
+  <ellipse cx="18" cy="48" rx="4" ry="2.5" fill="#81C784"/><ellipse cx="46" cy="48" rx="4" ry="2.5" fill="#81C784"/>
+  <path d="M10 38 Q6 40 8 42" fill="none" stroke="#81C784" stroke-width="2" stroke-linecap="round"/>
+</svg>

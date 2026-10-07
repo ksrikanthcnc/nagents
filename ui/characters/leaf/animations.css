@@ -1,0 +1,75 @@
+/* Leaf — gentle swaying nature character */
+
+@keyframes leaf-sway {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(4deg); }
+  75% { transform: rotate(-4deg); }
+}
+
+@keyframes leaf-rustle {
+  0%, 100% { transform: rotate(0deg) scaleX(1); }
+  20% { transform: rotate(6deg) scaleX(0.95); }
+  40% { transform: rotate(-4deg) scaleX(1.02); }
+  60% { transform: rotate(5deg) scaleX(0.97); }
+  80% { transform: rotate(-3deg) scaleX(1); }
+}
+
+@keyframes leaf-flutter {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(8deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-2px) rotate(-6deg); }
+}
+
+@keyframes leaf-droop {
+  0%, 100% { transform: rotate(-5deg) scaleY(0.95); }
+  50% { transform: rotate(-7deg) scaleY(0.93); }
+}
+
+@keyframes leaf-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.5) rotate(30deg); }
+}
+
+/* ─── idle ─── */
+[data-char="leaf"].char-slot-idle svg {
+  animation: leaf-sway 3s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+[data-char="leaf"].char-slot-active svg {
+  animation: leaf-rustle 2s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+[data-char="leaf"].char-slot-alert svg {
+  animation: leaf-flutter 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+[data-char="leaf"].char-slot-sleep svg {
+  animation: leaf-droop 6s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+[data-char="leaf"].char-slot-celebrate svg {
+  animation: leaf-flutter 0.5s ease-in-out 4;
+}
+
+/* ─── walk ─── */
+@keyframes leaf-tumble {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(5deg); }
+  50% { transform: translateY(1px) rotate(0deg); }
+  75% { transform: translateY(-1px) rotate(-5deg); }
+}
+
+[data-char="leaf"].char-slot-walk svg {
+  animation: leaf-tumble 1.5s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+[data-char="leaf"].char-slot-fading svg {
+  animation: leaf-fade 5s ease-out forwards;
+}

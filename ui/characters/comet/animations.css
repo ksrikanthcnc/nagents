@@ -1,0 +1,74 @@
+/* Comet — blazing speed and trail */
+
+@keyframes comet-flicker {
+  0%, 100% { transform: translateX(0) scale(1); }
+  30% { transform: translateX(1px) scale(1.02); }
+  70% { transform: translateX(-1px) scale(0.98); }
+}
+
+@keyframes comet-shake {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  20% { transform: translateX(2px) translateY(-1px); }
+  40% { transform: translateX(-1px) translateY(1px); }
+  60% { transform: translateX(1px) translateY(-1px); }
+  80% { transform: translateX(-2px) translateY(0); }
+}
+
+@keyframes comet-burst {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.12); }
+  50% { transform: scale(0.95); }
+  75% { transform: scale(1.08); }
+}
+
+@keyframes comet-cool {
+  0%, 100% { transform: scale(0.95); opacity: 0.35; }
+  50% { transform: scale(0.93); opacity: 0.3; }
+}
+
+@keyframes comet-fade {
+  0% { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(20px) scale(0.4); }
+}
+
+/* ─── idle ─── */
+[data-char="comet"].char-slot-idle svg {
+  animation: comet-flicker 2.5s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+[data-char="comet"].char-slot-active svg {
+  animation: comet-shake 1.5s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+[data-char="comet"].char-slot-alert svg {
+  animation: comet-burst 0.6s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+[data-char="comet"].char-slot-sleep svg {
+  animation: comet-cool 6s ease-in-out infinite;
+}
+
+/* ─── celebrate ─── */
+[data-char="comet"].char-slot-celebrate svg {
+  animation: comet-burst 0.4s ease-in-out 5;
+}
+
+/* ─── walk ─── */
+@keyframes comet-streak {
+  0%, 100% { transform: translateX(0) translateY(0) rotate(0deg); }
+  25% { transform: translateX(3px) translateY(-2px) rotate(2deg); }
+  50% { transform: translateX(0) translateY(0) rotate(0deg); }
+  75% { transform: translateX(-2px) translateY(-1px) rotate(-2deg); }
+}
+
+[data-char="comet"].char-slot-walk svg {
+  animation: comet-streak 1.2s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+[data-char="comet"].char-slot-fading svg {
+  animation: comet-fade 5s ease-out forwards;
+}

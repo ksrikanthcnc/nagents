@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Moon body (crescent cutout effect) -->
+  <circle class="body" cx="32" cy="32" r="18" fill="#FFD54F" fill-opacity="0.85" stroke="#F9A825" stroke-width="1"/>
+  <!-- Shadow crescent -->
+  <circle cx="38" cy="28" r="14" fill="#FFF8E1" opacity="0.25"/>
+  <!-- Craters -->
+  <circle cx="24" cy="36" r="3" fill="#FFB300" opacity="0.3"/>
+  <circle cx="34" cy="42" r="2" fill="#FFB300" opacity="0.25"/>
+  <!-- Eyes -->
+  <circle class="eye" cx="26" cy="30" r="2.5" fill="#E65100"/>
+  <circle class="eye" cx="36" cy="30" r="2.5" fill="#E65100"/>
+</svg>

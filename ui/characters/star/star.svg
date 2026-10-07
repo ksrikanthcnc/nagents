@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <!-- Star body (5-point) -->
+  <polygon class="body" points="32,8 37,24 54,24 40,34 45,50 32,40 19,50 24,34 10,24 27,24"
+    fill="#FFCA28" fill-opacity="0.85" stroke="#F9A825" stroke-width="1"/>
+  <!-- Inner glow -->
+  <circle cx="32" cy="30" r="6" fill="white" opacity="0.15"/>
+  <!-- Eyes -->
+  <circle class="eye" cx="28" cy="30" r="2.5" fill="#E65100"/>
+  <circle class="eye" cx="36" cy="30" r="2.5" fill="#E65100"/>
+</svg>

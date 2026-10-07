@@ -1,0 +1,115 @@
+/* Hamster — chubby, nibbles, scurries */
+
+@keyframes hamster-idle {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  40% { transform: scaleX(1.03) scaleY(0.97); }
+  70% { transform: scaleX(0.98) scaleY(1.02); }
+}
+
+@keyframes hamster-nibble {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  15% { transform: translateY(-1px) rotate(2deg); }
+  30% { transform: translateY(0) rotate(0deg); }
+  45% { transform: translateY(-1px) rotate(-2deg); }
+  60% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes hamster-cheek-puff {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(1.12); }
+}
+
+@keyframes hamster-alert {
+  0%, 100% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-4px) scale(1.05); }
+  50% { transform: translateY(0) scale(0.95); }
+  75% { transform: translateY(-2px) scale(1.03); }
+}
+
+@keyframes hamster-sleep {
+  0%, 100% { transform: scaleX(1.08) scaleY(0.92) translateY(2px); }
+  50% { transform: scaleX(1.12) scaleY(0.88) translateY(3px); }
+}
+
+@keyframes hamster-celebrate {
+  0% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(10deg) scale(1.1); }
+  40% { transform: rotate(-10deg) scale(1.1); }
+  60% { transform: rotate(6deg) scale(1.05); }
+  80% { transform: rotate(-4deg) scale(1.02); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes hamster-scurry {
+  0%, 100% { transform: translateY(0) scaleX(1) rotate(0deg); }
+  15% { transform: translateY(-3px) scaleX(1.06) rotate(2deg); }
+  30% { transform: translateY(0) scaleX(0.96) rotate(0deg); }
+  50% { transform: translateY(-2px) scaleX(1.04) rotate(-2deg); }
+  70% { transform: translateY(0) scaleX(0.98) rotate(0deg); }
+}
+
+@keyframes hamster-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6) scaleX(1.3); }
+}
+
+/* ─── idle ───────────────────────────────────────────────────────────────── */
+
+[data-char="hamster"].char-slot-idle svg {
+  animation: hamster-idle 3s ease-in-out infinite;
+}
+
+[data-char="hamster"].char-slot-idle svg .cheek {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hamster-cheek-puff 4s ease-in-out infinite;
+}
+
+/* ─── active (think) ─────────────────────────────────────────────────────── */
+
+[data-char="hamster"].char-slot-active svg {
+  animation: hamster-nibble 1.5s ease-in-out infinite;
+}
+
+[data-char="hamster"].char-slot-active svg .cheek {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hamster-cheek-puff 1s ease-in-out infinite;
+}
+
+/* ─── alert ──────────────────────────────────────────────────────────────── */
+
+[data-char="hamster"].char-slot-alert svg {
+  animation: hamster-alert 0.8s ease-in-out infinite;
+}
+
+/* ─── sleep ──────────────────────────────────────────────────────────────── */
+
+[data-char="hamster"].char-slot-sleep svg {
+  animation: hamster-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+[data-char="hamster"].char-slot-sleep svg .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.1);
+}
+
+/* ─── celebrate ──────────────────────────────────────────────────────────── */
+
+[data-char="hamster"].char-slot-celebrate svg {
+  animation: hamster-celebrate 1.2s ease-in-out;
+}
+
+/* ─── walk ───────────────────────────────────────────────────────────────── */
+
+[data-char="hamster"].char-slot-walk svg {
+  animation: hamster-scurry 0.8s ease-in-out infinite;
+}
+
+/* ─── fading ─────────────────────────────────────────────────────────────── */
+
+[data-char="hamster"].char-slot-fading svg {
+  animation: hamster-fade 5s ease-out forwards;
+}

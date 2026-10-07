@@ -1,0 +1,87 @@
+/* Lightning — electric, zappy, jittery */
+
+@keyframes lightning-crackle {
+  0%, 100% { transform: translateX(0) scaleY(1); }
+  25% { transform: translateX(1px) scaleY(1.02); }
+  50% { transform: translateX(-1px) scaleY(0.98); }
+  75% { transform: translateX(1px) scaleY(1.01); }
+}
+
+@keyframes lightning-zap {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(2deg); }
+  40% { transform: rotate(-2deg); }
+  60% { transform: rotate(1deg); }
+  80% { transform: rotate(-1deg); }
+}
+
+@keyframes lightning-flash {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255,238,88,0.4)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 16px rgba(255,238,88,1)); transform: scale(1.1); }
+}
+
+@keyframes lightning-sleep {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  50% { transform: rotate(-2deg) scaleY(0.97); }
+}
+
+@keyframes lightning-bolt {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  25% { transform: translateY(-4px) translateX(2px); }
+  50% { transform: translateY(0) translateX(0); }
+  75% { transform: translateY(-4px) translateX(-2px); }
+}
+
+@keyframes lightning-celebrate {
+  0% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 4px rgba(255,238,88,0.4)); }
+  50% { transform: scale(1.15) rotate(5deg); filter: drop-shadow(0 0 16px rgba(255,238,88,1)); }
+  100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 4px rgba(255,238,88,0.4)); }
+}
+
+@keyframes lightning-fade {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* ─── idle ─── */
+
+[data-char="lightning"].char-slot-idle svg {
+  animation: lightning-crackle 2s ease-in-out infinite;
+}
+
+/* ─── active (think) ─── */
+
+[data-char="lightning"].char-slot-active svg {
+  animation: lightning-zap 1s ease-in-out infinite;
+}
+
+/* ─── alert ─── */
+
+[data-char="lightning"].char-slot-alert svg {
+  animation: lightning-flash 0.6s ease-in-out infinite;
+}
+
+/* ─── sleep ─── */
+
+[data-char="lightning"].char-slot-sleep svg {
+  animation: lightning-sleep 5s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+/* ─── celebrate ─── */
+
+[data-char="lightning"].char-slot-celebrate svg {
+  animation: lightning-celebrate 1s ease-in-out;
+}
+
+/* ─── walk ─── */
+
+[data-char="lightning"].char-slot-walk svg {
+  animation: lightning-bolt 0.6s ease-in-out infinite;
+}
+
+/* ─── fading ─── */
+
+[data-char="lightning"].char-slot-fading svg {
+  animation: lightning-fade 5s ease-out forwards;
+}

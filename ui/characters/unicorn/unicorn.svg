@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="ghost-body">
+  <polygon class="horn" points="32,4 28,18 36,18" fill="#FFD700" stroke="#DAA520" stroke-width="0.8"/>
+  <ellipse class="body" cx="32" cy="36" rx="16" ry="14" fill="#E8D5F5" stroke="#C9A8E8" stroke-width="1"/>
+  <polygon class="ear" points="20,22 16,14 24,20" fill="#E8D5F5" stroke="#C9A8E8" stroke-width="0.8"/>
+  <polygon class="ear" points="44,22 48,14 40,20" fill="#E8D5F5" stroke="#C9A8E8" stroke-width="0.8"/>
+  <path class="mane" d="M22 20 Q18 28 20 36" fill="none" stroke="#FF69B4" stroke-width="2" stroke-linecap="round"/>
+  <ellipse class="eye eye-left" cx="26" cy="34" rx="2.5" ry="3" fill="#4B0082"/>
+  <ellipse class="eye eye-right" cx="38" cy="34" rx="2.5" ry="3" fill="#4B0082"/>
+  <circle cx="27" cy="33" r="0.8" fill="white"/>
+  <circle cx="39" cy="33" r="0.8" fill="white"/>
+  <ellipse class="blush" cx="22" cy="39" rx="3" ry="1.5" fill="#FFB6C1" fill-opacity="0.5"/>
+  <ellipse class="blush" cx="42" cy="39" rx="3" ry="1.5" fill="#FFB6C1" fill-opacity="0.5"/>
+  <path class="mouth" d="M28 42 Q32 46 36 42" fill="none" stroke="#7B5EA7" stroke-width="1.2" stroke-linecap="round"/>
+</svg>
